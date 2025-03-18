@@ -27,26 +27,25 @@
 #include "tkl_video_in.h"
 #include "tkl_gpio.h"
 
-#define AUDIO_SAMPLE_RATE          16000
-#define SPK_SAMPLE_RATE            16000
-#define AUDIO_SAMPLE_BITS          16
-#define AUDIO_CHANNEL              1
+#define AUDIO_SAMPLE_RATE 16000
+#define SPK_SAMPLE_RATE   16000
+#define AUDIO_SAMPLE_BITS 16
+#define AUDIO_CHANNEL     1
 
-#define AUDIO_TTS_STREAM_BUFF_MAX_LEN    (1024 * 64)
-#define AUDIO_PCM_SLICE_BUFF_LEN   (320)
-#define AUDIO_PCM_SLICE_TIME       (AUDIO_PCM_SLICE_BUFF_LEN / 2 / (AUDIO_SAMPLE_RATE / 1000))
+#define AUDIO_TTS_STREAM_BUFF_MAX_LEN (1024 * 64)
+#define AUDIO_PCM_SLICE_BUFF_LEN      (320)
+#define AUDIO_PCM_SLICE_TIME          (AUDIO_PCM_SLICE_BUFF_LEN / 2 / (AUDIO_SAMPLE_RATE / 1000))
 
-#define SPEAKER_ENABLE_PIN  TUYA_GPIO_NUM_28
-#define AUDIO_TRIGGER_PIN   TUYA_GPIO_NUM_12
+#define SPEAKER_ENABLE_PIN TUYA_GPIO_NUM_28
+#define AUDIO_TRIGGER_PIN  TUYA_GPIO_NUM_12
 
-static TUYA_AUDIO_RECODER_HANDLE ty_ai_handle = NULL;
+static TUYA_AUDIO_RECORDER_HANDLE ty_ai_handle = NULL;
 
+#define SILENCE_THRESHOLD_HOLD_MODE 200
+#define ACTIVE_THRESHOLD_HOLD_MODE  200
+#define WAIT_STOP_PLAY_THRESHOLD    200
 
-#define SILENCE_THRESHOLD_HOLD_MODE         200
-#define ACTIVE_THRESHOLD_HOLD_MODE          200
-#define WAIT_STOP_PLAY_THRESHOLD            200
-
-static TUYA_AUDIO_RECODER_CONFIG_T cfg = {
+static TUYA_AUDIO_RECORDER_CONFIG_T cfg = {
     .sample_rate = TKL_AUDIO_SAMPLE_16K,
     .sample_bits = TKL_AUDIO_DATABITS_16,
     .channel = TKL_AUDIO_CHANNEL_MONO,
@@ -54,7 +53,7 @@ static TUYA_AUDIO_RECODER_CONFIG_T cfg = {
     .record_duration = 10000,
 };
 
-static TUYA_AUDIO_RECODER_THRESHOLD_T recoder_threshold_cfg = {
+static TUYA_AUDIO_RECORDER_THRESHOLD_T recorder_threshold_cfg = {
     .silence_threshold = SILENCE_THRESHOLD_HOLD_MODE,
     .active_threshold = ACTIVE_THRESHOLD_HOLD_MODE,
     .wait_stop_play_threshold = WAIT_STOP_PLAY_THRESHOLD,
@@ -62,7 +61,6 @@ static TUYA_AUDIO_RECODER_THRESHOLD_T recoder_threshold_cfg = {
 };
 
 static void app_proc_task(void *arg);
-
 
 static void _vi_init(void)
 {
@@ -85,7 +83,7 @@ static void _vi_init(void)
 
 static void _vi_deinit(void)
 {
-    tkl_vi_uninit(TKL_VI_CAMERA_TYPE_UVC);                                                                                                                                   
+    tkl_vi_uninit(TKL_VI_CAMERA_TYPE_UVC);
 }
 
 static BOOL_T audio_trigger_pin_is_pressed(void)
@@ -111,7 +109,7 @@ static int _audio_frame_put(TKL_AUDIO_FRAME_INFO_T *pframe)
     }
 
     if (is_press == TRUE && key_status_old != is_press) {
-        key_status_old = is_press;        
+        key_status_old = is_press;
         PR_DEBUG("audio trigger pin is pressed");
 
         // status check
@@ -125,48 +123,48 @@ static int _audio_frame_put(TKL_AUDIO_FRAME_INFO_T *pframe)
             return 0;
         }
 
-        if (recoder_threshold_cfg.frame_duration_ms == 0) {
+        if (recorder_threshold_cfg.frame_duration_ms == 0) {
             PR_DEBUG("frame_duration_ms is 0, first frame");
 
-            tuya_audio_recorde_stream_clear(ty_ai_handle);
+            tuya_audio_recorder_stream_clear(ty_ai_handle);
 
-            if(tuya_audio_player_is_playing()) {
+            if (tuya_audio_player_is_playing()) {
                 PR_DEBUG("t5 mp3 is playing, stop it...");
                 tuya_audio_player_stop();
             }
             state = IN_SILENCE;
         }
 
-        recoder_threshold_cfg.frame_duration_ms += AUDIO_PCM_SLICE_TIME;
+        recorder_threshold_cfg.frame_duration_ms += AUDIO_PCM_SLICE_TIME;
 
-        tuya_audio_recorde_stream_write(ty_ai_handle, pframe->pbuf, pframe->buf_size);
+        tuya_audio_recorder_stream_write(ty_ai_handle, pframe->pbuf, pframe->buf_size);
         ret = ty_ai_voice_stat_post(ty_ai_handle, IN_SILENCE);
 
-    } else if(is_press == TRUE && key_status_old == is_press) {
+    } else if (is_press == TRUE && key_status_old == is_press) {
         alert_flag = FALSE;
         if (state == IN_IDLE)
             return 0;
 
-        recoder_threshold_cfg.frame_duration_ms += AUDIO_PCM_SLICE_TIME;
+        recorder_threshold_cfg.frame_duration_ms += AUDIO_PCM_SLICE_TIME;
 
-        tuya_audio_recorde_stream_write(ty_ai_handle, pframe->pbuf, pframe->buf_size);
+        tuya_audio_recorder_stream_write(ty_ai_handle, pframe->pbuf, pframe->buf_size);
 
-        if (recoder_threshold_cfg.frame_duration_ms >= recoder_threshold_cfg.active_threshold) {
+        if (recorder_threshold_cfg.frame_duration_ms >= recorder_threshold_cfg.active_threshold) {
             if (state == IN_SILENCE) {
                 ret = ty_ai_voice_stat_post(ty_ai_handle, IN_START);
-                if(ret != OPRT_OK) {
+                if (ret != OPRT_OK) {
                     PR_ERR("record start failed %x", ret);
-                } 
+                }
                 state = IN_VOICE;
             } else if (state == IN_VOICE) {
                 ret = ty_ai_voice_stat_post(ty_ai_handle, IN_VOICE);
-                if(ret != OPRT_OK) {
+                if (ret != OPRT_OK) {
                     PR_ERR("record post failed %x", ret);
                 }
                 state = IN_STOP;
             }
         }
-    } else if(is_press == FALSE && key_status_old != is_press) {
+    } else if (is_press == FALSE && key_status_old != is_press) {
         alert_flag = FALSE;
         key_status_old = is_press;
         PR_DEBUG("audio trigger pin is released");
@@ -175,13 +173,13 @@ static int _audio_frame_put(TKL_AUDIO_FRAME_INFO_T *pframe)
 
         state = IN_IDLE;
 
-        recoder_threshold_cfg.frame_duration_ms = 0;
+        recorder_threshold_cfg.frame_duration_ms = 0;
 
         ret = ty_ai_voice_stat_post(ty_ai_handle, IN_STOP);
-        if(ret != OPRT_OK) {
+        if (ret != OPRT_OK) {
             PR_ERR("record stop failed %x", ret);
         }
-    } 
+    }
 
     return pframe->buf_size;
 }
@@ -203,12 +201,12 @@ static OPERATE_RET _audio_init(void)
 
     config.spk_sample = SPK_SAMPLE_RATE;
     config.spk_gpio = SPEAKER_ENABLE_PIN;
-    config.spk_gpio_polarity = TUYA_GPIO_LEVEL_LOW;    
+    config.spk_gpio_polarity = TUYA_GPIO_LEVEL_LOW;
     // open audio
     PR_NOTICE("tkl_ai_init...");
 
     _vi_init(); // FIXME: open uvc to avoid system suspend
-    
+
     ret = tkl_ai_init(&config, 0);
     if (ret != OPRT_OK) {
         PR_ERR("tkl_ai_init fail");
@@ -225,7 +223,7 @@ static OPERATE_RET _audio_init(void)
     // set mic volume
     tkl_ai_set_vol(TKL_AUDIO_TYPE_BOARD, 0, 100);
 
-    // set spk volume        
+    // set spk volume
     tuya_audio_player_set_volume(audio_volume_get());
 
     return OPRT_OK;
@@ -251,11 +249,7 @@ static OPERATE_RET ai_audio_trigger_pin_init(void)
     OPERATE_RET rt = OPRT_OK;
 
     // init gpio
-    TUYA_GPIO_BASE_CFG_T key_cfg = {
-        .mode = TUYA_GPIO_PULLUP,
-        .direct = TUYA_GPIO_INPUT,
-        .level = TUYA_GPIO_LEVEL_HIGH
-    };
+    TUYA_GPIO_BASE_CFG_T key_cfg = {.mode = TUYA_GPIO_PULLUP, .direct = TUYA_GPIO_INPUT, .level = TUYA_GPIO_LEVEL_HIGH};
     TUYA_CALL_ERR_LOG(tkl_gpio_init(AUDIO_TRIGGER_PIN, &key_cfg));
 
     return OPRT_OK;
@@ -299,6 +293,6 @@ OPERATE_RET tuya_ai_audio_init(void)
         PR_ERR("ai_audio_trigger_pin_init failed");
         return ret;
     }
-    
+
     return OPRT_OK;
 }

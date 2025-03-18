@@ -1,8 +1,8 @@
 #include "tal_api.h"
 #include "tuya_iot.h"
 
-#define RESET_NETCNT_NAME     "rst_cnt"
-#define RESET_NETCNT_MAX      3
+#define RESET_NETCNT_NAME "rst_cnt"
+#define RESET_NETCNT_MAX  3
 
 int reset_count_read(uint8_t *count)
 {

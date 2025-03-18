@@ -44,13 +44,13 @@ tuya_iot_client_t ai_client;
 #define VOLUME_KEY_NAME "VOLUME"
 #define DEFAULT_VOLUME  50
 
-#define DPID_VOLUME     3
+#define DPID_VOLUME 3
 
 /**
  * @brief user defined log output api, in this demo, it will use uart0 as log-tx
- * 
+ *
  * @param str log string
- * @return void 
+ * @return void
  */
 void user_log_output_cb(const char *str)
 {
@@ -59,12 +59,12 @@ void user_log_output_cb(const char *str)
 
 /**
  * @brief user defined upgrade notify callback, it will notify device a OTA request received
- * 
+ *
  * @param client device info
  * @param upgrade the upgrade request info
- * @return void 
+ * @return void
  */
-void user_upgrade_notify_on(tuya_iot_client_t* client, cJSON* upgrade)
+void user_upgrade_notify_on(tuya_iot_client_t *client, cJSON *upgrade)
 {
     PR_INFO("----- Upgrade information -----");
     PR_INFO("OTA Channel: %d", cJSON_GetObjectItem(upgrade, "type")->valueint);
@@ -79,22 +79,22 @@ void user_upgrade_notify_on(tuya_iot_client_t* client, cJSON* upgrade)
 OPERATE_RET audio_dp_obj_proc(dp_obj_recv_t *dpobj)
 {
     uint32_t index = 0;
-    for(index = 0; index < dpobj->dpscnt; index++) {
+    for (index = 0; index < dpobj->dpscnt; index++) {
         dp_obj_t *dp = dpobj->dps + index;
         PR_DEBUG("idx:%d dpid:%d type:%d ts:%u", index, dp->id, dp->type, dp->time_stamp);
 
         switch (dp->id) {
-            case DPID_VOLUME: {
-                uint8_t volume = dp->value.dp_value;
-                PR_DEBUG("volume:%d", volume);
-                audio_volume_set(volume);
-                tuya_audio_player_set_volume(volume);
-                break;
-            }
+        case DPID_VOLUME: {
+            uint8_t volume = dp->value.dp_value;
+            PR_DEBUG("volume:%d", volume);
+            audio_volume_set(volume);
+            tuya_audio_player_set_volume(volume);
+            break;
+        }
 
-            default: {
-                break;
-            }
+        default: {
+            break;
+        }
         }
     }
 
@@ -120,7 +120,7 @@ uint8_t audio_volume_get(void)
         PR_ERR("read volume failed");
         return DEFAULT_VOLUME;
     }
-    
+
     volue = *read_volue;
     TUYA_CALL_ERR_LOG(tal_kv_free(read_volue));
 
@@ -139,16 +139,15 @@ OPERATE_RET ai_audio_status_proc(void)
     dp_obj.value.dp_value = volume;
 
     return tuya_iot_dp_obj_report(client, client->activate.devid, &dp_obj, 1, 0);
-
 }
 /**
  * @brief user defined event handler
- * 
+ *
  * @param client device info
  * @param event the event info
- * @return void 
+ * @return void
  */
-void user_event_handler_on(tuya_iot_client_t* client, tuya_event_msg_t* event)
+void user_event_handler_on(tuya_iot_client_t *client, tuya_event_msg_t *event)
 {
     PR_DEBUG("Tuya Event ID:%d(%s)", event->id, EVENT_ID2STR(event->id));
     PR_INFO("Device Free heap %d", tal_system_get_free_heap_size());
@@ -174,7 +173,7 @@ void user_event_handler_on(tuya_iot_client_t* client, tuya_event_msg_t* event)
 
     /* RECV upgrade request */
     case TUYA_EVENT_UPGRADE_NOTIFY:
-        user_upgrade_notify_on(client, event->value.asJSON);   
+        user_upgrade_notify_on(client, event->value.asJSON);
         break;
 
     /* Sync time with tuya Cloud */
@@ -186,7 +185,7 @@ void user_event_handler_on(tuya_iot_client_t* client, tuya_event_msg_t* event)
     case TUYA_EVENT_RESET:
         PR_INFO("Device Reset:%d", event->value.asInteger);
         tal_event_publish(EVENT_RESET, NULL);
-        break;        
+        break;
 
     /* RECV OBJ DP */
     case TUYA_EVENT_DP_RECEIVE_OBJ: {
@@ -215,7 +214,7 @@ void user_event_handler_on(tuya_iot_client_t* client, tuya_event_msg_t* event)
         PR_DEBUG("dpid:%d type:RAW len:%d data:", dp->id, dp->len);
         for (index = 0; index < dp->len; index++) {
             PR_DEBUG_RAW("%02x", dp->data[index]);
-        }  
+        }
 
         tuya_iot_dp_raw_report(client, dpraw->devid, &dpraw->dp, 3);
 
@@ -227,17 +226,17 @@ void user_event_handler_on(tuya_iot_client_t* client, tuya_event_msg_t* event)
 }
 
 /**
- * @brief user defined network check callback, it will check the network every 1sec, 
+ * @brief user defined network check callback, it will check the network every 1sec,
  *        in this demo it alwasy return ture due to it's a wired demo
- * 
- * @return true 
- * @return false 
+ *
+ * @return true
+ * @return false
  */
 bool user_network_check(void)
 {
     netmgr_status_e status = NETMGR_LINK_DOWN;
     netmgr_conn_get(NETCONN_AUTO, NETCONN_CMD_STATUS, &status);
-    return status==NETMGR_LINK_DOWN?false:true;
+    return status == NETMGR_LINK_DOWN ? false : true;
 }
 
 void user_main(void)
@@ -245,9 +244,12 @@ void user_main(void)
     int ret = OPRT_OK;
 
     //! open iot development kit runtim init
-    cJSON_InitHooks(&(cJSON_Hooks){.malloc_fn = tal_malloc,.free_fn = tal_free});    
-    tal_log_init(TAL_LOG_LEVEL_DEBUG,  1024, (TAL_LOG_OUTPUT_CB)tkl_log_output);
-    tal_kv_init(&(tal_kv_cfg_t) {.seed = "vmlkasdh93dlvlcy", .key  = "dflfuap134ddlduq",});    
+    cJSON_InitHooks(&(cJSON_Hooks){.malloc_fn = tal_malloc, .free_fn = tal_free});
+    tal_log_init(TAL_LOG_LEVEL_DEBUG, 1024, (TAL_LOG_OUTPUT_CB)tkl_log_output);
+    tal_kv_init(&(tal_kv_cfg_t){
+        .seed = "vmlkasdh93dlvlcy",
+        .key = "dflfuap134ddlduq",
+    });
     tal_sw_timer_init();
     tal_workq_init();
 
@@ -263,15 +265,15 @@ void user_main(void)
     }
 
     /* Initialize Tuya device configuration */
-    ret = tuya_iot_init(&ai_client, &(const tuya_iot_config_t) {
-        .software_ver = PROJECT_VERSION,
-        .productkey = TUYA_PRODUCT_KEY,
-        .uuid = license.uuid,
-        .authkey = license.authkey,
-        // .firmware_key      = TUYA_DEVICE_FIRMWAREKEY,
-        .event_handler     = user_event_handler_on,
-        .network_check     = user_network_check,
-    });
+    ret = tuya_iot_init(&ai_client, &(const tuya_iot_config_t){
+                                        .software_ver = PROJECT_VERSION,
+                                        .productkey = TUYA_PRODUCT_KEY,
+                                        .uuid = license.uuid,
+                                        .authkey = license.authkey,
+                                        // .firmware_key      = TUYA_DEVICE_FIRMWAREKEY,
+                                        .event_handler = user_event_handler_on,
+                                        .network_check = user_network_check,
+                                    });
     assert(ret == OPRT_OK);
 
     // 初始化LWIP
@@ -286,16 +288,14 @@ void user_main(void)
 #endif
 #if defined(ENABLE_WIRED) && (ENABLE_WIRED == 1)
     type |= NETCONN_WIRED;
-#endif  
+#endif
     netmgr_init(type);
 #if defined(ENABLE_WIFI) && (ENABLE_WIFI == 1)
-    netmgr_conn_set(NETCONN_WIFI, 
-                    NETCONN_CMD_NETCFG, 
-                    &(netcfg_args_t) {.type = NETCFG_TUYA_BLE});
+    netmgr_conn_set(NETCONN_WIFI, NETCONN_CMD_NETCFG, &(netcfg_args_t){.type = NETCFG_TUYA_BLE});
 #endif
 
     PR_DEBUG("tuya_iot_init success");
-    
+
     ret = tuya_ai_audio_init();
     if (ret != OPRT_OK) {
         PR_ERR("tuya_audio_recorde_init failed");
@@ -315,10 +315,10 @@ void user_main(void)
 
 /**
  * @brief main
- * 
- * @param argc 
- * @param argv 
- * @return void 
+ *
+ * @param argc
+ * @param argv
+ * @return void
  */
 #if OPERATING_SYSTEM == SYSTEM_LINUX
 void main(int argc, char *argv[])
@@ -331,15 +331,15 @@ void main(int argc, char *argv[])
 static THREAD_HANDLE ty_app_thread = NULL;
 
 /**
-* @brief  task thread
-*
-* @param[in] arg:Parameters when creating a task
-* @return none
-*/
+ * @brief  task thread
+ *
+ * @param[in] arg:Parameters when creating a task
+ * @return none
+ */
 static void tuya_app_thread(void *arg)
 {
     user_main();
-    
+
     tal_thread_delete(ty_app_thread);
     ty_app_thread = NULL;
 }

@@ -31,7 +31,7 @@
 #include "wav_encode.h"
 
 typedef struct {
-    TUYA_AUDIO_RECODER_CONFIG_T config;
+    TUYA_AUDIO_RECORDER_CONFIG_T config;
     BOOL_T is_running;
     BOOL_T is_stop;
     TUYA_RINGBUFF_T stream_ringbuf;
@@ -39,34 +39,33 @@ typedef struct {
     QUEUE_HANDLE msg_queue;
     BOOL_T is_empty;
     char *curr_session_id;
-    BOOL_T curr_is_need_keep;   // Used for multi-round conversations, to distinguish skills in multi-round conversations
-    uint32_t stream_buf_size;   // Audio stream buffer size, in bytes
-    uint32_t upload_buf_size;   // Slice upload buffer size, in bytes, default is 100ms
+    BOOL_T curr_is_need_keep; // Used for multi-round conversations, to distinguish skills in multi-round conversations
+    uint32_t stream_buf_size; // Audio stream buffer size, in bytes
+    uint32_t upload_buf_size; // Slice upload buffer size, in bytes, default is 100ms
     uint8_t *read_buf;
     THREAD_HANDLE task_handle;
-} TUYA_AUDIO_RECODER_CONTEXT;
+} TUYA_AUDIO_RECORDER_CONTEXT;
 
 #ifndef AP_ASSERT_CHECK
-#define AP_ASSERT_CHECK(EXPR, MSG, ACTION)                                      \
-    if (!(EXPR)) {                                                              \
-        PR_ERR("ASSERT(%s) has assert failed at %s:%d %s:%s\n",                 \
-              #EXPR, __FILE__, __LINE__, __FUNCTION__, MSG);                    \
-        ACTION;                                                                 \
+#define AP_ASSERT_CHECK(EXPR, MSG, ACTION)                                                                             \
+    if (!(EXPR)) {                                                                                                     \
+        PR_ERR("ASSERT(%s) has assert failed at %s:%d %s:%s\n", #EXPR, __FILE__, __LINE__, __FUNCTION__, MSG);         \
+        ACTION;                                                                                                        \
     }
 #endif /* #ifndef AP_ASSERT_CHECK */
 
 #define PCM_STREAM_BUFF_MAX_LEN
 #ifndef TUYA_WS_REQUEST_ID_MAX_LEN
-#define TUYA_WS_REQUEST_ID_MAX_LEN       (64)
+#define TUYA_WS_REQUEST_ID_MAX_LEN (64)
 #endif
 
 static char s_tts_request_id[TUYA_WS_REQUEST_ID_MAX_LEN] = {0};
 static MUTEX_HANDLE s_mutex;
 static BOOL_T s_is_stop = TRUE;
-TUYA_AUDIO_RECODER_CONTEXT *s_ctx = NULL;
+TUYA_AUDIO_RECORDER_CONTEXT *s_ctx = NULL;
 
-static void _ai_proc_task(void* arg);
-static OPERATE_RET ty_ai_session_id_set(TUYA_AUDIO_RECODER_HANDLE handle, char *session_id);
+static void _ai_proc_task(void *arg);
+static OPERATE_RET ty_ai_session_id_set(TUYA_AUDIO_RECORDER_HANDLE handle, char *session_id);
 
 static void _request_id_update(char *request_id)
 {
@@ -78,7 +77,7 @@ static void _request_id_reset(void)
     memset(s_tts_request_id, 0, TUYA_WS_REQUEST_ID_MAX_LEN);
 }
 
-static char * _get_request_id(void)
+static char *_get_request_id(void)
 {
     return s_tts_request_id;
 }
@@ -116,7 +115,7 @@ static void __tuya_voice_play_tts(TUYA_VOICE_TTS_S *tts)
 
     tal_mutex_unlock(s_mutex);
 
-    return ;
+    return;
 }
 
 static void _tuya_voice_custom(char *type, cJSON *json)
@@ -129,7 +128,7 @@ static void _tuya_voice_custom(char *type, cJSON *json)
         tal_mutex_unlock(s_mutex);
         return;
     }
-    
+
     if (json) {
         char *data = cJSON_PrintUnformatted(json);
         PR_DEBUG("json: %s", data);
@@ -157,66 +156,66 @@ static void _tuya_voice_stream_player(TUYA_VOICE_STREAM_E type, uint8_t *data, i
     cur_request_id = _get_request_id();
     // send data to socket
     switch (type) {
-        case TUYA_VOICE_STREAM_START:
-            PR_DEBUG("tts start... requestid=%s", data);
-            if (strcmp(cur_request_id, data) != 0) {
-                PR_DEBUG("tts start, request id is not match");
-                break;
-            }
-            tuya_audio_player_start();
+    case TUYA_VOICE_STREAM_START:
+        PR_DEBUG("tts start... requestid=%s", data);
+        if (strcmp(cur_request_id, data) != 0) {
+            PR_DEBUG("tts start, request id is not match");
             break;
+        }
+        tuya_audio_player_start();
+        break;
 
-        case TUYA_VOICE_STREAM_DATA:
-            if (!cur_request_id || cur_request_id[0] == '\0') {
-                // PR_DEBUG("tts data, but no request id");
-                break;
-            }
+    case TUYA_VOICE_STREAM_DATA:
+        if (!cur_request_id || cur_request_id[0] == '\0') {
+            // PR_DEBUG("tts data, but no request id");
+            break;
+        }
 
-            PR_DEBUG("tts data... len=%d, used size=%d", len, tuya_audio_player_stream_get_size());
-            while (len > 0) {
-                ret = tuya_audio_player_stream_write((char *)data, len);
-                if (ret < 0) {
-                    PR_ERR("tkl_player_start_stream_write failed, ret=%d", ret);
-                    break;
-                }
-                if (ret == 0) {
-                    tal_system_sleep(10);
-                } else {
-                    len -= ret;
-                    data += ret;
-                }
-            }
-
+        PR_DEBUG("tts data... len=%d, used size=%d", len, tuya_audio_player_stream_get_size());
+        while (len > 0) {
+            ret = tuya_audio_player_stream_write((char *)data, len);
             if (ret < 0) {
-                // stream buffer error, drop all pending data
-                _request_id_reset(); // all pending data will be dropped
-            }
-            break;
-
-        case TUYA_VOICE_STREAM_STOP: {
-            if (!cur_request_id || cur_request_id[0] == '\0') {
-                PR_DEBUG("tts stop, but no request id");
+                PR_ERR("tkl_player_start_stream_write failed, ret=%d", ret);
                 break;
             }
-            PR_DEBUG("tts stop...");
-            tuya_audio_player_stream_write(NULL, 0);
-            _request_id_reset();
-            break;
-        }
-
-        case TUYA_VOICE_STREAM_ABORT: {
-            if (!cur_request_id || cur_request_id[0] == '\0') {
-                PR_DEBUG("tts abort, but no request id");
-                break;
+            if (ret == 0) {
+                tal_system_sleep(10);
+            } else {
+                len -= ret;
+                data += ret;
             }
-            PR_DEBUG("tts abort...");
-            tuya_audio_player_stop();
-            _request_id_reset();
-            break;
         }
 
-        default:
+        if (ret < 0) {
+            // stream buffer error, drop all pending data
+            _request_id_reset(); // all pending data will be dropped
+        }
+        break;
+
+    case TUYA_VOICE_STREAM_STOP: {
+        if (!cur_request_id || cur_request_id[0] == '\0') {
+            PR_DEBUG("tts stop, but no request id");
             break;
+        }
+        PR_DEBUG("tts stop...");
+        tuya_audio_player_stream_write(NULL, 0);
+        _request_id_reset();
+        break;
+    }
+
+    case TUYA_VOICE_STREAM_ABORT: {
+        if (!cur_request_id || cur_request_id[0] == '\0') {
+            PR_DEBUG("tts abort, but no request id");
+            break;
+        }
+        PR_DEBUG("tts abort...");
+        tuya_audio_player_stop();
+        _request_id_reset();
+        break;
+    }
+
+    default:
+        break;
     }
     tal_mutex_unlock(s_mutex);
     return;
@@ -255,8 +254,8 @@ static OPERATE_RET _tuya_player_init(void)
     OPERATE_RET rt = OPRT_OK;
 
     TUYA_VOICE_CBS_S voice_cbc = {0};
-    memset(&voice_cbc,0,sizeof(voice_cbc));
-    voice_cbc.tuya_voice_play_tts   = __tuya_voice_play_tts;
+    memset(&voice_cbc, 0, sizeof(voice_cbc));
+    voice_cbc.tuya_voice_play_tts = __tuya_voice_play_tts;
     voice_cbc.tuya_voice_custom = _tuya_voice_custom;
     voice_cbc.tuya_voice_tts_stream = _tuya_voice_stream_player;
     rt = tuya_voice_proto_init(&voice_cbc);
@@ -266,8 +265,10 @@ static OPERATE_RET _tuya_player_init(void)
     }
 
     // Subscribe to events
-    TUYA_CALL_ERR_RETURN(tal_event_subscribe(EVENT_MQTT_CONNECTED, "tts_player", _tuya_voice_register_extra_mqt_cb, SUBSCRIBE_TYPE_NORMAL));
-    TUYA_CALL_ERR_RETURN(tal_event_subscribe(EVENT_RESET,"tts_player", _tuya_voice_register_extra_reset_cb, SUBSCRIBE_TYPE_NORMAL));
+    TUYA_CALL_ERR_RETURN(tal_event_subscribe(EVENT_MQTT_CONNECTED, "tts_player", _tuya_voice_register_extra_mqt_cb,
+                                             SUBSCRIBE_TYPE_NORMAL));
+    TUYA_CALL_ERR_RETURN(
+        tal_event_subscribe(EVENT_RESET, "tts_player", _tuya_voice_register_extra_reset_cb, SUBSCRIBE_TYPE_NORMAL));
 
     PR_DEBUG("_tuya_player_init end");
     return rt;
@@ -341,24 +342,24 @@ error:
  *         OPRT_INVALID_PARM - Invalid parameter.
  *         OPRT_ERROR - An error occurred during start.
  */
-OPERATE_RET tuya_audio_recorder_start(TUYA_AUDIO_RECODER_HANDLE *handle, const TUYA_AUDIO_RECODER_CONFIG_T *cfg)
+OPERATE_RET tuya_audio_recorder_start(TUYA_AUDIO_RECORDER_HANDLE *handle, const TUYA_AUDIO_RECORDER_CONFIG_T *cfg)
 {
     OPERATE_RET rt = OPRT_OK;
-    TUYA_AUDIO_RECODER_CONTEXT *ctx = NULL;
+    TUYA_AUDIO_RECORDER_CONTEXT *ctx = NULL;
 
     PR_NOTICE("tuya_audio_recorder start...");
     if (cfg == NULL) {
         PR_ERR("invalid param");
         return OPRT_INVALID_PARM;
     }
-    
+
     tal_mutex_lock(s_mutex);
-    ctx = tkl_system_psram_malloc(sizeof(TUYA_AUDIO_RECODER_CONTEXT));
+    ctx = tkl_system_psram_malloc(sizeof(TUYA_AUDIO_RECORDER_CONTEXT));
     if (ctx == NULL) {
         PR_ERR("malloc failed");
         goto error;
     }
-    memset(ctx, 0, sizeof(TUYA_AUDIO_RECODER_CONTEXT));
+    memset(ctx, 0, sizeof(TUYA_AUDIO_RECORDER_CONTEXT));
     ctx->config = *cfg;
 
     // calc buffer size
@@ -371,12 +372,15 @@ OPERATE_RET tuya_audio_recorder_start(TUYA_AUDIO_RECODER_HANDLE *handle, const T
     }
 
     ctx->stream_buf_size = cfg->record_duration * cfg->sample_rate * cfg->sample_bits * cfg->channel / 8 / 1000;
-    TUYA_CALL_ERR_GOTO(tuya_ring_buff_create(ctx->stream_buf_size, OVERFLOW_PSRAM_STOP_TYPE, &ctx->stream_ringbuf), error);
+    TUYA_CALL_ERR_GOTO(tuya_ring_buff_create(ctx->stream_buf_size, OVERFLOW_PSRAM_STOP_TYPE, &ctx->stream_ringbuf),
+                       error);
     TUYA_CALL_ERR_GOTO(tal_mutex_create_init(&ctx->ringbuf_mutex), error);
     TUYA_CALL_ERR_GOTO(tal_queue_create_init(&ctx->msg_queue, sizeof(int), 8), error);
 
     ctx->is_running = TRUE;
-    TUYA_CALL_ERR_GOTO(tkl_thread_create_in_psram(&ctx->task_handle, "ai_proc_task", 1024 * 4 * 4, THREAD_PRIO_2, _ai_proc_task, ctx), error);
+    TUYA_CALL_ERR_GOTO(
+        tkl_thread_create_in_psram(&ctx->task_handle, "ai_proc_task", 1024 * 4 * 4, THREAD_PRIO_2, _ai_proc_task, ctx),
+        error);
     PR_NOTICE("ai_proc_task create success");
     s_ctx = *handle = ctx;
     s_is_stop = FALSE;
@@ -398,7 +402,7 @@ error:
  *
  * @param handle - A pointer to the Tuya Audio Recorder handle.
  */
-void tuya_audio_recorder_stop(TUYA_AUDIO_RECODER_HANDLE handle)
+void tuya_audio_recorder_stop(TUYA_AUDIO_RECORDER_HANDLE handle)
 {
     OPERATE_RET rt = OPRT_OK;
 
@@ -406,7 +410,7 @@ void tuya_audio_recorder_stop(TUYA_AUDIO_RECODER_HANDLE handle)
     tal_mutex_lock(s_mutex);
     _voice_tts_interrupt();
 
-    TUYA_AUDIO_RECODER_CONTEXT *ctx = (TUYA_AUDIO_RECODER_CONTEXT *)handle;
+    TUYA_AUDIO_RECORDER_CONTEXT *ctx = (TUYA_AUDIO_RECORDER_CONTEXT *)handle;
     if (ctx == NULL) {
         tal_mutex_unlock(s_mutex);
         return;
@@ -450,18 +454,16 @@ void tuya_audio_recorder_stop(TUYA_AUDIO_RECODER_HANDLE handle)
  * @return int - The number of bytes written to the audio stream.
  *         OPRT_COM_ERROR - An error occurred during writing.
  */
-int tuya_audio_recorde_stream_write(TUYA_AUDIO_RECODER_HANDLE handle, const char *buf, uint32_t len)
+int tuya_audio_recorder_stream_write(TUYA_AUDIO_RECORDER_HANDLE handle, const char *buf, uint32_t len)
 {
     int ret = 0, write_size = 0;
-    TUYA_AUDIO_RECODER_CONTEXT *ctx = (TUYA_AUDIO_RECODER_CONTEXT *)handle;
+    TUYA_AUDIO_RECORDER_CONTEXT *ctx = (TUYA_AUDIO_RECORDER_CONTEXT *)handle;
     tal_mutex_lock(ctx->ringbuf_mutex);
     ret = tuya_ring_buff_write(ctx->stream_ringbuf, buf, len);
     tal_mutex_unlock(ctx->ringbuf_mutex);
     if (ret != len) {
-        PR_ERR("tuya_ring_buff_write failed, ret=%d, used_size=%d, free_size=%d",
-                    ret,
-                    tuya_ring_buff_used_size_get(ctx->stream_ringbuf),
-                    tuya_ring_buff_free_size_get(ctx->stream_ringbuf));
+        PR_ERR("tuya_ring_buff_write failed, ret=%d, used_size=%d, free_size=%d", ret,
+               tuya_ring_buff_used_size_get(ctx->stream_ringbuf), tuya_ring_buff_free_size_get(ctx->stream_ringbuf));
         return OPRT_COM_ERROR;
     }
 
@@ -480,10 +482,10 @@ int tuya_audio_recorde_stream_write(TUYA_AUDIO_RECODER_HANDLE handle, const char
  * @return int - The number of bytes read from the audio stream.
  *         OPRT_COM_ERROR - An error occurred during reading.
  */
-int tuya_audio_recorde_stream_read(TUYA_AUDIO_RECODER_HANDLE handle, char *buf, uint32_t len)
+int tuya_audio_recorder_stream_read(TUYA_AUDIO_RECORDER_HANDLE handle, char *buf, uint32_t len)
 {
     int ret = 0, read_size = 0;
-    TUYA_AUDIO_RECODER_CONTEXT *ctx = (TUYA_AUDIO_RECODER_CONTEXT *)handle;
+    TUYA_AUDIO_RECORDER_CONTEXT *ctx = (TUYA_AUDIO_RECORDER_CONTEXT *)handle;
     tal_mutex_lock(ctx->ringbuf_mutex);
     ret = tuya_ring_buff_read(ctx->stream_ringbuf, buf, len);
     tal_mutex_unlock(ctx->ringbuf_mutex);
@@ -505,10 +507,10 @@ int tuya_audio_recorde_stream_read(TUYA_AUDIO_RECODER_HANDLE handle, char *buf, 
  * @return OPERATE_RET - The return code of the clear function.
  *         OPRT_OK - Success.
  */
-OPERATE_RET tuya_audio_recorde_stream_clear(TUYA_AUDIO_RECODER_HANDLE handle)
+OPERATE_RET tuya_audio_recorder_stream_clear(TUYA_AUDIO_RECORDER_HANDLE handle)
 {
     OPERATE_RET ret;
-    TUYA_AUDIO_RECODER_CONTEXT *ctx = (TUYA_AUDIO_RECODER_CONTEXT *)handle;
+    TUYA_AUDIO_RECORDER_CONTEXT *ctx = (TUYA_AUDIO_RECORDER_CONTEXT *)handle;
     tal_mutex_lock(ctx->ringbuf_mutex);
     ret = tuya_ring_buff_reset(ctx->stream_ringbuf);
     tal_mutex_unlock(ctx->ringbuf_mutex);
@@ -523,10 +525,10 @@ OPERATE_RET tuya_audio_recorde_stream_clear(TUYA_AUDIO_RECODER_HANDLE handle)
  * @param handle - A pointer to the Tuya Audio Recorder handle.
  * @return int - The size of the audio stream buffer in bytes.
  */
-int tuya_audio_recorde_stream_get_size(TUYA_AUDIO_RECODER_HANDLE handle)
+int tuya_audio_recorder_stream_get_size(TUYA_AUDIO_RECORDER_HANDLE handle)
 {
     int size = 0;
-    TUYA_AUDIO_RECODER_CONTEXT *ctx = (TUYA_AUDIO_RECODER_CONTEXT *)handle;
+    TUYA_AUDIO_RECORDER_CONTEXT *ctx = (TUYA_AUDIO_RECORDER_CONTEXT *)handle;
     tal_mutex_lock(ctx->ringbuf_mutex);
     size = tuya_ring_buff_used_size_get(ctx->stream_ringbuf);
     tal_mutex_unlock(ctx->ringbuf_mutex);
@@ -544,11 +546,11 @@ int tuya_audio_recorde_stream_get_size(TUYA_AUDIO_RECODER_HANDLE handle)
  *         OPRT_OK - Success.
  *         OPRT_COM_ERROR - An error occurred during posting.
  */
-OPERATE_RET ty_ai_voice_stat_post(TUYA_AUDIO_RECODER_HANDLE handle, TY_AI_VoiceState stat)
+OPERATE_RET ty_ai_voice_stat_post(TUYA_AUDIO_RECORDER_HANDLE handle, TY_AI_VoiceState stat)
 {
     OPERATE_RET ret = OPRT_OK;
     tal_mutex_lock(s_mutex);
-    TUYA_AUDIO_RECODER_CONTEXT *ctx = (TUYA_AUDIO_RECODER_CONTEXT *)handle;
+    TUYA_AUDIO_RECORDER_CONTEXT *ctx = (TUYA_AUDIO_RECORDER_CONTEXT *)handle;
     if (ctx == NULL) {
         tal_mutex_unlock(s_mutex);
         return OPRT_COM_ERROR;
@@ -558,10 +560,10 @@ OPERATE_RET ty_ai_voice_stat_post(TUYA_AUDIO_RECODER_HANDLE handle, TY_AI_VoiceS
     tal_mutex_unlock(s_mutex);
     return ret;
 }
-static OPERATE_RET ty_ai_voice_stat_fetch(TUYA_AUDIO_RECODER_HANDLE handle, TY_AI_VoiceState *stat, uint32_t timeout)
+static OPERATE_RET ty_ai_voice_stat_fetch(TUYA_AUDIO_RECORDER_HANDLE handle, TY_AI_VoiceState *stat, uint32_t timeout)
 {
     OPERATE_RET ret = OPRT_OK;
-    TUYA_AUDIO_RECODER_CONTEXT *ctx = (TUYA_AUDIO_RECODER_CONTEXT *)handle;
+    TUYA_AUDIO_RECORDER_CONTEXT *ctx = (TUYA_AUDIO_RECORDER_CONTEXT *)handle;
     if (ctx == NULL) {
         return OPRT_COM_ERROR;
     }
@@ -573,14 +575,14 @@ static OPERATE_RET ty_ai_voice_stat_fetch(TUYA_AUDIO_RECODER_HANDLE handle, TY_A
     *stat = msg;
     return OPRT_OK;
 }
-static BOOL_T ty_ai_voice_need_keep_session(TUYA_AUDIO_RECODER_HANDLE handle)
+static BOOL_T ty_ai_voice_need_keep_session(TUYA_AUDIO_RECORDER_HANDLE handle)
 {
-    TUYA_AUDIO_RECODER_CONTEXT *ctx = (TUYA_AUDIO_RECODER_CONTEXT *)handle;
+    TUYA_AUDIO_RECORDER_CONTEXT *ctx = (TUYA_AUDIO_RECORDER_CONTEXT *)handle;
     return ctx->curr_is_need_keep;
 }
-static char *ty_ai_gession_id_get(TUYA_AUDIO_RECODER_HANDLE handle)
+static char *ty_ai_get_session_id_get(TUYA_AUDIO_RECORDER_HANDLE handle)
 {
-    TUYA_AUDIO_RECODER_CONTEXT *ctx = (TUYA_AUDIO_RECODER_CONTEXT *)handle;
+    TUYA_AUDIO_RECORDER_CONTEXT *ctx = (TUYA_AUDIO_RECORDER_CONTEXT *)handle;
     if (ctx == NULL)
         return NULL;
 
@@ -588,9 +590,9 @@ static char *ty_ai_gession_id_get(TUYA_AUDIO_RECODER_HANDLE handle)
     return ctx->curr_session_id;
 }
 
-static OPERATE_RET ty_ai_session_id_set(TUYA_AUDIO_RECODER_HANDLE handle, char *session_id)
+static OPERATE_RET ty_ai_session_id_set(TUYA_AUDIO_RECORDER_HANDLE handle, char *session_id)
 {
-    TUYA_AUDIO_RECODER_CONTEXT *ctx = (TUYA_AUDIO_RECODER_CONTEXT *)handle;
+    TUYA_AUDIO_RECORDER_CONTEXT *ctx = (TUYA_AUDIO_RECORDER_CONTEXT *)handle;
     if (ctx == NULL) {
         return OPRT_COM_ERROR;
     }
@@ -609,7 +611,7 @@ static OPERATE_RET ty_ai_session_id_set(TUYA_AUDIO_RECODER_HANDLE handle, char *
     PR_DEBUG("%s: current session id [%s]", __func__, ctx->curr_session_id != NULL ? ctx->curr_session_id : "null");
     return OPRT_OK;
 }
-static OPERATE_RET _upoad_start(TUYA_AUDIO_RECODER_CONTEXT *ctx)
+static OPERATE_RET _upload_start(TUYA_AUDIO_RECORDER_CONTEXT *ctx)
 {
     OPERATE_RET rt = OPRT_OK;
 
@@ -642,7 +644,7 @@ static OPERATE_RET _upoad_start(TUYA_AUDIO_RECODER_CONTEXT *ctx)
         is_init = TRUE;
     }
 
-    session_id = ty_ai_gession_id_get(ctx);
+    session_id = ty_ai_get_session_id_get(ctx);
     if (session_id)
         strncpy(param.session_id, session_id, TUYA_WS_REQUEST_ID_MAX_LEN);
 
@@ -663,20 +665,20 @@ static OPERATE_RET _upoad_start(TUYA_AUDIO_RECODER_CONTEXT *ctx)
     return OPRT_OK;
 }
 
-static OPERATE_RET _upoad_proc(TUYA_AUDIO_RECODER_CONTEXT *ctx, BOOL_T need_force_upload)
+static OPERATE_RET _upload_proc(TUYA_AUDIO_RECORDER_CONTEXT *ctx, BOOL_T need_force_upload)
 {
     OPERATE_RET rt = OPRT_OK;
     int stream_size = 0;
     int read_size = 0;
 
-    stream_size = tuya_audio_recorde_stream_get_size(ctx);
+    stream_size = tuya_audio_recorder_stream_get_size(ctx);
     if (stream_size < ctx->upload_buf_size && !need_force_upload) {
         return OPRT_OK; // no enough data
     }
 
-    read_size = tuya_audio_recorde_stream_read(ctx, (char *)ctx->read_buf, ctx->upload_buf_size);
+    read_size = tuya_audio_recorder_stream_read(ctx, (char *)ctx->read_buf, ctx->upload_buf_size);
     if (read_size < 0) {
-        PR_ERR("tuya_audio_recorde_stream_read failed, ret=%d", read_size);
+        PR_ERR("tuya_audio_recorder_stream_read failed, ret=%d", read_size);
     }
 
 #if defined(TUYA_AUDIO_DEBUG) && (TUYA_AUDIO_DEBUG == 1)
@@ -689,15 +691,15 @@ static OPERATE_RET _upoad_proc(TUYA_AUDIO_RECODER_CONTEXT *ctx, BOOL_T need_forc
     return OPRT_OK;
 }
 
-static OPERATE_RET _upload_stop(TUYA_AUDIO_RECODER_CONTEXT *ctx, BOOL_T force_stop)
+static OPERATE_RET _upload_stop(TUYA_AUDIO_RECORDER_CONTEXT *ctx, BOOL_T force_stop)
 {
     OPERATE_RET ret = OPRT_OK;
     if (!force_stop) {
         // upload remain data
-        while (tuya_audio_recorde_stream_get_size(ctx) > 0) {
-            ret = _upoad_proc(ctx, TRUE);
+        while (tuya_audio_recorder_stream_get_size(ctx) > 0) {
+            ret = _upload_proc(ctx, TRUE);
             if (ret != OPRT_OK) {
-                PR_ERR("_upoad_proc failed, ret=%d", ret);
+                PR_ERR("_upload_proc failed, ret=%d", ret);
                 break;
             }
         }
@@ -715,10 +717,10 @@ static OPERATE_RET _upload_stop(TUYA_AUDIO_RECODER_CONTEXT *ctx, BOOL_T force_st
     return ret;
 }
 
-static void _ai_proc_task(void* arg)
+static void _ai_proc_task(void *arg)
 {
     OPERATE_RET ret = OPRT_OK;
-    TUYA_AUDIO_RECODER_CONTEXT *ctx = (TUYA_AUDIO_RECODER_CONTEXT *)arg;
+    TUYA_AUDIO_RECORDER_CONTEXT *ctx = (TUYA_AUDIO_RECORDER_CONTEXT *)arg;
 
     TY_AI_VoiceState stat = IN_SILENCE;
     PR_NOTICE("ai_proc start...");
@@ -735,7 +737,7 @@ static void _ai_proc_task(void* arg)
             PR_NOTICE("stat changed: %d->%d", stat, cur_stat);
             stat = cur_stat;
         }
-        switch(stat) {
+        switch (stat) {
         case IN_SILENCE:
             PR_NOTICE("voice silence...");
             _voice_tts_interrupt(); // stop current tts
@@ -744,11 +746,11 @@ static void _ai_proc_task(void* arg)
 
         case IN_START:
             PR_NOTICE("voice start...");
-            ret = _upoad_start(ctx);
+            ret = _upload_start(ctx);
             break;
 
         case IN_VOICE:
-            ret = _upoad_proc(ctx, FALSE);
+            ret = _upload_proc(ctx, FALSE);
             break;
 
         case IN_STOP:

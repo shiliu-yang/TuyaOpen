@@ -22,7 +22,7 @@
 
 #define TUYA_AUDIO_DEBUG_MAX_CONNECTIONS 4
 
-#define TCP_SERVER_IP "192.168.28.30"
+#define TCP_SERVER_IP   "192.168.28.30"
 #define TCP_SERVER_PORT 5055
 
 static TUYA_IP_ADDR_T server_ip;
@@ -217,7 +217,7 @@ static int tuya_audio_debug_tcp_send(int type, char *data, int len)
     if (type >= TUYA_AUDIO_DEBUG_MAX_CONNECTIONS || sock_fds[type] < 0) {
         return -1;
     }
-    
+
     int rt = 0;
     rt = tkl_net_send(sock_fds[type], data, len);
     if (rt < 0) {

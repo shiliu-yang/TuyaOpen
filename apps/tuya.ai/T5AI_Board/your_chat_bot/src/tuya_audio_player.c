@@ -26,9 +26,9 @@
 #include <driver/audio_ring_buff.h>
 #include <modules/mp3dec.h>
 
-#define TY_MP3_DECODER_MAIN_BUFF_SIZE       (MAINBUF_SIZE)
-#define PCM_SIZE_MAX		                (MAX_NSAMP * MAX_NCHAN * MAX_NGRAN * 2)
-#define MP3_STREAM_BUFF_MAX_LEN             (1024 * 64 * 2)
+#define TY_MP3_DECODER_MAIN_BUFF_SIZE (MAINBUF_SIZE)
+#define PCM_SIZE_MAX                  (MAX_NSAMP * MAX_NCHAN * MAX_NGRAN * 2)
+#define MP3_STREAM_BUFF_MAX_LEN       (1024 * 64 * 2)
 
 typedef struct {
     BOOL_T is_playing;
@@ -80,7 +80,8 @@ static int _mp3_find_id3(uint8_t *buf)
     memcpy(tag_header, buf, sizeof(tag_header));
 
     if (tag_header[0] == 'I' && tag_header[1] == 'D' && tag_header[2] == '3') {
-        tag_size = ((tag_header[6] & 0x7F) << 21) | ((tag_header[7] & 0x7F) << 14) | ((tag_header[8] & 0x7F) << 7) | (tag_header[9] & 0x7F);
+        tag_size = ((tag_header[6] & 0x7F) << 21) | ((tag_header[7] & 0x7F) << 14) | ((tag_header[8] & 0x7F) << 7) |
+                   (tag_header[9] & 0x7F);
         PR_DEBUG("ID3 tag_size = %d", tag_size);
         return tag_size + sizeof(tag_header);
     } else {
@@ -89,7 +90,7 @@ static int _mp3_find_id3(uint8_t *buf)
     }
 }
 
-static void _t5_mp3_play_task(void* arg)
+static void _t5_mp3_play_task(void *arg)
 {
     OPERATE_RET ret = OPRT_OK;
     MP3FrameInfo frame_info;
@@ -97,33 +98,33 @@ static void _t5_mp3_play_task(void* arg)
     TUYA_PLAYER_CONTEXT *ctx = (TUYA_PLAYER_CONTEXT *)arg;
     TUYA_PLAYER_STAT stat;
     int offset;
-    while(ctx->stat != TUYA_PLAYER_STAT_DESTROY) {
+    while (ctx->stat != TUYA_PLAYER_STAT_DESTROY) {
         // fetch play stat
         ret = _play_stat_fetch(&stat, ctx->is_playing ? 5 : 500);
         if (ret == OPRT_OK) {
             PR_DEBUG("t5 mp3 player task recv stat=%d", stat);
             switch (stat) {
-                case TUYA_PLAYER_STAT_IDLE:
-                    break;
-                case TUYA_PLAYER_STAT_PLAY:
-                    // TODO: post event
-                    break;
+            case TUYA_PLAYER_STAT_IDLE:
+                break;
+            case TUYA_PLAYER_STAT_PLAY:
+                // TODO: post event
+                break;
 
-                case TUYA_PLAYER_STAT_STOP:
-                    if (ctx->bytes_left > 0) {
-                        // clear ring buffer
-                        tkl_ao_clear_buffer(TKL_AUDIO_TYPE_BOARD, 0);
-                    }
-                    break;
+            case TUYA_PLAYER_STAT_STOP:
+                if (ctx->bytes_left > 0) {
+                    // clear ring buffer
+                    tkl_ao_clear_buffer(TKL_AUDIO_TYPE_BOARD, 0);
+                }
+                break;
 
-                case TUYA_PLAYER_STAT_PAUSE:
-                    break;
+            case TUYA_PLAYER_STAT_PAUSE:
+                break;
 
-                case TUYA_PLAYER_STAT_RESUME:
-                    break;
-                    
-                default:
-                    break;
+            case TUYA_PLAYER_STAT_RESUME:
+                break;
+
+            default:
+                break;
             }
         }
 
@@ -143,7 +144,8 @@ static void _t5_mp3_play_task(void* arg)
             }
 
             // read ring buffer from audio stream and decoce mp3 stream
-            ret = tuya_audio_player_stream_read((char *)ctx->read_buf + ctx->bytes_left, MAINBUF_SIZE - ctx->bytes_left);
+            ret =
+                tuya_audio_player_stream_read((char *)ctx->read_buf + ctx->bytes_left, MAINBUF_SIZE - ctx->bytes_left);
             if (ret < 0) {
                 PR_ERR("tuya_audio_player_stream_read failed, ret=%d", ret);
                 goto next_loop;
@@ -186,7 +188,8 @@ static void _t5_mp3_play_task(void* arg)
         int bytes_left = ctx->bytes_left;
         ret = MP3Decode(ctx->decoder, &ctx->read_ptr, &ctx->bytes_left, (short *)ctx->pcm_buf, 0);
         if (ret != ERR_MP3_NONE) {
-            PR_ERR("MP3Decode failed, ret=%d, offset=%d, bytes_left=%d, %d, read_size=%d", ret, offset, ctx->bytes_left, bytes_left, read_size);
+            PR_ERR("MP3Decode failed, ret=%d, offset=%d, bytes_left=%d, %d, read_size=%d", ret, offset, ctx->bytes_left,
+                   bytes_left, read_size);
             // reset bytes_left if no data is decoded
             if (bytes_left == ctx->bytes_left) {
                 ctx->bytes_left = 0;
@@ -199,11 +202,8 @@ static void _t5_mp3_play_task(void* arg)
 
         MP3GetLastFrameInfo(ctx->decoder, &frame_info);
         tal_mutex_unlock(ctx->mutex);
-        PR_TRACE("MP3 frame info: bitrate=%d, nChans=%d, samprate=%d, outputSamps=%d",
-                        frame_info.bitrate,
-                        frame_info.nChans,
-                        frame_info.samprate,
-                        frame_info.outputSamps);
+        PR_TRACE("MP3 frame info: bitrate=%d, nChans=%d, samprate=%d, outputSamps=%d", frame_info.bitrate,
+                 frame_info.nChans, frame_info.samprate, frame_info.outputSamps);
 
         TKL_AUDIO_FRAME_INFO_T frame;
         frame.pbuf = (char *)ctx->pcm_buf;
@@ -214,7 +214,7 @@ static void _t5_mp3_play_task(void* arg)
             continue;
         }
         continue;
-next_loop:
+    next_loop:
         tal_mutex_unlock(ctx->mutex);
     }
 
@@ -282,7 +282,6 @@ static OPERATE_RET _tuya_audio_player_destroy(void)
     return OPRT_OK;
 }
 
-
 static OPERATE_RET _tuya_audio_player_init(void)
 {
     OPERATE_RET rt = OPRT_OK;
@@ -300,7 +299,8 @@ static OPERATE_RET _tuya_audio_player_init(void)
     ctx->stat = TUYA_PLAYER_STAT_STOP;
 
     TUYA_CALL_ERR_GOTO(tal_queue_create_init(&ctx->msg_queue, sizeof(int), 8), error);
-    TUYA_CALL_ERR_GOTO(tuya_ring_buff_create(MP3_STREAM_BUFF_MAX_LEN, OVERFLOW_PSRAM_STOP_TYPE, &ctx->stream_ringbuf), error);
+    TUYA_CALL_ERR_GOTO(tuya_ring_buff_create(MP3_STREAM_BUFF_MAX_LEN, OVERFLOW_PSRAM_STOP_TYPE, &ctx->stream_ringbuf),
+                       error);
     TUYA_CALL_ERR_GOTO(tal_mutex_create_init(&ctx->mutex), error);
     TUYA_CALL_ERR_GOTO(tal_mutex_create_init(&ctx->ringbuf_mutex), error);
 
@@ -311,7 +311,9 @@ static OPERATE_RET _tuya_audio_player_init(void)
     }
 
     s_ctx = ctx;
-    TUYA_CALL_ERR_GOTO(tkl_thread_create_in_psram(&s_t5_player_hander, "tuya_audio_player", 1024 * 8, THREAD_PRIO_2, _t5_mp3_play_task, ctx), error);
+    TUYA_CALL_ERR_GOTO(tkl_thread_create_in_psram(&s_t5_player_hander, "tuya_audio_player", 1024 * 8, THREAD_PRIO_2,
+                                                  _t5_mp3_play_task, ctx),
+                       error);
     s_is_stop = FALSE;
     tal_mutex_unlock(s_mutex);
     PR_DEBUG("tuya_audio_player task create success");
@@ -340,7 +342,8 @@ OPERATE_RET tuya_audio_player_init(void)
     PR_DEBUG("t5 mp3 player init...");
 
     if (!is_init) {
-        MP3SetBuffMethodAlwaysFourAlignedAccess(mp3_private_alloc_psram, mp3_private_free_psram, mp3_private_memset_psram);
+        MP3SetBuffMethodAlwaysFourAlignedAccess(mp3_private_alloc_psram, mp3_private_free_psram,
+                                                mp3_private_memset_psram);
 
         TUYA_CALL_ERR_GOTO(tal_mutex_create_init(&s_mutex), error);
 
@@ -728,4 +731,3 @@ int tuya_audio_player_get_volume(void)
     }
     return vol;
 }
-
