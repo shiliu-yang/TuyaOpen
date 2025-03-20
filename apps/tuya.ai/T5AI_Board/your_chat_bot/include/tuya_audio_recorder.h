@@ -37,13 +37,19 @@ typedef struct {
 } TUYA_AUDIO_RECORDER_THRESHOLD_T;
 
 typedef enum {
-    IN_IDLE = 0,
-    IN_SILENCE,
-    IN_START,
-    IN_VOICE,
-    IN_STOP,
-    IN_RESUME,
-} TY_AI_VoiceState;
+    VOICE_STATE_IN_IDLE = 0,
+    VOICE_STATE_IN_SILENCE,
+    VOICE_STATE_IN_START,
+    VOICE_STATE_IN_VOICE,
+    VOICE_STATE_IN_STOP,
+    VOICE_STATE_IN_RESUME,
+} TUYA_AUDIO_VOICE_STATE;
+
+typedef enum {
+    TTS_STATE_STREAM_IDLE = 0,
+    TTS_STATE_STREAM_START,
+    TTS_STATE_STREAM_DATA,
+} TUYA_TTS_STATE;
 
 /**
  * @brief Initializes the Tuya Audio Recorder.
@@ -140,6 +146,6 @@ int tuya_audio_recorder_stream_get_size(TUYA_AUDIO_RECORDER_HANDLE handle);
  *         OPRT_OK - Success.
  *         OPRT_COM_ERROR - An error occurred during posting.
  */
-OPERATE_RET ty_ai_voice_stat_post(TUYA_AUDIO_RECORDER_HANDLE handle, TY_AI_VoiceState stat);
+OPERATE_RET ty_ai_voice_stat_post(TUYA_AUDIO_RECORDER_HANDLE handle, TUYA_AUDIO_VOICE_STATE stat);
 
 #endif /* __TUYA_AUDIO_RECORDER_H__ */

@@ -98,7 +98,7 @@ static int _audio_frame_put(TKL_AUDIO_FRAME_INFO_T *pframe)
     static BOOL_T key_status_old = FALSE;
     static BOOL_T alert_flag = FALSE;
     BOOL_T is_press = FALSE;
-    static TY_AI_VoiceState state = IN_IDLE;
+    static TUYA_AUDIO_VOICE_STATE state = VOICE_STATE_IN_IDLE;
     OPERATE_RET ret;
     tuya_iot_client_t *client = tuya_iot_client_get();
 
@@ -129,20 +129,20 @@ static int _audio_frame_put(TKL_AUDIO_FRAME_INFO_T *pframe)
             tuya_audio_recorder_stream_clear(ty_ai_handle);
 
             if (tuya_audio_player_is_playing()) {
-                PR_DEBUG("t5 mp3 is playing, stop it...");
+                PR_DEBUG("tuya audio is playing, stop it...");
                 tuya_audio_player_stop();
             }
-            state = IN_SILENCE;
+            state = VOICE_STATE_IN_SILENCE;
         }
 
         recorder_threshold_cfg.frame_duration_ms += AUDIO_PCM_SLICE_TIME;
 
         tuya_audio_recorder_stream_write(ty_ai_handle, pframe->pbuf, pframe->buf_size);
-        ret = ty_ai_voice_stat_post(ty_ai_handle, IN_SILENCE);
+        ret = ty_ai_voice_stat_post(ty_ai_handle, VOICE_STATE_IN_SILENCE);
 
     } else if (is_press == TRUE && key_status_old == is_press) {
         alert_flag = FALSE;
-        if (state == IN_IDLE)
+        if (state == VOICE_STATE_IN_IDLE)
             return 0;
 
         recorder_threshold_cfg.frame_duration_ms += AUDIO_PCM_SLICE_TIME;
@@ -150,32 +150,32 @@ static int _audio_frame_put(TKL_AUDIO_FRAME_INFO_T *pframe)
         tuya_audio_recorder_stream_write(ty_ai_handle, pframe->pbuf, pframe->buf_size);
 
         if (recorder_threshold_cfg.frame_duration_ms >= recorder_threshold_cfg.active_threshold) {
-            if (state == IN_SILENCE) {
-                ret = ty_ai_voice_stat_post(ty_ai_handle, IN_START);
+            if (state == VOICE_STATE_IN_SILENCE) {
+                ret = ty_ai_voice_stat_post(ty_ai_handle, VOICE_STATE_IN_START);
                 if (ret != OPRT_OK) {
                     PR_ERR("record start failed %x", ret);
                 }
-                state = IN_VOICE;
-            } else if (state == IN_VOICE) {
-                ret = ty_ai_voice_stat_post(ty_ai_handle, IN_VOICE);
+                state = VOICE_STATE_IN_VOICE;
+            } else if (state == VOICE_STATE_IN_VOICE) {
+                ret = ty_ai_voice_stat_post(ty_ai_handle, VOICE_STATE_IN_VOICE);
                 if (ret != OPRT_OK) {
                     PR_ERR("record post failed %x", ret);
                 }
-                state = IN_STOP;
+                state = VOICE_STATE_IN_STOP;
             }
         }
     } else if (is_press == FALSE && key_status_old != is_press) {
         alert_flag = FALSE;
         key_status_old = is_press;
         PR_DEBUG("audio trigger pin is released");
-        if (state == IN_IDLE)
+        if (state == VOICE_STATE_IN_IDLE)
             return;
 
-        state = IN_IDLE;
+        state = VOICE_STATE_IN_IDLE;
 
         recorder_threshold_cfg.frame_duration_ms = 0;
 
-        ret = ty_ai_voice_stat_post(ty_ai_handle, IN_STOP);
+        ret = ty_ai_voice_stat_post(ty_ai_handle, VOICE_STATE_IN_STOP);
         if (ret != OPRT_OK) {
             PR_ERR("record stop failed %x", ret);
         }

@@ -25,6 +25,7 @@ file(GLOB_RECURSE LIB_SRCS
 set(LIB_PUBLIC_INC ${MODULE_PATH}/protobuf/include)
 list(APPEND  LIB_PUBLIC_INC ${MODULE_PATH}/websocket_client/include)
 list(APPEND  LIB_PUBLIC_INC ${MODULE_PATH}/tuya_voice_protocol/include)
+list(APPEND  LIB_PUBLIC_INC ${MODULE_PATH}/tuya_voice_protocol/src)
 list(APPEND  LIB_PUBLIC_INC ${MODULE_PATH}/speaker_upload/include)
 list(APPEND  LIB_PUBLIC_INC ${MODULE_PATH}/codec_speex/include)
 list(APPEND  LIB_PUBLIC_INC ${MODULE_PATH}/codec_speex/src)

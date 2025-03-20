@@ -26,9 +26,9 @@
 #include <driver/audio_ring_buff.h>
 #include <modules/mp3dec.h>
 
-#define TY_MP3_DECODER_MAIN_BUFF_SIZE (MAINBUF_SIZE)
-#define PCM_SIZE_MAX                  (MAX_NSAMP * MAX_NCHAN * MAX_NGRAN * 2)
-#define MP3_STREAM_BUFF_MAX_LEN       (1024 * 64 * 2)
+#define TY_MP3_DECODER_MAVOICE_STATE_IN_BUFF_SIZE (MAINBUF_SIZE)
+#define PCM_SIZE_MAX                              (MAX_NSAMP * MAX_NCHAN * MAX_NGRAN * 2)
+#define MP3_STREAM_BUFF_MAX_LEN                   (1024 * 64 * 2)
 
 typedef struct {
     BOOL_T is_playing;
@@ -102,7 +102,7 @@ static void _t5_mp3_play_task(void *arg)
         // fetch play stat
         ret = _play_stat_fetch(&stat, ctx->is_playing ? 5 : 500);
         if (ret == OPRT_OK) {
-            PR_DEBUG("t5 mp3 player task recv stat=%d", stat);
+            PR_DEBUG("tuya audio player task recv stat=%d", stat);
             switch (stat) {
             case TUYA_PLAYER_STAT_IDLE:
                 break;
@@ -154,7 +154,7 @@ static void _t5_mp3_play_task(void *arg)
                 if (ctx->is_eof) {
                     ctx->is_eof = FALSE;
                     tuya_audio_player_stop();
-                    PR_DEBUG("t5 mp3 player play end");
+                    PR_DEBUG("tuya audio player play end");
                 }
                 goto next_loop;
             }
@@ -218,7 +218,7 @@ static void _t5_mp3_play_task(void *arg)
         tal_mutex_unlock(ctx->mutex);
     }
 
-    PR_NOTICE("t5 mp3 player task exit");
+    PR_NOTICE("tuya audio player task exit");
     ctx->is_task_stop = TRUE;
     tkl_thread_release(s_t5_player_hander);
 }
@@ -242,7 +242,7 @@ static OPERATE_RET _tuya_audio_player_destroy(void)
 {
     TUYA_PLAYER_CONTEXT *ctx = s_ctx;
 
-    PR_NOTICE("t5 mp3 player destroy...");
+    PR_NOTICE("tuya audio player destroy...");
     tal_mutex_lock(s_mutex);
     if (s_t5_player_hander) {
         // tal_mutex_lock(ctx->mutex);
@@ -278,7 +278,7 @@ static OPERATE_RET _tuya_audio_player_destroy(void)
     s_ctx = NULL;
     s_is_stop = TRUE;
     tal_mutex_unlock(s_mutex);
-    PR_NOTICE("t5 mp3 player destroy success");
+    PR_NOTICE("tuya audio player destroy success");
     return OPRT_OK;
 }
 
@@ -287,11 +287,11 @@ static OPERATE_RET _tuya_audio_player_init(void)
     OPERATE_RET rt = OPRT_OK;
     TUYA_PLAYER_CONTEXT *ctx;
 
-    PR_DEBUG("t5 mp3 player start...");
+    PR_DEBUG("tuya audio player start...");
     tal_mutex_lock(s_mutex);
     ctx = tkl_system_psram_malloc(sizeof(TUYA_PLAYER_CONTEXT));
     if (ctx == NULL) {
-        PR_ERR("t5 ctx malloc failed");
+        PR_ERR("tuya player ctx malloc failed");
         goto error;
     }
     memset(ctx, 0, sizeof(TUYA_PLAYER_CONTEXT));
@@ -339,7 +339,7 @@ OPERATE_RET tuya_audio_player_init(void)
     OPERATE_RET rt = OPRT_OK;
     static BOOL_T is_init = FALSE;
 
-    PR_DEBUG("t5 mp3 player init...");
+    PR_DEBUG("tuya audio player init...");
 
     if (!is_init) {
         MP3SetBuffMethodAlwaysFourAlignedAccess(mp3_private_alloc_psram, mp3_private_free_psram,
@@ -353,7 +353,7 @@ OPERATE_RET tuya_audio_player_init(void)
 
     rt = _tuya_audio_player_init();
     if (rt != OPRT_OK) {
-        PR_ERR("t5 mp3 player init failed");
+        PR_ERR("tuya audio player init failed");
         _tuya_audio_player_destroy();
         return rt;
     }
@@ -398,7 +398,7 @@ int tuya_audio_player_stream_write(char *buf, uint32_t len)
         return OPRT_COM_ERROR;
     }
     if (ctx == NULL) {
-        PR_ERR("t5 player ctx is NULL");
+        PR_ERR("tuya audio ctx is NULL");
         return OPRT_COM_ERROR;
     }
     tal_mutex_lock(ctx->mutex);
@@ -509,16 +509,16 @@ OPERATE_RET tuya_audio_player_play_raw(char *data, uint32_t len)
     OPERATE_RET ret = OPRT_OK;
     TUYA_PLAYER_CONTEXT *ctx = s_ctx;
     if (ctx == NULL) {
-        PR_ERR("t5 player ctx is NULL");
+        PR_ERR("tuya audio ctx is NULL");
         return OPRT_COM_ERROR;
     }
     if (tuya_audio_player_is_playing()) {
-        PR_DEBUG("t5 player is playing, stop it first");
+        PR_DEBUG("tuya audio is playing, stop it first");
         // stop current playing
         tuya_audio_player_stop();
         tuya_audio_player_start();
     } else {
-        PR_DEBUG("t5 player is not playing, start it");
+        PR_DEBUG("tuya audio is not playing, start it");
         tuya_audio_player_start();
     }
     // start play
@@ -552,14 +552,14 @@ OPERATE_RET tuya_audio_player_play_alert(AUDIO_ALART_TYPE type, BOOL_T send_eof)
 {
     OPERATE_RET ret = OPRT_OK;
 
-    PR_DEBUG("t5 player play alert type=%d", type);
+    PR_DEBUG("tuya audio play alert type=%d", type);
     tal_mutex_lock(s_mutex);
     if (s_is_stop) {
         tal_mutex_unlock(s_mutex);
         return OPRT_COM_ERROR;
     }
     if (s_ctx == NULL) {
-        PR_ERR("t5 player ctx is NULL");
+        PR_ERR("tuya audio ctx is NULL");
         return OPRT_COM_ERROR;
     }
     switch (type) {
@@ -611,11 +611,11 @@ OPERATE_RET tuya_audio_player_start(void)
 {
     TUYA_PLAYER_CONTEXT *ctx = s_ctx;
     if (ctx == NULL) {
-        PR_ERR("t5 player ctx is NULL");
+        PR_ERR("tuya audio ctx is NULL");
         return OPRT_COM_ERROR;
     }
     if (ctx->is_playing) {
-        PR_DEBUG("t5 player is playing...........");
+        PR_DEBUG("tuya audio is playing...........");
     }
     tal_mutex_lock(ctx->mutex);
     // FIXME: clear mp3 decoder
@@ -643,7 +643,7 @@ OPERATE_RET tuya_audio_player_start(void)
     _play_stat_post(TUYA_PLAYER_STAT_PLAY);
     tal_event_publish(EVENT_TUYA_PLAYER, &ctx->stat);
     tal_mutex_unlock(ctx->mutex);
-    PR_NOTICE("t5 player start");
+    PR_NOTICE("tuya audio start");
     return OPRT_OK;
 }
 
@@ -659,7 +659,7 @@ OPERATE_RET tuya_audio_player_stop(void)
 {
     TUYA_PLAYER_CONTEXT *ctx = s_ctx;
     if (ctx == NULL) {
-        PR_ERR("t5 player ctx is NULL");
+        PR_ERR("tuya audio ctx is NULL");
         return OPRT_COM_ERROR;
     }
     tal_mutex_lock(ctx->mutex);
@@ -672,7 +672,7 @@ OPERATE_RET tuya_audio_player_stop(void)
     _play_stat_post(TUYA_PLAYER_STAT_STOP);
     tal_event_publish(EVENT_TUYA_PLAYER, &ctx->stat);
     tal_mutex_unlock(ctx->mutex);
-    PR_NOTICE("t5 player stop");
+    PR_NOTICE("tuya audio stop");
     return OPRT_OK;
 }
 
@@ -687,7 +687,7 @@ BOOL_T tuya_audio_player_is_playing(void)
 {
     TUYA_PLAYER_CONTEXT *ctx = s_ctx;
     if (ctx == NULL) {
-        PR_ERR("t5 player ctx is NULL");
+        PR_ERR("tuya audio ctx is NULL");
         return FALSE;
     }
     return ctx->is_playing;

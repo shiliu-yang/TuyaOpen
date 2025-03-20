@@ -32,64 +32,63 @@ extern "C" {
 
 #ifndef SAFE_MALLOC_ERR_GOTO
 
-#define SAFE_MALLOC_ERR_GOTO(_ptr, _size, _label)\
-do{\
-    if (NULL == ((_ptr) = Malloc((_size)))){\
-        PR_ERR("Malloc err.");\
-        rt = OPRT_MALLOC_FAILED;\
-        goto _label;\
-    }\
-    memset((_ptr), 0, (_size));\
-}while(0)
+#define SAFE_MALLOC_ERR_GOTO(_ptr, _size, _label)                                                                      \
+    do {                                                                                                               \
+        if (NULL == ((_ptr) = Malloc((_size)))) {                                                                      \
+            PR_ERR("Malloc err.");                                                                                     \
+            rt = OPRT_MALLOC_FAILED;                                                                                   \
+            goto _label;                                                                                               \
+        }                                                                                                              \
+        memset((_ptr), 0, (_size));                                                                                    \
+    } while (0)
 #endif
 
 #ifndef SAFE_MALLOC_ERR_RET
 
-#define SAFE_MALLOC_ERR_RET(_ptr, _size)\
-do{\
-    if (NULL == ((_ptr) = Malloc((_size)))){\
-        PR_ERR("Malloc err.");\
-        return OPRT_MALLOC_FAILED;\
-    }\
-    memset((_ptr), 0, (_size));\
-}while(0)
+#define SAFE_MALLOC_ERR_RET(_ptr, _size)                                                                               \
+    do {                                                                                                               \
+        if (NULL == ((_ptr) = Malloc((_size)))) {                                                                      \
+            PR_ERR("Malloc err.");                                                                                     \
+            return OPRT_MALLOC_FAILED;                                                                                 \
+        }                                                                                                              \
+        memset((_ptr), 0, (_size));                                                                                    \
+    } while (0)
 #endif
 
 #ifndef SAFE_MALLOC
 
-#define SAFE_MALLOC(_ptr, _size)\
-do{\
-    if (NULL == ((_ptr) = Malloc((_size)))){\
-        PR_ERR("Malloc err.");\
-    } else {\
-        memset((_ptr), 0, (_size));\
-    }\
-}while(0)
+#define SAFE_MALLOC(_ptr, _size)                                                                                       \
+    do {                                                                                                               \
+        if (NULL == ((_ptr) = Malloc((_size)))) {                                                                      \
+            PR_ERR("Malloc err.");                                                                                     \
+        } else {                                                                                                       \
+            memset((_ptr), 0, (_size));                                                                                \
+        }                                                                                                              \
+    } while (0)
 #endif
 
 #ifndef SAFE_FREE
 
-#define SAFE_FREE(_ptr)\
-do{\
-    if(NULL != (_ptr)){\
-        Free((_ptr));\
-        (_ptr) = NULL;\
-    }else{\
-        PR_TRACE("Pointer is null,do not free again.");\
-    }\
-}while(0)
+#define SAFE_FREE(_ptr)                                                                                                \
+    do {                                                                                                               \
+        if (NULL != (_ptr)) {                                                                                          \
+            Free((_ptr));                                                                                              \
+            (_ptr) = NULL;                                                                                             \
+        } else {                                                                                                       \
+            PR_TRACE("Pointer is null,do not free again.");                                                            \
+        }                                                                                                              \
+    } while (0)
 #endif
 
 #ifndef TY_GW_CHECK_NULL_RETURN_VOID
-#define TY_GW_CHECK_NULL_RETURN_VOID(x)\
-do {\
-    if (NULL == (x)) {\
-        PR_ERR("%s is null!", #x);\
-        return;\
-    }\
-} while (0)
+#define TY_GW_CHECK_NULL_RETURN_VOID(x)                                                                                \
+    do {                                                                                                               \
+        if (NULL == (x)) {                                                                                             \
+            PR_ERR("%s is null!", #x);                                                                                 \
+            return;                                                                                                    \
+        }                                                                                                              \
+    } while (0)
 #endif
-
 
 typedef enum {
     TUYA_VOICE_HTTP_GET,
@@ -99,7 +98,7 @@ typedef enum {
 } TUYA_VOICE_HTTP_METHOD_E;
 
 typedef enum {
-    TUYA_VOICE_TASK_NORMAL = 0,     //music story ...
+    TUYA_VOICE_TASK_NORMAL = 0, // music story ...
     TUYA_VOICE_TASK_CLOCK = 1,
     TUYA_VOICE_TASK_ALERT = 2,
     TUYA_VOICE_TASK_RING_TONE = 3,
@@ -115,7 +114,7 @@ typedef enum {
     TUYA_VOICE_AUDIO_FORMAT_AAC = 3,
     TUYA_VOICE_AUDIO_FORMAT_AMR = 4,
     TUYA_VOICE_AUDIO_FORMAT_M4A = 5,
-    TUYA_VOICE_AUDIO_FORMAT_PCM = 6,             //for speaker stream data play
+    TUYA_VOICE_AUDIO_FORMAT_PCM = 6, // for speaker stream data play
     TUYA_VOICE_AUDIO_FORMAT_OPUS = 7,
     TUYA_VOICE_AUDIO_FORMAT_FLAC = 8,
     TUYA_VOICE_AUDIO_FORMAT_M3U8 = 9,
@@ -125,10 +124,10 @@ typedef enum {
 } TUYA_VOICE_AUDIO_FORMAT_E;
 
 typedef enum {
-    TUYA_VOICE_CODE_CLOUD_SENT_COMMAND,            //Cloud sent command correctly, controlled device returned status normally
-    TUYA_VOICE_CODE_CLOUD_NOT_SENT_COMMAND,        //Cloud recognized command but did not send it
-    TUYA_VOICE_CODE_CLOUD_NOT_IDENTIFY,            //Voice not recognized
-    TUYA_VOICE_CODE_CLOUD_DEVICE_NOT_RESPONSE,     //Cloud sent command but controlled device did not return status
+    TUYA_VOICE_CODE_CLOUD_SENT_COMMAND,     // Cloud sent command correctly, controlled device returned status normally
+    TUYA_VOICE_CODE_CLOUD_NOT_SENT_COMMAND, // Cloud recognized command but did not send it
+    TUYA_VOICE_CODE_CLOUD_NOT_IDENTIFY,     // Voice not recognized
+    TUYA_VOICE_CODE_CLOUD_DEVICE_NOT_RESPONSE, // Cloud sent command but controlled device did not return status
 } TUYA_VOICE_PROCESS_CODE_E;
 
 typedef enum {
@@ -160,47 +159,47 @@ typedef enum {
     TUYA_VOICE_TEL_MODE_INVALD
 } TUYA_VOICE_TEL_MODE_T;
 
-#define TUYA_VOICE_SESSION_ID_MAX_LEN     (64)
-#define TUYA_VOICE_CALLBACK_VAL_MAX_LEN   (32)
-#define TUYA_VOICE_MESSAGE_ID_MAX_LEN     (64)
-#define TUYA_VOICE_SONGNAME_MAX_LEN       (128)
-#define TUYA_VOICE_ARTIST_MAX_LEN         (64)
+#define TUYA_VOICE_SESSION_ID_MAX_LEN   (64)
+#define TUYA_VOICE_CALLBACK_VAL_MAX_LEN (32)
+#define TUYA_VOICE_MESSAGE_ID_MAX_LEN   (64)
+#define TUYA_VOICE_SONGNAME_MAX_LEN     (128)
+#define TUYA_VOICE_ARTIST_MAX_LEN       (64)
 
 typedef struct {
-    char                        *url;
-    char                        *req_body;
-    TUYA_VOICE_AUDIO_FORMAT_E      format;
-    BOOL_T                         keep_session;
-    TUYA_VOICE_HTTP_METHOD_E       http_method;
-    TUYA_VOICE_TASK_TYPE_E         task_type;
-    char                         session_id[TUYA_VOICE_SESSION_ID_MAX_LEN + 1];
-    char                         message_id[TUYA_VOICE_MESSAGE_ID_MAX_LEN + 1];
-    char                         callback_val[TUYA_VOICE_CALLBACK_VAL_MAX_LEN + 1];
+    char *url;
+    char *req_body;
+    TUYA_VOICE_AUDIO_FORMAT_E format;
+    BOOL_T keep_session;
+    TUYA_VOICE_HTTP_METHOD_E http_method;
+    TUYA_VOICE_TASK_TYPE_E task_type;
+    char session_id[TUYA_VOICE_SESSION_ID_MAX_LEN + 1];
+    char message_id[TUYA_VOICE_MESSAGE_ID_MAX_LEN + 1];
+    char callback_val[TUYA_VOICE_CALLBACK_VAL_MAX_LEN + 1];
 } TUYA_VOICE_TTS_S;
 
 typedef struct {
-    uint32_t                         id;
-    char                        *url;
-    char                        *req_body;
-    uint32_t                         length;
-    uint32_t                         duration;
-    TUYA_VOICE_AUDIO_FORMAT_E      format;
-    TUYA_VOICE_HTTP_METHOD_E       http_method;
-    char                         artist[TUYA_VOICE_ARTIST_MAX_LEN];
-    char                         song_name[TUYA_VOICE_SONGNAME_MAX_LEN];
+    uint32_t id;
+    char *url;
+    char *req_body;
+    uint32_t length;
+    uint32_t duration;
+    TUYA_VOICE_AUDIO_FORMAT_E format;
+    TUYA_VOICE_HTTP_METHOD_E http_method;
+    char artist[TUYA_VOICE_ARTIST_MAX_LEN];
+    char song_name[TUYA_VOICE_SONGNAME_MAX_LEN];
 } TUYA_VOICE_MEDIA_SRC_S;
 
 typedef struct {
-    TUYA_VOICE_TTS_S              *pre_tts;
-    int                          src_cnt;
-    TUYA_VOICE_MEDIA_SRC_S        *src_array;
+    TUYA_VOICE_TTS_S *pre_tts;
+    int src_cnt;
+    TUYA_VOICE_MEDIA_SRC_S *src_array;
 } TUYA_VOICE_MEDIA_S;
 
 typedef struct {
-    TUYA_VOICE_TTS_S              *pre_tts;
-    char                         target_id[64];
-    char                         target_name[128];
-    int                          type;
+    TUYA_VOICE_TTS_S *pre_tts;
+    char target_id[64];
+    char target_name[128];
+    int type;
 } TUYA_VOICE_CALL_PHONE_INFO_S;
 
 typedef enum {
@@ -209,6 +208,15 @@ typedef enum {
     TUYA_VOICE_STREAM_STOP,
     TUYA_VOICE_STREAM_ABORT,
 } TUYA_VOICE_STREAM_E;
+
+typedef struct {
+    char *url;
+    char *req_body;
+    TUYA_VOICE_AUDIO_FORMAT_E format;
+    TUYA_VOICE_HTTP_METHOD_E http_method;
+    int duration_time;
+    char callback_val[TUYA_VOICE_CALLBACK_VAL_MAX_LEN + 1];
+} TUYA_VOICE_BGM_S;
 
 typedef struct {
     void (*tuya_voice_audio_sync)(void);
@@ -227,8 +235,10 @@ typedef struct {
     void (*tuya_voice_tel_operate)(TUYA_VOICE_TEL_MODE_T mode);
     void (*tuya_voice_call_second_dial)(char *dial);
     void (*tuya_voice_tts_stream)(TUYA_VOICE_STREAM_E type, uint8_t *data, int len);
-} TUYA_VOICE_CBS_S;
+    void (*tuya_voice_play_bgm_audio)(TUYA_VOICE_BGM_S *bgm);
 
+    void (*tuya_voice_text_stream)(TUYA_VOICE_STREAM_E type, uint8_t *data, int len);
+} TUYA_VOICE_CBS_S;
 
 OPERATE_RET tuya_voice_proto_init(TUYA_VOICE_CBS_S *cbs);
 
@@ -264,7 +274,8 @@ OPERATE_RET tuya_voice_proto_thing_config_reject_report(void);
 
 OPERATE_RET tuya_voice_proto_thing_config_access_count_report(int count);
 
-OPERATE_RET tuya_voice_proto_nick_name_report(TUYA_VOICE_NICK_NAME_OPRT_E mode, char *nickname, char *pinyin, BOOL_T set_result);
+OPERATE_RET tuya_voice_proto_nick_name_report(TUYA_VOICE_NICK_NAME_OPRT_E mode, char *nickname, char *pinyin,
+                                              BOOL_T set_result);
 
 OPERATE_RET tuya_voice_proto_dndmode_report(BOOL_T set_result, int stamp);
 

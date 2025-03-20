@@ -29,7 +29,7 @@
 #include "tuya_voice_protocol.h"
 #include "tuya_iot.h"
 
-#define TUYA_WS_REQUEST_ID_MAX_LEN       (64)
+#define TUYA_WS_REQUEST_ID_MAX_LEN (64)
 #define ENABLE_VOICE_DEBUG
 
 typedef enum {
@@ -42,18 +42,20 @@ typedef enum {
     TY_VOICE_RSP_TTS_MID,
     TY_VOICE_RSP_TTS_FINISH,
     TY_VOICE_RSP_TTS_INTERRUPTED,
+    TY_VOICE_RSP_TEXT_START,
+    TY_VOICE_RSP_TEXT_MID,
+    TY_VOICE_RSP_TEXT_FINISH,
     TY_VOICE_RSP_TYPE_MAX
 } TY_VOICE_RSP_TYPE_E;
 
-typedef struct
-{
-    uint32_t                       data_len;
-    char                       request_id[TUYA_WS_REQUEST_ID_MAX_LEN];
+typedef struct {
+    uint32_t data_len;
+    char request_id[TUYA_WS_REQUEST_ID_MAX_LEN];
 } TY_VOICE_WS_UPLOAD_CTX_S;
 
 typedef struct {
-    char          current_id[TUYA_WS_REQUEST_ID_MAX_LEN];
-    MUTEX_HANDLE    id_mutex;
+    char current_id[TUYA_WS_REQUEST_ID_MAX_LEN];
+    MUTEX_HANDLE id_mutex;
 } TY_VOICE_PROTOCOL_WS_S;
 
 static TUYA_VOICE_CBS_S g_voice_ws_cbs = {0};
@@ -65,7 +67,6 @@ static void __voice_ws_generate_request_id(char *req_id, int id_len);
 static OPERATE_RET __format_upload_speex(Speech__Request *req, TUYA_VOICE_WS_START_PARAMS_S *head);
 static OPERATE_RET __format_upload_wav(Speech__Request *req, TUYA_VOICE_WS_START_PARAMS_S *head);
 static OPERATE_RET __format_upload_ulaw(Speech__Request *req, TUYA_VOICE_WS_START_PARAMS_S *head);
-
 
 static OPERATE_RET __save_current_request_id(char *request_id)
 {
@@ -84,11 +85,11 @@ static OPERATE_RET __get_current_request_id(char *request_id)
 
 /**
  * @brief Get the current voice request ID
- * 
+ *
  * This function retrieves the ID of the currently active voice request.
- * 
+ *
  * @param[out] request_id Buffer to store the current request ID
- * 
+ *
  * @return OPERATE_RET
  * @retval OPRT_OK Success
  * @retval Other Error codes from internal implementation
@@ -100,16 +101,16 @@ OPERATE_RET tuya_voice_get_current_request_id(char *request_id)
 
 /**
  * @brief Initialize the WebSocket voice protocol
- * 
+ *
  * This function initializes the WebSocket voice protocol by setting up callbacks,
  * initializing the WebSocket client, and creating necessary synchronization primitives.
- * 
+ *
  * @param[in] cbs Pointer to structure containing callback functions
- * 
+ *
  * @return OPERATE_RET
  * @retval OPRT_OK Success
  * @retval OPRT_INVALID_PARM Invalid parameters (cbs is NULL)
- * 
+ *
  * @note This function must be called before using any other WebSocket voice protocol functions
  */
 OPERATE_RET tuya_voice_proto_ws_init(TUYA_VOICE_CBS_S *cbs)
@@ -130,13 +131,13 @@ OPERATE_RET tuya_voice_proto_ws_init(TUYA_VOICE_CBS_S *cbs)
 
 /**
  * @brief Deinitialize the WebSocket voice protocol
- * 
+ *
  * This function cleans up resources used by the WebSocket voice protocol,
  * including releasing mutex and clearing protocol state.
- * 
+ *
  * @return OPERATE_RET
  * @retval OPRT_OK Success
- * 
+ *
  * @note This function should be called when the WebSocket voice protocol is no longer needed
  */
 OPERATE_RET tuya_voice_proto_ws_deinit(void)
@@ -148,9 +149,9 @@ OPERATE_RET tuya_voice_proto_ws_deinit(void)
 
 /**
  * @brief Start the WebSocket client
- * 
+ *
  * This function starts the WebSocket client and prepares it for communication.
- * 
+ *
  * @return OPERATE_RET
  * @retval OPRT_OK Success
  * @retval Other Error codes from WebSocket client implementation
@@ -162,9 +163,9 @@ OPERATE_RET tuya_voice_proto_ws_client_start(void)
 
 /**
  * @brief Stop the WebSocket client
- * 
+ *
  * This function stops the WebSocket client and terminates any ongoing communication.
- * 
+ *
  * @return OPERATE_RET
  * @retval OPRT_OK Success
  * @retval Other Error codes from WebSocket client implementation
@@ -176,13 +177,13 @@ OPERATE_RET tuya_voice_proto_ws_client_stop(void)
 
 /**
  * @brief Delete the domain name configuration
- * 
+ *
  * This function removes the configured domain name from the WebSocket client.
- * 
+ *
  * @return OPERATE_RET
  * @retval OPRT_OK Success
  * @retval Other Error codes from WebSocket client implementation
- * 
+ *
  * @note This operation may affect the ability to establish new connections
  */
 OPERATE_RET tuya_voice_proto_ws_del_domain_name(void)
@@ -218,12 +219,12 @@ OPERATE_RET tuya_voice_proto_ws_del_domain_name(void)
  */
 OPERATE_RET tuya_voice_proto_ws_get_tts_text(char *p_tts_text)
 {
-    OPERATE_RET  rt = OPRT_OK;
-    size_t       enc_len = 0;
-    uint8_t      *enc_buf = NULL;
-    char      *p_tts_content = (char *)p_tts_text;
+    OPERATE_RET rt = OPRT_OK;
+    size_t enc_len = 0;
+    uint8_t *enc_buf = NULL;
+    char *p_tts_content = (char *)p_tts_text;
 
-    TUYA_CHECK_NULL_RETURN(p_tts_content,OPRT_INVALID_PARM);
+    TUYA_CHECK_NULL_RETURN(p_tts_content, OPRT_INVALID_PARM);
 
     if (!tuya_speaker_ws_is_online()) {
         PR_ERR("Communication has been disconnected, can't process voice, get tts failed");
@@ -286,17 +287,15 @@ OPERATE_RET tuya_voice_proto_ws_get_tts_text(char *p_tts_text)
  * - OPRT_COM_ERROR: Communication error or encoding failed
  * - OPRT_MALLOC_FAILED: Memory allocation failed
  */
-OPERATE_RET tuya_voice_proto_ws_get_tts_audio(char *p_session_id,
-                                       char *p_tts_text,
-                                       char *p_declaimer)
+OPERATE_RET tuya_voice_proto_ws_get_tts_audio(char *p_session_id, char *p_tts_text, char *p_declaimer)
 {
-    OPERATE_RET  rt = OPRT_OK;
-    size_t       enc_len = 0;
-    uint8_t      *enc_buf = NULL;
+    OPERATE_RET rt = OPRT_OK;
+    size_t enc_len = 0;
+    uint8_t *enc_buf = NULL;
 
-    TUYA_CHECK_NULL_RETURN(p_session_id,OPRT_INVALID_PARM);
-    TUYA_CHECK_NULL_RETURN(p_tts_text,OPRT_INVALID_PARM);
-    TUYA_CHECK_NULL_RETURN(p_declaimer,OPRT_INVALID_PARM);
+    TUYA_CHECK_NULL_RETURN(p_session_id, OPRT_INVALID_PARM);
+    TUYA_CHECK_NULL_RETURN(p_tts_text, OPRT_INVALID_PARM);
+    TUYA_CHECK_NULL_RETURN(p_declaimer, OPRT_INVALID_PARM);
 
     if (!tuya_speaker_ws_is_online()) {
         PR_ERR("Communication has been disconnected, can't process voice, get tts audio failed");
@@ -388,14 +387,11 @@ OPERATE_RET tuya_voice_proto_ws_get_tts_audio(char *p_session_id,
  * @note The function requires an active websocket connection before starting the upload.
  *       The caller is responsible for managing the memory of p_session_id and p_buf.
  */
-OPERATE_RET tuya_voice_proto_ws_upload_start(TUYA_VOICE_UPLOAD_T *uploader,
-                                    TUYA_VOICE_AUDIO_FORMAT_E format,
-                                    TUYA_VOICE_UPLOAD_TARGET_E target,
-                                    char *p_session_id,
-                                    uint8_t *p_buf,
-                                    uint32_t buf_len)
+OPERATE_RET tuya_voice_proto_ws_upload_start(TUYA_VOICE_UPLOAD_T *uploader, TUYA_VOICE_AUDIO_FORMAT_E format,
+                                             TUYA_VOICE_UPLOAD_TARGET_E target, char *p_session_id, uint8_t *p_buf,
+                                             uint32_t buf_len)
 {
-    OPERATE_RET         rt = OPRT_OK;
+    OPERATE_RET rt = OPRT_OK;
     if (NULL == uploader || format >= TUYA_VOICE_AUDIO_FORMAT_INVALD) {
         PR_ERR("param is invalid, uploader %p, p_buf %p", uploader, p_buf);
         return OPRT_INVALID_PARM;
@@ -432,7 +428,7 @@ OPERATE_RET tuya_voice_proto_ws_upload_start(TUYA_VOICE_UPLOAD_T *uploader,
     case TUYA_VOICE_AUDIO_FORMAT_ULAW:
         TUYA_CALL_ERR_RETURN(__format_upload_ulaw(&device_req, p_head));
         break;
-    default :
+    default:
         PR_ERR("this encode type is not currently supported, %d", format);
         return OPRT_COM_ERROR;
     }
@@ -461,9 +457,9 @@ OPERATE_RET tuya_voice_proto_ws_upload_start(TUYA_VOICE_UPLOAD_T *uploader,
  */
 OPERATE_RET tuya_voice_proto_ws_upload_send(TUYA_VOICE_UPLOAD_T uploader, uint8_t *buf, uint32_t len)
 {
-    OPERATE_RET    rt = OPRT_OK;
-    size_t         enc_len = 0;
-    uint8_t        *enc_buf = NULL;
+    OPERATE_RET rt = OPRT_OK;
+    size_t enc_len = 0;
+    uint8_t *enc_buf = NULL;
 
     if (NULL == uploader || (len && !buf)) {
         PR_ERR("param is invalid");
@@ -535,12 +531,12 @@ OPERATE_RET tuya_voice_proto_ws_upload_send(TUYA_VOICE_UPLOAD_T uploader, uint8_
 OPERATE_RET tuya_voice_proto_ws_upload_stop(TUYA_VOICE_UPLOAD_T uploader, BOOL_T force_stop)
 {
     OPERATE_RET rt = OPRT_OK;
-    TUYA_CHECK_NULL_RETURN(uploader,OPRT_INVALID_PARM);
+    TUYA_CHECK_NULL_RETURN(uploader, OPRT_INVALID_PARM);
 
     TY_VOICE_WS_UPLOAD_CTX_S *p_upload_ctx = (TY_VOICE_WS_UPLOAD_CTX_S *)uploader;
 
     if (!force_stop) {
-        size_t  enc_len = 0;
+        size_t enc_len = 0;
         uint8_t *enc_buf = NULL;
 
         if (!tuya_speaker_ws_is_online()) {
@@ -634,9 +630,9 @@ OPERATE_RET tuya_voice_proto_ws_upload_get_message_id(TUYA_VOICE_UPLOAD_T upload
  */
 OPERATE_RET tuya_voice_proto_ws_control(char *request_id, char *command)
 {
-    OPERATE_RET    rt = OPRT_OK;
-    size_t         enc_len = 0;
-    uint8_t        *enc_buf = NULL;
+    OPERATE_RET rt = OPRT_OK;
+    size_t enc_len = 0;
+    uint8_t *enc_buf = NULL;
 
     if (NULL == request_id || NULL == command) {
         PR_ERR("param is invalid");
@@ -653,7 +649,7 @@ OPERATE_RET tuya_voice_proto_ws_control(char *request_id, char *command)
     device_req.requestid = request_id;
     device_req.type = "CONTROL";
 
-    PB_ENC_OPT_ENTRY_S  entry;
+    PB_ENC_OPT_ENTRY_S entry;
     pb_enc_opt_entry_init(&entry, (PB_ENC_OPT_ENTRY_INIT_CB)speech__request__options_entry__init);
     pb_enc_opt_entry_set_kv_string(&entry, "command", command);
 
@@ -702,29 +698,29 @@ OPERATE_RET tuya_voice_proto_ws_control(char *request_id, char *command)
 
 /**
  * @brief Send a voice skill request through WebSocket protocol
- * 
+ *
  * This function sends a voice skill request with specified domain, intent and optional
  * parameters through WebSocket connection. The request is encoded using protobuf format.
- * 
+ *
  * @param[in] domain The domain of the skill request
  * @param[in] intent The intent of the skill request
  * @param[in] slots Optional JSON string containing slot information, can be NULL
  * @param[in] raw Optional raw data string, can be NULL
- * 
+ *
  * @return OPERATE_RET
  * @retval OPRT_OK Success
  * @retval OPRT_INVALID_PARM Invalid parameters (domain or intent is NULL)
  * @retval OPRT_COM_ERROR Communication error or encoding error
  * @retval OPRT_MALLOC_FAILED Memory allocation failed
- * 
+ *
  * @note The function will generate a unique request ID for each call
  * @note The WebSocket connection must be established before calling this function
  */
 OPERATE_RET tuya_voice_proto_ws_skill_request(char *domain, char *intent, char *slots, char *raw)
 {
-    OPERATE_RET    rt = OPRT_OK;
-    size_t         enc_len = 0;
-    uint8_t        *enc_buf = NULL;
+    OPERATE_RET rt = OPRT_OK;
+    size_t enc_len = 0;
+    uint8_t *enc_buf = NULL;
 
     if (NULL == domain || NULL == intent) {
         PR_ERR("param is invalid");
@@ -745,7 +741,7 @@ OPERATE_RET tuya_voice_proto_ws_skill_request(char *domain, char *intent, char *
     device_req.requestid = request_id;
     device_req.type = "SKILL";
 
-    PB_ENC_OPT_ENTRY_S  entry;
+    PB_ENC_OPT_ENTRY_S entry;
     pb_enc_opt_entry_init(&entry, (PB_ENC_OPT_ENTRY_INIT_CB)speech__request__options_entry__init);
     pb_enc_opt_entry_set_kv_string(&entry, "domain", domain);
     pb_enc_opt_entry_set_kv_string(&entry, "intent", intent);
@@ -830,15 +826,15 @@ OPERATE_RET tuya_voice_proto_ws_get_tts_stream(char *tts_text)
 
 /**
  * @brief Interrupt current voice WebSocket request
- * 
+ *
  * This function interrupts the currently active voice request by sending an interrupt
  * control command through WebSocket connection. If there is no active request,
  * the function will return successfully without performing any operation.
- * 
+ *
  * @return OPERATE_RET
  * @retval OPRT_OK Success, either interrupted active request or no request to interrupt
  * @retval Other Error codes from tuya_voice_proto_ws_control function
- * 
+ *
  * @note This function checks if there is an active request before attempting to interrupt
  */
 OPERATE_RET tuya_voice_proto_ws_interrupt(void)
@@ -861,15 +857,16 @@ static void __voice_ws_generate_request_id(char *req_id, int id_len)
         random[i] = (uint8_t)tal_system_get_random(0xFF);
     }
     tuya_iot_client_t *iot_client = tuya_iot_client_get();
-    snprintf(req_id, id_len, "%s_%02x%02x%02x%02x", iot_client->activate.devid, random[0], random[1], random[2], random[3]);
+    snprintf(req_id, id_len, "%s_%02x%02x%02x%02x", iot_client->activate.devid, random[0], random[1], random[2],
+             random[3]);
 }
 
 static OPERATE_RET __format_upload_speex(Speech__Request *req, TUYA_VOICE_WS_START_PARAMS_S *head)
 {
-    OPERATE_RET         rt = OPRT_OK;
-    size_t              enc_len = 0;
-    uint8_t             *enc_buf = NULL;
-    PB_ENC_OPT_ENTRY_S  entry;
+    OPERATE_RET rt = OPRT_OK;
+    size_t enc_len = 0;
+    uint8_t *enc_buf = NULL;
+    PB_ENC_OPT_ENTRY_S entry;
 
     pb_enc_opt_entry_init(&entry, (PB_ENC_OPT_ENTRY_INIT_CB)speech__request__options_entry__init);
     pb_enc_opt_entry_set_kv_string(&entry, "format", "spx");
@@ -885,8 +882,11 @@ static OPERATE_RET __format_upload_speex(Speech__Request *req, TUYA_VOICE_WS_STA
     pb_enc_opt_entry_set_kv_integer(&entry, "spx.encodeFrameSize", head->encode_frame_size);
     pb_enc_opt_entry_set_kv_integer(&entry, "spx.bitRate", head->bit_rate);
 #ifdef ENABLE_VOICE_TTS_STREAM
-    pb_enc_opt_entry_set_kv_string(&entry, "tts.stream", "true");
+    if (g_voice_ws_cbs.tuya_voice_tts_stream)
+        pb_enc_opt_entry_set_kv_string(&entry, "tts.stream", "true");
 #endif
+    if (g_voice_ws_cbs.tuya_voice_text_stream)
+        pb_enc_opt_entry_set_kv_string(&entry, "text.stream", "true");
 
     TUYA_CALL_ERR_RETURN(pb_enc_opt_entry_create_arr(&entry));
     req->n_options = entry.node_num;
@@ -932,17 +932,17 @@ static OPERATE_RET __format_upload_speex(Speech__Request *req, TUYA_VOICE_WS_STA
 
 static OPERATE_RET __format_upload_wav(Speech__Request *req, TUYA_VOICE_WS_START_PARAMS_S *head)
 {
-    OPERATE_RET         rt = OPRT_OK;
-    size_t              enc_len = 0;
-    uint8_t             *enc_buf = NULL;
-    PB_ENC_OPT_ENTRY_S  entry;
+    OPERATE_RET rt = OPRT_OK;
+    size_t enc_len = 0;
+    uint8_t *enc_buf = NULL;
+    PB_ENC_OPT_ENTRY_S entry;
 
     pb_enc_opt_entry_init(&entry, (PB_ENC_OPT_ENTRY_INIT_CB)speech__request__options_entry__init);
     pb_enc_opt_entry_set_kv_string(&entry, "format", "wav");
     // pb_enc_opt_entry_set_kv_integer(&entry, "channel", 1);
     // pb_enc_opt_entry_set_kv_integer(&entry, "sampleRate", 16000);
-    pb_enc_opt_entry_set_kv_integer(&entry, "channel", head? head->channels: 1);
-    pb_enc_opt_entry_set_kv_integer(&entry, "sampleRate", head? head->rate: 16000);
+    pb_enc_opt_entry_set_kv_integer(&entry, "channel", head ? head->channels : 1);
+    pb_enc_opt_entry_set_kv_integer(&entry, "sampleRate", head ? head->rate : 16000);
     pb_enc_opt_entry_set_kv_string(&entry, "sampleBytes", "16");
 #ifdef ENABLE_VOICE_TTS_STREAM
     pb_enc_opt_entry_set_kv_string(&entry, "tts.stream", "true");
@@ -992,15 +992,15 @@ static OPERATE_RET __format_upload_wav(Speech__Request *req, TUYA_VOICE_WS_START
 
 static OPERATE_RET __format_upload_ulaw(Speech__Request *req, TUYA_VOICE_WS_START_PARAMS_S *head)
 {
-    OPERATE_RET         rt = OPRT_OK;
-    size_t              enc_len = 0;
-    uint8_t             *enc_buf = NULL;
-    PB_ENC_OPT_ENTRY_S  entry;
+    OPERATE_RET rt = OPRT_OK;
+    size_t enc_len = 0;
+    uint8_t *enc_buf = NULL;
+    PB_ENC_OPT_ENTRY_S entry;
 
     pb_enc_opt_entry_init(&entry, (PB_ENC_OPT_ENTRY_INIT_CB)speech__request__options_entry__init);
     pb_enc_opt_entry_set_kv_string(&entry, "format", "ulaw");
-    pb_enc_opt_entry_set_kv_integer(&entry, "channel", head? head->channels: 1);
-    pb_enc_opt_entry_set_kv_integer(&entry, "sampleRate", head? head->rate: 16000);
+    pb_enc_opt_entry_set_kv_integer(&entry, "channel", head ? head->channels : 1);
+    pb_enc_opt_entry_set_kv_integer(&entry, "sampleRate", head ? head->rate : 16000);
     pb_enc_opt_entry_set_kv_string(&entry, "sampleBytes", "16");
 #ifdef ENABLE_VOICE_TTS_STREAM
     pb_enc_opt_entry_set_kv_string(&entry, "tts.stream", "true");
@@ -1050,7 +1050,7 @@ static OPERATE_RET __format_upload_ulaw(Speech__Request *req, TUYA_VOICE_WS_STAR
 
 static OPERATE_RET __parse_cloud_rsp_asr(char *asr)
 {
-    TUYA_CHECK_NULL_RETURN(asr,OPRT_INVALID_PARM);
+    TUYA_CHECK_NULL_RETURN(asr, OPRT_INVALID_PARM);
 
     if (g_voice_ws_cbs.tuya_voice_custom == NULL) {
         return OPRT_OK;
@@ -1074,9 +1074,9 @@ static OPERATE_RET __parse_cloud_rsp_asr(char *asr)
 
 static OPERATE_RET __parse_cloud_rsp_nlu(Speech__Nlu *nlu)
 {
-    size_t      i = 0;
+    size_t i = 0;
 
-    TUYA_CHECK_NULL_RETURN(nlu,OPRT_INVALID_PARM);
+    TUYA_CHECK_NULL_RETURN(nlu, OPRT_INVALID_PARM);
     if (nlu->domain != NULL) {
         PR_DEBUG("nlu->domain: %s", nlu->domain);
     }
@@ -1102,8 +1102,8 @@ static OPERATE_RET __parse_cloud_rsp_nlu(Speech__Nlu *nlu)
 
 static OPERATE_RET __parse_cloud_rsp_skill(Speech__Skill *skill)
 {
-    cJSON    *json = NULL;
-    TUYA_CHECK_NULL_RETURN(skill,OPRT_INVALID_PARM);
+    cJSON *json = NULL;
+    TUYA_CHECK_NULL_RETURN(skill, OPRT_INVALID_PARM);
 
     if (skill->name != NULL) {
         PR_DEBUG("name: %s", skill->name);
@@ -1126,7 +1126,8 @@ static OPERATE_RET __parse_cloud_rsp_skill(Speech__Skill *skill)
         }
     }
 
-    if ((!strcmp(skill->type, "playTts") || !strcmp(skill->type, "playUrl")) && g_voice_ws_cbs.tuya_voice_play_tts != NULL) {
+    if ((!strcmp(skill->type, "playTts") || !strcmp(skill->type, "playUrl")) &&
+        g_voice_ws_cbs.tuya_voice_play_tts != NULL) {
         TUYA_VOICE_TTS_S *tts = NULL;
         if (tuya_voice_json_parse_tts(json, &tts) != OPRT_OK) {
             PR_ERR("parse tts error");
@@ -1193,15 +1194,15 @@ static OPERATE_RET __handle_cloud_rsp(TY_VOICE_RSP_TYPE_E type, Speech__Response
     case TY_VOICE_RSP_TTS_START:
         snprintf(tts_request_id, TUYA_WS_REQUEST_ID_MAX_LEN, "%s", cloud_rsp->requestid);
         if (g_voice_ws_cbs.tuya_voice_tts_stream) {
-            g_voice_ws_cbs.tuya_voice_tts_stream(TUYA_VOICE_STREAM_START,
-                    (uint8_t *)cloud_rsp->requestid, strlen(cloud_rsp->requestid)+1);
+            g_voice_ws_cbs.tuya_voice_tts_stream(TUYA_VOICE_STREAM_START, (uint8_t *)cloud_rsp->requestid,
+                                                 strlen(cloud_rsp->requestid) + 1);
         }
         break;
     case TY_VOICE_RSP_TTS_MID:
         if (g_voice_ws_cbs.tuya_voice_tts_stream) {
             if (0 == strncmp(tts_request_id, cloud_rsp->requestid, TUYA_WS_REQUEST_ID_MAX_LEN)) {
-                g_voice_ws_cbs.tuya_voice_tts_stream(TUYA_VOICE_STREAM_DATA,
-                        cloud_rsp->data->block.data, cloud_rsp->data->block.len);
+                g_voice_ws_cbs.tuya_voice_tts_stream(TUYA_VOICE_STREAM_DATA, cloud_rsp->data->block.data,
+                                                     cloud_rsp->data->block.len);
             } else {
                 // PR_WARN("TTS MID current id: %s, response id: %s", tts_request_id, cloud_rsp->requestid);
             }
@@ -1210,7 +1211,7 @@ static OPERATE_RET __handle_cloud_rsp(TY_VOICE_RSP_TYPE_E type, Speech__Response
     case TY_VOICE_RSP_TTS_FINISH:
         if (g_voice_ws_cbs.tuya_voice_tts_stream) {
             if (0 == strncmp(tts_request_id, cloud_rsp->requestid, TUYA_WS_REQUEST_ID_MAX_LEN)) {
-            g_voice_ws_cbs.tuya_voice_tts_stream(TUYA_VOICE_STREAM_STOP, NULL, 0);
+                g_voice_ws_cbs.tuya_voice_tts_stream(TUYA_VOICE_STREAM_STOP, NULL, 0);
             } else {
                 PR_WARN("TTS FINISH current id: %s, response id: %s", tts_request_id, cloud_rsp->requestid);
             }
@@ -1225,6 +1226,23 @@ static OPERATE_RET __handle_cloud_rsp(TY_VOICE_RSP_TYPE_E type, Speech__Response
             }
         }
         break;
+    case TY_VOICE_RSP_TEXT_START:
+        if (g_voice_ws_cbs.tuya_voice_text_stream) {
+            g_voice_ws_cbs.tuya_voice_text_stream(TUYA_VOICE_STREAM_START, (uint8_t *)cloud_rsp->requestid,
+                                                  strlen(cloud_rsp->requestid) + 1);
+        }
+        break;
+    case TY_VOICE_RSP_TEXT_MID:
+        if (g_voice_ws_cbs.tuya_voice_text_stream) {
+            g_voice_ws_cbs.tuya_voice_text_stream(TUYA_VOICE_STREAM_DATA, (uint8_t *)cloud_rsp->data->nlg,
+                                                  strlen(cloud_rsp->data->nlg) + 1);
+        }
+        break;
+    case TY_VOICE_RSP_TEXT_FINISH:
+        if (g_voice_ws_cbs.tuya_voice_text_stream) {
+            g_voice_ws_cbs.tuya_voice_text_stream(TUYA_VOICE_STREAM_STOP, NULL, 0);
+        }
+        break;
     default:
         PR_ERR("shouldn't enter here");
         break;
@@ -1233,16 +1251,13 @@ static OPERATE_RET __handle_cloud_rsp(TY_VOICE_RSP_TYPE_E type, Speech__Response
     return OPRT_OK;
 }
 
-
 // callback used by stream_gw
 static void speaker_ws_recv_bin_cb(uint8_t *data, size_t len)
 {
     size_t i = 0;
-    char *rsp_type[TY_VOICE_RSP_TYPE_MAX] = {
-        "ASR_MID", "ASR_FINISH", "NLP_FINISH", "SKILL_FINISH",
-        "SPEECH_FINISH", "TTS_START", "TTS_MID", "TTS_FINISH",
-        "TTS_INTERRUPTED",
-    };
+    char *rsp_type[TY_VOICE_RSP_TYPE_MAX] = {"ASR_MID",         "ASR_FINISH", "NLP_FINISH", "SKILL_FINISH",
+                                             "SPEECH_FINISH",   "TTS_START",  "TTS_MID",    "TTS_FINISH",
+                                             "TTS_INTERRUPTED", "TEXT_START", "TEXT_MID",   "TEXT_FINISH"};
 
     Speech__Response *cloud_rsp = speech__response__unpack(NULL, len, data);
 
@@ -1252,8 +1267,7 @@ static void speaker_ws_recv_bin_cb(uint8_t *data, size_t len)
     TY_GW_CHECK_NULL_RETURN_VOID(cloud_rsp->data);
     TY_GW_CHECK_NULL_RETURN_VOID(cloud_rsp->data->type);
     if (strcmp(cloud_rsp->data->type, "TTS_MID")) {
-        PR_INFO("cloud rsp, code:%s, message:%s, requestid:%s, type:%s",
-                cloud_rsp->code, cloud_rsp->message,
+        PR_INFO("cloud rsp, code:%s, message:%s, requestid:%s, type:%s", cloud_rsp->code, cloud_rsp->message,
                 cloud_rsp->requestid, cloud_rsp->data->type);
     }
 
@@ -1261,7 +1275,7 @@ static void speaker_ws_recv_bin_cb(uint8_t *data, size_t len)
         if (0 == strcmp(cloud_rsp->data->type, rsp_type[i])) {
             __handle_cloud_rsp((TY_VOICE_RSP_TYPE_E)i, cloud_rsp);
             speech__response__free_unpacked(cloud_rsp, NULL);
-            return ;
+            return;
         }
     }
 
@@ -1276,10 +1290,10 @@ static void speaker_ws_recv_text_cb(uint8_t *data, size_t len)
 
 /**
  * @brief Check if WebSocket connection is online
- * 
+ *
  * This function checks the current status of the WebSocket connection
  * to determine if it is online and available for communication.
- * 
+ *
  * @return BOOL_T
  * @retval TRUE WebSocket connection is online
  * @retval FALSE WebSocket connection is offline
@@ -1291,10 +1305,10 @@ BOOL_T tuya_voice_proto_ws_is_online(void)
 
 /**
  * @brief Disconnect the WebSocket connection
- * 
+ *
  * This function actively disconnects the current WebSocket connection.
  * Any ongoing communication will be terminated.
- * 
+ *
  * @note After disconnection, the connection needs to be re-established
  *       before any further communication can occur
  */
@@ -1305,12 +1319,12 @@ void tuya_voice_proto_ws_disconnect(void)
 
 /**
  * @brief Set the keepalive interval for WebSocket connection
- * 
+ *
  * This function configures the keepalive interval for the WebSocket connection
  * to maintain the connection alive and detect disconnections.
- * 
+ *
  * @param[in] sec Keepalive interval in seconds
- * 
+ *
  * @note Setting a proper keepalive interval is important for maintaining
  *       a stable connection and detecting network issues early
  */
