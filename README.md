@@ -44,22 +44,8 @@ tuyaopen can be compiled and debugged using the tos command, which will search f
 
 For detailed usage of the tos command, please refer to [tos command](./docs/en/tos_guide.md).
 
-### Step 2. Set Platform
-The tos tool configures the build platform through the `project_build.ini` file located in the project's directory. The `project_build.ini` file includes the following fields:
-- project: The name of the project, which can be customized. It is recommended to use the format <project directory name>_<platform/chip name>.
-- platform: The target platform for compilation, with available options including: ubuntu, t2, t3, t5ai, esp32, ln882h, bk7231x. This name should match the name defined in `platform/platform_config.yaml`.
-- chip: Optional values; when the selected platform supports multiple chips, the specific chip name must be specified.
-    - When the platform is set to esp32, the available options are: esp32, esp32c3, esp32s3.
-    - When the platform is set to bk7231x, the available options are: bk7231n.
-
-An example configuration is as follows:
-```bash
-[project:sample_project_bk7231x]
-platform = bk7231x
-chip = bk7231n
-```
-
-Additionally, the tos tool can configure the simultaneous compilation of projects across multiple platforms via the `project_build.ini` file. For more information, refer to [Multi-platform Configuration](#Multi-platform Configuration).
+### step2. Select the corresponding example
+Use the command `tos set_example` to complete the selection according to the platform, and the directory `examples` will be modified to the corresponding platform's examples.
 
 ### step3. Compilation
 Select the corresponding project for the current compilation in examples or apps, and then run the following command to compile:

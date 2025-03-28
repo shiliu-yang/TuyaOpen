@@ -15,5 +15,6 @@ __pycache__
 .build
 
 /arduino-tuyaopen
-
-/tools/tyutool/tyutool_*
+/examples
+/tools/tyutool/*tyutool_*
+/.set_example

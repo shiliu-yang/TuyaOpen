@@ -43,22 +43,8 @@ tuyaopen 通过 tos 命令进行编译、调试等操作，tos 命令会根据�
 
 tos 命令的详细使用方法，请参考 [tos 命令](./docs/zh/tos_guide.md)。
 
-### step2. 设置 platform
-tos 工具通过项目工程目录下的 `project_build.ini` 文件配置编译 platform，`project_build.ini` 包括以下字段：
-- project: 项目名称，可自定义，建议工程目录名_<platform/chip name>。
-- platform: 编译目标平台，可选值：ubuntu、t2、t3、t5ai、esp32、ln882h、bk7231x。该名称与 `platform/platform_config.yaml` 中定义的 name 名称一致。
-- chip: 可选值，当 platform 中支持多 chip 时，需指定 chip 名称。
-    - platform 为 esp32 时可选值：esp32、esp32c3、esp32s3。
-    - platform 为 bk7231x 时可选值：bk7231n。
-
-示例如下：
-```bash
-[project:sample_project_bk7231x]
-platform = bk7231x
-chip = bk7231n
-```
-
-同时 tos 工具可通过 `project_build.ini` 文件配置项目多平台同时编译，可参考[多平台配置](#多平台配置)。
+### step2. 选择对应的example
+使用命令`tos set_example`，根据平台完成选择，目录`examples`会修改为对应平台的示例。
 
 ### step3. 编译
 选择当前编译的 examples 或 apps 对应工程，运行如下命令编译：
@@ -73,7 +59,7 @@ $ tos build
 - sample_project_t2_UG_1.0.0.bin：用于 OTA 升级的 bin 文件，无法直接烧录后运行。
 
 
-项目版本默认为 `1.0.0`，可在 menuconfig 配置中修改。
+项目名称默认为目录名称，项目版本默认为 `1.0.0`，可通过 `tos menuconfig` 配置中修改。
 
 ### step4. menuconfig 配置 
 选择需配置的 examples 或 apps 对应工程，在对应工程目录下运行如下命令进行菜单化配置：

@@ -24,6 +24,7 @@
 
 #include "tdl_button_driver.h"
 #include "tdl_button_manage.h"
+#include "tdd_button_gpio.h"
 
 /***********************************************************
 *************************micro define***********************

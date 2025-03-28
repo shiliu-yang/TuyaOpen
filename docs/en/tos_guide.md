@@ -15,14 +15,15 @@ Usage: tos COMMAND [ARGS]...
 Commands:
     version    - Show TOS verson
     check      - Check command and version
-    new        - New project
-    build      - Build specific project or all projects
-                 [name] (default build all project by project_build.ini)
-    clean      - Clean specific project or all projects
-                 [name] (default clean all project by project_build.ini)
+    new        - New project [base(default) / auduino]
+    build      - Build project
+    clean      - Clean project
+    fullclean  - Clean project and delete build path
     menuconfig - Configuration project features
-    build_all  - Build all projects in the directory
-                 [*path]
+    savedef    - Saves minimal configuration file (app_default.config)
+    set_example  - Set examples from platform
+    new_platform - New platform [platform_name]
+    upgrade    - Upgrade framework and platforms
     help       - Help information
 ```
 
@@ -31,18 +32,22 @@ Commands:
 ### View Version
 ```shell
 $ tos version
-1.0.0
+2.0.0
 ```
 
 ### Check Current Environment
 ```shell
 $ tos check
 Check command and version ...
-Check [python3](3.10.12) > [3.6.0]: OK.
-Check [git](2.34.1) > [2.0.0]: OK.
-Check [cmake](3.22.1) > [3.16.0]: OK.
-Check [ccmake](3.22.1) > [3.16.0]: OK.
-Check [lcov](1.14) > [1.14]: OK.
+Check [bash](5.2.21) > [4.0.0]: OK.
+Check [grep](3.11
+10.42) > [3.0.0]: OK.
+Check [sed](4.9) > [4.0.0]: OK.
+Check [python3](3.12.3) > [3.6.0]: OK.
+Check [git](2.43.0) > [2.0.0]: OK.
+Check [ninja](1.11.1) > [1.6.0]: OK.
+Check [cmake](3.28.3) > [3.16.0]: OK.
+Check submodules.
 ```
 
 The tos check command will check whether the current environment meets the build requirements. If it does, it will output OK. If not, it will prompt for the minimum version required, such as `Please install [lcov], and version > [1.14]`. Please install the relevant dependencies and corresponding versions according to the check results.
@@ -52,29 +57,24 @@ The tos check command will check whether the current environment meets the build
 $ tos new
 ```
 1. Enter the project name according to the prompt, such as: `hello_world`.
-2. Select the platform corresponding to the project:
+
+2. Select the board to the project:
 ```shell
-Choice platform ...
-========================
-Platforms
-  1. t2
-  2. t3
-  3. ubuntu
-------------------------
-Please select: 
+$ cd hello_world
+$ tos menuconfig
 ```
-After the selection, tos will automatically download the relevant dependency files and generate the project directory and template files.
+
+Select the corresponding board on the display page.
+
 ```shell
 ├── CMakeLists.txt
-├── project_build.ini
+├── app_default.config
 └── src
     └── hello_world.c
 ```
 Among them:
 - `CMakeLists.txt`: Project configuration file, used to configure project compilation options.
-- `project_build.ini`: Project configuration file, used to configure project compilation options.
-    - The project name is the project name + platform name.
-    - The platform is the platform corresponding to the project.
+- `app_default.config`: The project configuration file, which records the difference results of menuconfig, is not actively saved, and needs to be saved by the command `tos savedef`.
 - `src`: Source code directory, used to store project source code files.
 - `src/hello_world.c`: Project source code file, used to store project source code.
 
@@ -85,6 +85,7 @@ Enter the project directory and run the following command:
 $ cd hello_world
 $ tos build
 ```
+When you build for the first time, the tos tool downloads the related toolchain.
 
 ### Configure Project
 Enter the project directory and run the following command:
@@ -100,8 +101,40 @@ $ cd hello_world
 $ tos clean
 ```
 
-## Compile All Projects in the Specified Directory
+Deep cleaning command:
+
 ```shell
-$ tos build_all .
+$ cd hello_world
+$ tos fullclean
 ```
-Tos will compile all projects in the specified directory according to the project configuration files under the project engineering directory.
+
+### Save the configuration file
+
+```shell
+$ tos savedef
+```
+
+This command saves the difference between the menuconfig result and the default value in the `app_default.config` file.
+
+### Select the configuration
+```shell
+$ tos conifg_choice
+```
+
+This command selects the configuration file in the config directory instead of the app_defalut.config file.
+
+### Setting example
+
+```shell
+$ tos set_example
+```
+
+This command is used to display examples for different chip platforms, changing the contents of the directory `examples`.
+
+### Update tuyaopen
+
+Run the following command:
+
+```shell
+$ tos upgrade
+```

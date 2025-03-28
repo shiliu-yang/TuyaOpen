@@ -1,3 +1,5 @@
+[English](./README.md) | 简体中文
+
 # tuya.ai
 通过 tuya.ai 提供的 AI ，连接涂鸦云 和 AI 服务，实现 AI 语音交互、音频/视频多模态 AI 交互、智能化控制等功能。
 
@@ -48,14 +50,16 @@
 
 4. 使用 涂鸦 APP 配网激活设备后，即可通过麦克风进行 AI 语音交互。
 
+## AI 应用
 
-## 支持芯片列表
+### you_chat_bot
+1. 支持芯片列表
 | 芯片 | 模组 |
 | ----------------| ---------------- |
 | [T5](https://developer.tuya.com/cn/docs/iot/wifibt-dual-mode-chip?id=Ke3voh7uu0htz)      | [T5-E1](https://developer.tuya.com/cn/docs/iot/T5-E1-Module-Datasheet?id=Kdar6hf0kzmfi) [T5-E1-IPEX](https://developer.tuya.com/cn/docs/iot/T5-E1-IPEX-Module-Datasheet?id=Kdskxvxe835tq)  |
 
 
-## 支持开发板列表
+2. 支持开发板列表
 
 | 开发板 | 描述 |
 | ----------- | ------------- |

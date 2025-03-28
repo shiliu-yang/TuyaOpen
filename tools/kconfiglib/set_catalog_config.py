@@ -16,23 +16,43 @@ KCONFIG = "Kconfig"
 
 
 def set_config(board, src_dir, app_dir, output_config):
-    context = '''# CatalogKconfig
-config PROJECT_VERSION
-    string "PROJECT_VERSION"
-    default "1.0.0"
+    app_name = os.path.basename(app_dir)
+    context = f'''# CatalogKconfig
+menu "configure project"
+    config PROJECT_NAME
+        string "PROJECT_NAME"
+        default "{app_name}"
+    config PROJECT_VERSION
+        string "PROJECT_VERSION"
+        default "1.0.0"
+    choice
+        prompt "Choose framework"
+        default PROJECT_FRAMEWORK_BASE
+
+        config PROJECT_FRAMEWORK_BASE
+            bool "base"
+
+        config PROJECT_FRAMEWORK_ARDUINO
+            bool "arduino"
+    endchoice
+    config FRAMEWORK_CHOICE
+        string
+        default "base" if PROJECT_FRAMEWORK_BASE
+        default "arduino" if PROJECT_FRAMEWORK_ARDUINO
+endmenu
 
 '''
-    config_path = os.path.join(src_dir, KCONFIG)
-    if os.path.exists(config_path):
-        context += f'source \"{config_path}\"\n'
-    if board:
-        config_path = os.path.join(board, KCONFIG)
-        if os.path.exists(config_path):
-            context += f'source \"{config_path}\"\n'
     if app_dir:
         config_path = os.path.join(app_dir, KCONFIG)
         if os.path.exists(config_path):
             context += f'source \"{config_path}\"\n'
+    if board:
+        config_path = os.path.join(board, KCONFIG)
+        if os.path.exists(config_path):
+            context += f'source \"{config_path}\"\n'
+    config_path = os.path.join(src_dir, KCONFIG)
+    if os.path.exists(config_path):
+        context += f'source \"{config_path}\"\n'
 
     with open(output_config, 'w', encoding='utf-8') as f:
         f.write(context)
@@ -61,7 +81,7 @@ def main():
     # print(f'board: {board}')
     # print(f'src_dir: {src_dir}')
     # print(f'app_dif: {app_dif}')
-    print(f'output_config: {output_config}')
+    # print(f'output_config: {output_config}')
     output_dir = os.path.dirname(output_config)
     if output_dir and not os.path.exists(output_dir):
         os.makedirs(output_dir)

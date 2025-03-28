@@ -117,7 +117,7 @@ list(APPEND PLATFORM_NEED_HDIR ${COMPONENT_PUBINC})
 string(REPLACE ";" " " PLATFORM_NEED_HDIR "${PLATFORM_NEED_HDIR}")
 set(PLATFORM_NEED_LIBS "${EXAMPLE_LIB} ${COMPONENTS_ALL_LIB}")
 if(TOS_FRAMEWORK STREQUAL "arduino")
-    if(PLATFORM_NAME STREQUAL "t2")
+    if(PLATFORM_NAME STREQUAL "T2")
         set(PLATFORM_NEED_LIBS "${EXAMPLE_LIB} ${COMPONENTS_ALL_LIB} stdc++")
     endif()
 endif()
@@ -161,7 +161,7 @@ add_custom_target(platform_clean
     COMMAND
     ./build_example.sh "${EXAMPLE_NAME}" "${CONFIG_PROJECT_VERSION}" "${PLATFORM_NEED_HDIR}"
     "${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}" "${PLATFORM_NEED_LIBS}"
-    "${EXECUTABLE_OUTPUT_PATH}" "clean"
+    "${EXECUTABLE_OUTPUT_PATH}" "clean" "${PLATFORM_CHIP}" | tee /dev/tty
 
     COMMENT
     "[TOP] Platform clean."
@@ -174,7 +174,7 @@ add_custom_target(platform_menuconfig
     COMMAND
     ./build_example.sh "${EXAMPLE_NAME}" "${CONFIG_PROJECT_VERSION}" "${PLATFORM_NEED_HDIR}"
     "${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}" "${PLATFORM_NEED_LIBS}"
-    "${EXECUTABLE_OUTPUT_PATH}" "menuconfig"
+    "${EXECUTABLE_OUTPUT_PATH}" "menuconfig" "${PLATFORM_CHIP}"
 
     COMMENT
     "[TOP] Platform menuconfig."
