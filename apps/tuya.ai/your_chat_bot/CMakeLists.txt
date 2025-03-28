@@ -13,10 +13,10 @@ get_filename_component(APP_NAME ${APP_PATH} NAME)
 aux_source_directory(${APP_PATH}/src APP_SRCS)
 
 file(GLOB_RECURSE display_srcs "${APP_PATH}/src/display/*.c")
-list(APPEND APP_SRCS ${display_srcs})
+file(GLOB_RECURSE media_srcs "${APP_PATH}/src/media/*.c")
+list(APPEND APP_SRCS ${display_srcs} ${media_srcs})
 
-
-set(APP_INC ${APP_PATH}/include)
+set(APP_INC ${APP_PATH}/include ${APP_PATH}/include/media)
 ########################################
 # Target Configure
 ########################################
