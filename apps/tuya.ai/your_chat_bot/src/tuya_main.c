@@ -255,7 +255,7 @@ void user_main(void)
     tal_sw_timer_init();
     tal_workq_init();
 
-    reset_netconfig_init();
+    reset_netconfig_start();
 
     tuya_iot_license_t license;
 
