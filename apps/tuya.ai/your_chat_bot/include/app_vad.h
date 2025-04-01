@@ -34,6 +34,10 @@ OPERATE_RET app_vad_frame_put(uint8_t *pbuf, uint16_t len);
 
 ty_vad_flag_e app_vad_get_flag(void);
 
+OPERATE_RET app_vad_start(void);
+
+OPERATE_RET app_vad_stop(void);
+
 #ifdef __cplusplus
 }
 #endif

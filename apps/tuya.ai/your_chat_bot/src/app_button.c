@@ -8,7 +8,9 @@
 #include "app_button.h"
 #include "app_recorder.h"
 #include "app_chat_bot.h"
-#include "tuya_display.h"
+#include "app_player.h"
+
+#include "netmgr.h"
 
 #include "tal_api.h"
 #include "tdd_button_gpio.h"
@@ -39,6 +41,19 @@ static TDL_BUTTON_HANDLE sg_button_hdl = NULL;
 static void __app_button_function_cb(char *name, TDL_BUTTON_TOUCH_EVENT_E event, void *argc)
 {
     APP_WORK_MODE_E work_mode = app_chat_bot_get_work_mode();
+    PR_DEBUG("app button function cb, work mode: %d", work_mode);
+
+    // network status
+    netmgr_status_e status = NETMGR_LINK_DOWN;
+    netmgr_conn_get(NETCONN_AUTO, NETCONN_CMD_STATUS, &status);
+    if (status == NETMGR_LINK_DOWN) {
+        PR_DEBUG("network is down, ignore button event");
+        if (app_player_is_playing()) {
+            return;
+        }
+        app_player_play_alert(APP_ALERT_TYPE_NOT_ACTIVE);
+        return;
+    }
 
     PR_DEBUG("button event: %s, %d", name, event);
 
@@ -46,15 +61,15 @@ static void __app_button_function_cb(char *name, TDL_BUTTON_TOUCH_EVENT_E event,
     case TDL_BUTTON_PRESS_DOWN: {
         if (work_mode == APP_CHAT_BOT_WORK_MODE_HOLD) {
             PR_DEBUG("button press down, chat bot enable");
-            // app_chat_bot_enable_set(1);
+            app_chat_bot_enable_set(1);
             app_recorder_stat_post(VOICE_STATE_IN_START);
         }
     } break;
     case TDL_BUTTON_PRESS_UP: {
         if (work_mode == APP_CHAT_BOT_WORK_MODE_HOLD) {
             PR_DEBUG("button press up, chat bot disable");
-            // app_chat_bot_enable_set(0);
             app_recorder_stat_post(VOICE_STATE_IN_STOP);
+            app_chat_bot_enable_set(0);
         }
     } break;
     case TDL_BUTTON_PRESS_SINGLE_CLICK: {
@@ -62,11 +77,7 @@ static void __app_button_function_cb(char *name, TDL_BUTTON_TOUCH_EVENT_E event,
             uint8_t is_enable = app_chat_bot_is_enable();
             is_enable = !is_enable;
             app_chat_bot_enable_set(is_enable);
-            PR_DEBUG("button single click, chat bot %s", is_enable ? "disable" : "enable");
-
-            TY_DISPLAY_TYPE_E disp_tp;
-            disp_tp = is_enable ? TY_DISPLAY_TP_STAT_LISTEN : TY_DISPLAY_TP_STAT_IDLE;
-            tuya_display_send_msg(disp_tp, NULL, 0);
+            PR_DEBUG("button single click, chat bot %s", is_enable ? "enable" : "disable");
         }
     } break;
     default:
