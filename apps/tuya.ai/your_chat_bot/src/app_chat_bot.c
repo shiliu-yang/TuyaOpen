@@ -29,6 +29,8 @@
 // vad cache size
 #define VAD_CACHE_SIZE (30 * 320) // 300ms pcm data
 
+#define RECORDER_DELAY_MS (200)
+
 /***********************************************************
 ***********************typedef define***********************
 ***********************************************************/
@@ -86,20 +88,59 @@ static APP_CHAT_BOT_S sg_chat_bot = {
 ***********************function define**********************
 ***********************************************************/
 
-static int __app_audio_frame_put(TKL_AUDIO_FRAME_INFO_T *pframe)
+static int __app_chat_bot_mode_hold(TKL_AUDIO_FRAME_INFO_T *pframe)
 {
-    if (sg_chat_bot.work_mode != APP_CHAT_BOT_WORK_MODE_HOLD) {
-        // mic data put to vad
-        app_vad_frame_put(pframe->pbuf, pframe->used_size);
-    }
-
-    // mic data put to recorder
     uint8_t is_playing = app_player_is_playing();
-    if (is_playing && VOICE_STATE_IN_IDLE == app_recorder_stat_get()) {
+
+    if (is_playing) {
+        // if player is playing, discard the data
         app_recorder_rb_reset();
         return 0;
     }
+
     app_recorder_rb_write(pframe->pbuf, pframe->used_size);
+
+    return 0;
+}
+
+static int __app_chat_bot_mode_one_shot(TKL_AUDIO_FRAME_INFO_T *pframe)
+{
+    static uint8_t recv_cnt = 0;
+    uint8_t is_playing = app_player_is_playing();
+
+    if (is_playing) {
+        app_vad_stop();
+        recv_cnt = 0;
+        return 0;
+    }
+
+    recv_cnt++;
+    if (recv_cnt < RECORDER_DELAY_MS / RECORDER_FRAME_SIZE) {
+        return 0;
+    }
+    recv_cnt = RECORDER_DELAY_MS / RECORDER_FRAME_SIZE; // Prevent overflow
+
+    app_vad_start();
+    app_vad_frame_put(pframe->pbuf, pframe->used_size);
+
+    app_recorder_rb_write(pframe->pbuf, pframe->used_size);
+
+    return 0;
+}
+
+static int __app_audio_frame_put(TKL_AUDIO_FRAME_INFO_T *pframe)
+{
+    if (sg_chat_bot.is_enable == 0) {
+        return 0;
+    }
+
+    if (APP_CHAT_BOT_WORK_MODE_HOLD == sg_chat_bot.work_mode) {
+        __app_chat_bot_mode_hold(pframe);
+    } else if (APP_CHAT_BOT_WORK_MODE_ONE_SHOT == sg_chat_bot.work_mode) {
+        __app_chat_bot_mode_one_shot(pframe);
+    } else {
+        return 0;
+    }
 
     return 0;
 }
@@ -256,8 +297,21 @@ OPERATE_RET app_chat_bot_enable_set(uint8_t enable)
     sg_chat_bot.is_enable = enable;
     tal_mutex_unlock(sg_chat_bot.enable_mutex);
 
-    // TODO: set led, display, etc.
+    // vad enable/disable
+    if (sg_chat_bot.work_mode != APP_CHAT_BOT_WORK_MODE_HOLD) {
+        if (enable) {
+            app_vad_start();
+        } else {
+            app_vad_stop();
+        }
+    }
+
+    // set led, display, etc.
     app_led_set(enable);
+
+    TY_DISPLAY_TYPE_E disp_tp;
+    disp_tp = enable ? TY_DISPLAY_TP_STAT_LISTEN : TY_DISPLAY_TP_STAT_IDLE;
+    tuya_display_send_msg(disp_tp, NULL, 0);
 
     return OPRT_OK;
 }
@@ -307,6 +361,8 @@ OPERATE_RET app_chat_bot_init(void)
     TUYA_CALL_ERR_RETURN(app_button_init(sg_chat_bot.config.btn.pin, sg_chat_bot.config.btn.active_level));
     // led init
     TUYA_CALL_ERR_RETURN(app_led_init(sg_chat_bot.config.led.pin, sg_chat_bot.config.led.active_level));
+
+    TUYA_CALL_ERR_LOG(app_chat_bot_enable_set(0));
 
     return OPRT_OK;
 }

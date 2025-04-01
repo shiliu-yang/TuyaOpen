@@ -24,6 +24,8 @@
 ***********************************************************/
 #define MP3_STREAM_BUFF_MAX_LEN (1024 * 64 * 2)
 
+#define PLAYING_NO_DATA_TIMEOUT_MS (5 * 1000)
+
 #define MP3_PCM_SIZE_MAX (MAX_NSAMP * MAX_NCHAN * MAX_NGRAN * 2)
 
 #define APP_PLAYER_STAT_CHANGE(new_stat)                                                                               \
@@ -42,6 +44,7 @@ typedef struct {
     MUTEX_HANDLE spk_rb_mutex;
     THREAD_HANDLE thrd_hdl;
     APP_PLAYER_STATE stat;
+    TIMER_ID tm_id;
 
     HMP3Decoder mp3_dec;
     MP3FrameInfo mp3_frame_info;
@@ -230,6 +233,13 @@ static void __chat_bot_player(void *arg)
         } break;
         case APP_PLAYER_STAT_PLAY: {
             rt = __app_player_mp3_playing();
+            if (OPRT_RECV_DA_NOT_ENOUGH == rt) {
+                tal_sw_timer_start(ctx->tm_id, PLAYING_NO_DATA_TIMEOUT_MS, TAL_TIMER_ONCE);
+            } else if (OPRT_OK == rt) {
+                if (tal_sw_timer_is_running(ctx->tm_id)) {
+                    tal_sw_timer_stop(ctx->tm_id);
+                }
+            }
             uint32_t rb_used_len = tuya_ring_buff_used_size_get(ctx->rb_hdl);
             if (rb_used_len == 0 && 0 == ctx->mp3_raw_used_len && ctx->is_eof) {
                 PR_DEBUG("app player end");
@@ -237,6 +247,9 @@ static void __chat_bot_player(void *arg)
             }
         } break;
         case APP_PLAYER_STAT_STOP: {
+            if (tal_sw_timer_is_running(ctx->tm_id)) {
+                tal_sw_timer_stop(ctx->tm_id);
+            }
             app_player_stat_post(APP_PLAYER_STAT_IDLE);
             ctx->is_playing = 0;
             ctx->is_eof = 0;
@@ -427,6 +440,13 @@ OPERATE_RET app_player_stop(void)
     return rt;
 }
 
+static void __app_playing_tm_cb(TIMER_ID timer_id, void *arg)
+{
+    PR_DEBUG("app player timeout cb, stop playing");
+    app_player_stat_post(APP_PLAYER_STAT_STOP);
+    return;
+}
+
 OPERATE_RET app_player_init(void)
 {
     OPERATE_RET rt = OPRT_OK;
@@ -439,6 +459,8 @@ OPERATE_RET app_player_init(void)
     TUYA_CALL_ERR_GOTO(tal_mutex_create_init(&sg_player.player_mutex), __ERR);
 
     tal_mutex_lock(sg_player.player_mutex);
+
+    TUYA_CALL_ERR_GOTO(tal_sw_timer_create(__app_playing_tm_cb, NULL, &sg_player.tm_id), __ERR);
 
     // create stat queue
     TUYA_CALL_ERR_GOTO(tal_mutex_create_init(&sg_player.stat_mutex), __ERR);

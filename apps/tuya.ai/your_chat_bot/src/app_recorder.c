@@ -97,7 +97,6 @@ static void __app_recorder_wait_asr_tm_cb(TIMER_ID timer_id, void *arg)
 static OPERATE_RET __app_recorder_vad_proc(void)
 {
     OPERATE_RET rt = OPRT_OK;
-    // static ty_vad_flag_e last_vad_state = TY_VAD_FLAG_VAD_NONE;
 
     uint8_t chat_bot_enable = app_chat_bot_is_enable();
 
@@ -119,20 +118,6 @@ static OPERATE_RET __app_recorder_vad_proc(void)
         // chat bot is disable
         return OPRT_OK;
     }
-
-    // if (last_vad_state != vad_state) {
-    //     if (TY_VAD_FLAG_VAD_START == vad_state && sg_recorder.state == VOICE_STATE_IN_IDLE) {
-    //         // vad first
-    //         PR_DEBUG("vad start");
-    //         app_recorder_stat_post(VOICE_STATE_IN_START);
-    //     } else if (TY_VAD_FLAG_VAD_END == vad_state && sg_recorder.state == VOICE_STATE_IN_VOICE) {
-    //         // vad end
-    //         PR_DEBUG("vad end");
-    //         app_recorder_stat_post(VOICE_STATE_IN_STOP);
-    //     }
-    // }
-
-    // last_vad_state = vad_state;
 
     if (TY_VAD_FLAG_VAD_START == vad_state && sg_recorder.state == VOICE_STATE_IN_IDLE) {
         // vad first
