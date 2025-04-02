@@ -121,6 +121,8 @@ static OPERATE_RET __app_ai_chat_txt_recv(AI_BIZ_ATTR_INFO_T *attr, AI_BIZ_HEAD_
         return OPRT_OK;
     }
 
+    // PR_DEBUG("content: %s", data);
+
     // parse bizType
     node = cJSON_GetObjectItem(json, "bizType");
     const char *bizType = cJSON_GetStringValue(node);
@@ -192,7 +194,24 @@ static OPERATE_RET __app_ai_chat_txt_recv(AI_BIZ_ATTR_INFO_T *attr, AI_BIZ_HEAD_
         }
 
     } else if (eof && strcmp(bizType, "SKILL") == 0) {
+        // {"bizId":"xxx","bizType":"SKILL","eof":1,"data":{"code":"emo","skillContent":{"emotion":["NEUTRAL"],"text":["😐"]}}}
         node = cJSON_GetObjectItem(json, "data");
+        cJSON *skillContent = cJSON_GetObjectItem(node, "skillContent");
+        cJSON *emotion = cJSON_GetObjectItem(skillContent, "emotion");
+        cJSON *emo_text = cJSON_GetObjectItem(skillContent, "text");
+        emo_text = cJSON_GetArrayItem(emo_text, 0);
+        if (NULL == emo_text) {
+            PR_ERR("emo text is NULL");
+        } else {
+            PR_DEBUG("emo text: %s", emo_text->valuestring);
+        }
+
+        APP_AI_MSG_T ai_msg = {
+            .type = APP_AI_MSG_TYPE_EMOTION,
+            .data_len = strlen(emo_text->valuestring),
+            .data = emo_text->valuestring,
+        };
+        sg_ai.msg_cb(&ai_msg);
     }
 
     cJSON_Delete(json);

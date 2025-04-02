@@ -101,7 +101,7 @@ OPERATE_RET app_vad_init(uint16_t sample_rate, uint16_t channel)
     vad_config.sample_rate = sample_rate;
     vad_config.channel = channel;
     vad_config.vad_frame_duration = 10;
-    vad_config.scale = 1.3;
+    vad_config.scale = 2.5;
 
     TUYA_CALL_ERR_RETURN(ty_vad_app_init(&vad_config));
 

@@ -187,6 +187,17 @@ static void __app_ai_msg_cb(APP_AI_MSG_T *msg)
         PR_DEBUG("---> AI_MSG_TYPE_AUDIO_STOP");
         app_player_data_write(msg->data, msg->data_len, 1);
     } break;
+    case APP_AI_MSG_TYPE_EMOTION: {
+        PR_DEBUG("---> AI_MSG_TYPE_EMOTION");
+        PR_DEBUG("emotion len: %d", msg->data_len);
+        if (msg->data_len > 0) {
+            // send emotion text to display
+            PR_DEBUG("emotion data: %s", msg->data);
+            for (int i = 0; i < msg->data_len; i++) {
+                PR_DEBUG("emotion data[%d]: 0x%x", i, msg->data[i]);
+            }
+        }
+    } break;
     default:
         break;
     }

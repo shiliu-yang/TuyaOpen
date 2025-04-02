@@ -23,6 +23,7 @@ typedef uint8_t APP_AI_MSG_TYPE_T;
 #define APP_AI_MSG_TYPE_AUDIO_START 0x03
 #define APP_AI_MSG_TYPE_AUDIO_DATA  0x04
 #define APP_AI_MSG_TYPE_AUDIO_STOP  0x05
+#define APP_AI_MSG_TYPE_EMOTION     0x06
 
 typedef struct {
     APP_AI_MSG_TYPE_T type;
