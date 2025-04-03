@@ -22,7 +22,7 @@
 
 #define RECORDER_UPLOAD_TIME_MS (100)
 
-#define APP_VAD_CHECK_TM_MS (300 + 100) // vad active duration is 300ms, add 100ms to upload
+#define APP_VAD_CHECK_TM_MS (300 + 300) // vad active duration is 300ms, add 300ms to upload
 
 #define APP_RECORDER_WAIT_ASR_TM_MS (10 * 1000)
 
