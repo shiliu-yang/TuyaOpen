@@ -12,7 +12,7 @@ platforms:
 - name: Ubuntu
   repo: https://github.com/tuya/TuyaOpen-ubuntu
   branch: platform_ubuntu
-  commit: 4f5964f4d65154fc336dd15cde834766dc0591e7
+  commit: 2d009224c5c6cebbfe09a9eebefa117dda97ffca
 
 - name: T5AI
   repo: https://github.com/tuya/TuyaOpen-T5AI
@@ -22,14 +22,14 @@ platforms:
 - name: ESP32
   repo: https://github.com/tuya/TuyaOpen-esp32
   branch: master
-  commit: f47841782adb711721dd1148bc694d7bf334feb5
+  commit: 2efe28ec6182e1e335d8844fe4aa7e22946db701
 
 - name: LN882H
   repo: https://github.com/tuya/TuyaOpen-ln882h
   branch: master
-  commit: ca49b2d9a57638584c8c6c6376edbe6d24bd3596
+  commit: 74e0f72f98f7ba33d9bf82e0ce795ffe273b4e9f
 
 - name: BK7231X
   repo: https://github.com/tuya/TuyaOpen-bk7231x
   branch: master
-  commit: 84a1eb939cd3034a190803f6a1d12add5b29c7b0
+  commit: 00c95e3dd3fdf823c983ba3b9ea3d02120924eb4
