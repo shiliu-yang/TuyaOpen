@@ -15,6 +15,8 @@
 #include "tuya_config.h"
 #include "tuya_iot.h"
 #include "tuya_iot_dp.h"
+#include "tal_cli.h"
+#include "tuya_authorize.h"
 #include <assert.h>
 #if defined(ENABLE_WIFI) && (ENABLE_WIFI == 1)
 #include "netconn_wifi.h"
@@ -25,6 +27,8 @@
 #if defined(ENABLE_LIBLWIP) && (ENABLE_LIBLWIP == 1)
 #include "lwip_init.h"
 #endif
+
+#include "reset_netcfg.h"
 
 #ifndef PROJECT_VERSION
 #define PROJECT_VERSION "1.0.0"
@@ -38,6 +42,9 @@ extern void tuya_app_cli_init(void);
 
 /* Tuya device handle */
 tuya_iot_client_t client;
+
+/* Tuya license information (uuid authkey) */
+tuya_iot_license_t license;
 
 /**
  * @brief user defined log output api, in this demo, it will use uart0 as log-tx
@@ -89,7 +96,7 @@ void user_event_handler_on(tuya_iot_client_t *client, tuya_event_msg_t *event)
     /* Print the QRCode for Tuya APP bind */
     case TUYA_EVENT_DIRECT_MQTT_CONNECTED: {
         char buffer[255];
-        sprintf(buffer, "https://smartapp.tuya.com/s/p?p=%s&uuid=%s&v=2.0", TUYA_PRODUCT_KEY, TUYA_OPENSDK_UUID);
+        sprintf(buffer, "https://smartapp.tuya.com/s/p?p=%s&uuid=%s&v=2.0", TUYA_PRODUCT_KEY, license.uuid);
         example_qrcode_string(buffer, user_log_output_cb, 0);
     } break;
 
@@ -210,11 +217,12 @@ void user_main()
     tal_sw_timer_init();
     tal_workq_init();
     tal_cli_init();
+    tuya_authorize_init();
     tuya_app_cli_init();
 
-    tuya_iot_license_t license;
+    reset_netconfig_start();
 
-    if (OPRT_OK != tuya_iot_license_read(&license)) {
+    if (OPRT_OK != tuya_authorize_read(&license)) {
         license.uuid = TUYA_OPENSDK_UUID;
         license.authkey = TUYA_OPENSDK_AUTHKEY;
         PR_WARN("Replace the TUYA_OPENSDK_UUID and TUYA_OPENSDK_AUTHKEY contents, otherwise the demo cannot work.\n \
@@ -253,6 +261,8 @@ void user_main()
     PR_DEBUG("tuya_iot_init success");
     /* Start tuya iot task */
     tuya_iot_start(&client);
+
+    reset_netconfig_check();
 
     for (;;) {
         /* Loop to receive packets, and handles client keepalive */

@@ -22,6 +22,8 @@
 #include "tuya_iot_dp.h"
 #include "netmgr.h"
 #include "tkl_output.h"
+#include "tal_cli.h"
+#include "tuya_authorize.h"
 #if defined(ENABLE_WIFI) && (ENABLE_WIFI == 1)
 #include "netconn_wifi.h"
 #endif
@@ -33,7 +35,9 @@
 #endif
 
 #include "tuya_display.h"
-#include "ai_audio_proc.h"
+#include "app_chat_bot.h"
+#include "ai_audio.h"
+#include "reset_netcfg.h"
 
 /* Tuya device handle */
 tuya_iot_client_t ai_client;
@@ -42,10 +46,9 @@ tuya_iot_client_t ai_client;
 #define PROJECT_VERSION "1.0.0"
 #endif
 
-#define VOLUME_KEY_NAME "VOLUME"
-#define DEFAULT_VOLUME  50
-
 #define DPID_VOLUME 3
+
+static uint8_t _need_reset = 0;
 
 /**
  * @brief user defined log output api, in this demo, it will use uart0 as log-tx
@@ -88,59 +91,33 @@ OPERATE_RET audio_dp_obj_proc(dp_obj_recv_t *dpobj)
         case DPID_VOLUME: {
             uint8_t volume = dp->value.dp_value;
             PR_DEBUG("volume:%d", volume);
-            audio_volume_set(volume);
-            tuya_audio_player_set_volume(volume);
+            ai_audio_set_volume(volume);
             break;
         }
-
-        default: {
+        default:
             break;
-        }
         }
     }
 
     return OPRT_OK;
 }
 
-void audio_volume_set(uint8_t volue)
+OPERATE_RET ai_audio_status_upload(void)
 {
-    OPERATE_RET rt = OPRT_OK;
-
-    TUYA_CALL_ERR_LOG(tal_kv_set(VOLUME_KEY_NAME, &volue, sizeof(volue)));
-}
-
-uint8_t audio_volume_get(void)
-{
-    OPERATE_RET rt = OPRT_OK;
-    uint8_t volue = 0;
-    size_t read_len;
-    uint8_t *read_volue = NULL;
-
-    rt = tal_kv_get(VOLUME_KEY_NAME, &read_volue, &read_len);
-    if (rt != OPRT_OK) {
-        PR_ERR("read volume failed");
-        return DEFAULT_VOLUME;
-    }
-
-    volue = *read_volue;
-    TUYA_CALL_ERR_LOG(tal_kv_free(read_volue));
-
-    return volue;
-}
-OPERATE_RET ai_audio_status_proc(void)
-{
-    OPERATE_RET rt = OPRT_OK;
     tuya_iot_client_t *client = tuya_iot_client_get();
     dp_obj_t dp_obj = {0};
 
-    uint8_t volume = audio_volume_get();
+    uint8_t volume = ai_audio_get_volume();
 
     dp_obj.id = DPID_VOLUME;
     dp_obj.type = PROP_VALUE;
     dp_obj.value.dp_value = volume;
 
+    PR_DEBUG("DP upload volume:%d", volume);
+
     return tuya_iot_dp_obj_report(client, client->activate.devid, &dp_obj, 1, 0);
 }
+
 /**
  * @brief user defined event handler
  *
@@ -156,15 +133,27 @@ void user_event_handler_on(tuya_iot_client_t *client, tuya_event_msg_t *event)
     switch (event->id) {
     case TUYA_EVENT_BIND_START:
         PR_INFO("Device Bind Start!");
+        if (_need_reset == 1) {
+            PR_INFO("Device Reset!");
+            tal_system_reset();
+        }
         // 软重启，未配网，播报配网提示
         tuya_display_send_msg(TY_DISPLAY_TP_STAT_NETCFG, NULL, 0);
-        tuya_audio_player_play_alert(AUDIO_ALART_TYPE_NETWORK_CFG, TRUE);
+        ai_audio_player_play_alert(AI_AUDIO_ALERT_NETWORK_CFG);
         break;
 
     /* MQTT with tuya cloud is connected, device online */
     case TUYA_EVENT_MQTT_CONNECTED:
         PR_INFO("Device MQTT Connected!");
         tal_event_publish(EVENT_MQTT_CONNECTED, NULL);
+
+        static uint8_t first = 1;
+        if (first) {
+            first = 0;
+            tuya_display_send_msg(TY_DISPLAY_TP_STAT_ONLINE, NULL, 0);
+            ai_audio_player_play_alert(AI_AUDIO_ALERT_NETWORK_CONNECTED);
+            ai_audio_status_upload();
+        }
         break;
 
     /* MQTT with tuya cloud is disconnected, device offline */
@@ -186,7 +175,8 @@ void user_event_handler_on(tuya_iot_client_t *client, tuya_event_msg_t *event)
 
     case TUYA_EVENT_RESET:
         PR_INFO("Device Reset:%d", event->value.asInteger);
-        tal_event_publish(EVENT_RESET, NULL);
+
+        _need_reset = 1;
         break;
 
     /* RECV OBJ DP */
@@ -254,12 +244,14 @@ void user_main(void)
     });
     tal_sw_timer_init();
     tal_workq_init();
+    tal_cli_init();
+    tuya_authorize_init();
 
-    reset_netconfig_init();
+    reset_netconfig_start();
 
     tuya_iot_license_t license;
 
-    if (OPRT_OK != tuya_iot_license_read(&license)) {
+    if (OPRT_OK != tuya_authorize_read(&license)) {
         license.uuid = TUYA_OPENSDK_UUID;
         license.authkey = TUYA_OPENSDK_AUTHKEY;
         PR_WARN("Replace the TUYA_OPENSDK_UUID and TUYA_OPENSDK_AUTHKEY contents, otherwise the demo cannot work.\n \
@@ -298,7 +290,7 @@ void user_main(void)
 
     PR_DEBUG("tuya_iot_init success");
 
-    ret = tuya_ai_audio_init();
+    ret = app_chat_bot_init();
     if (ret != OPRT_OK) {
         PR_ERR("tuya_audio_recorde_init failed");
         return;
@@ -350,7 +342,7 @@ static void tuya_app_thread(void *arg)
 
 void tuya_app_main(void)
 {
-    THREAD_CFG_T thrd_param = {4096 + 1024, 4, "tuya_app_main"};
+    THREAD_CFG_T thrd_param = {4096, 4, "tuya_app_main"};
     tal_thread_create_and_start(&ty_app_thread, NULL, NULL, tuya_app_thread, NULL, &thrd_param);
 }
 #endif

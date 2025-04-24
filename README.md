@@ -49,7 +49,41 @@ For detailed usage of the tos command, please refer to [tos command](./docs/en/t
 
 ### Step2. Select the project to be compiled
 
-Select the current compilation project, such as the [apps/tuya_cloud/switch_demo](https://github.com/tuya/TuyaOpen/tree/master/apps/tuya_cloud/switch_demo) project, or use the `tos set_example` command to select based on the platform. The `examples` directory will be modified to the corresponding platform's example.
+- Method 1: Compile Example
+
+To select the example to be compiled, use the `tos set_example` command to choose based on the platform. The `examples` directory will be modified to match the selected platform's example.
+
+For more information about examples, click [Example Project](#example).
+
+- Method 2: Compile App
+
+Select the app to be compiled, such as [apps/tuya_cloud/switch_demo](https://github.com/tuya/TuyaOpen/tree/master/apps/tuya_cloud/switch_demo), and switch to the corresponding directory.
+
+Use the `tos config_choice` command to select the target platform or board for compilation.
+
+```sh
+$ cd apps/tuya_cloud/switch_demo
+$ tos config_choice
+[TuyaOpen/apps/tuya_cloud/switch_demo/config] is empty.
+Using boards default config file.
+========================
+Configs
+  1. BK7231X.config
+  2. ESP32-C3.config
+  3. ESP32.config
+  4. ESP32-S3.config
+  5. LN882H.config
+  6. T2.config
+  7. T3.config
+  8. T5AI.config
+  9. Ubuntu.config
+------------------------
+Please select: 
+```
+
+The `tos config_choice` command reads the configuration files in the `config` directory of the project and generates the configuration file `app_default.config` for the current project.
+
+> After running `tos config_choice` to switch configurations, the `tos` command will automatically clear the previously compiled intermediate files in the current project.
 
 ### step3. Compilation
 Select the corresponding project for the current compilation in examples or apps, and then run the following command to compile:
@@ -67,12 +101,16 @@ The compiled target files include:
 The project name defaults to the directory name, and the project version defaults to `1.0.0`. These can be modified in the `tos menuconfig` configuration.
 
 ### step4. Configuration 
-To configure the selected examples or apps project, run the following command in the corresponding project directory for menu-driven configuration:
+If you need to modify the project configuration, select the corresponding example or app project that needs to be configured, and run the following command for menu-based configuration in the corresponding project directory:
+
 ```sh
 $ cd apps/tuya_cloud/switch_demo
 $ tos menuconfig
 ```
+
 Configure the current project, save and exit after configuration, and then compile the project.
+
+> When you run `tos menuconfig` to switch the chip or development board, the `tos` command will automatically clear the compiled intermediate files in the current project.
 
 ### Supported platform list
 | Name  | Support Status | Introduction | Debug log serial port |
@@ -84,7 +122,6 @@ Configure the current project, save and exit after configuration, and then compi
 | ESP32/ESP32C3/ESP32S3 | Supported | | Uart0/115200 |
 | LN882H | Supported |  | Uart1/921600 |
 | BK7231N | Supported | Supported Module List:  [CBU](https://developer.tuya.com/en/docs/iot/cbu-module-datasheet?id=Ka07pykl5dk4u)  [CB3S](https://developer.tuya.com/en/docs/iot/cb3s?id=Kai94mec0s076) [CB3L](https://developer.tuya.com/en/docs/iot/cb3l-module-datasheet?id=Kai51ngmrh3qm) [CB3SE](https://developer.tuya.com/en/docs/iot/CB3SE-Module-Datasheet?id=Kanoiluul7nl2) [CB2S](https://developer.tuya.com/en/docs/iot/cb2s-module-datasheet?id=Kafgfsa2aaypq) [CB2L](https://developer.tuya.com/en/docs/iot/cb2l-module-datasheet?id=Kai2eku1m3pyl) [CB1S](https://developer.tuya.com/en/docs/iot/cb1s-module-datasheet?id=Kaij1abmwyjq2) [CBLC5](https://developer.tuya.com/en/docs/iot/cblc5-module-datasheet?id=Ka07iqyusq1wm) [CBLC9](https://developer.tuya.com/en/docs/iot/cblc9-module-datasheet?id=Ka42cqnj9r0i5) [CB8P](https://developer.tuya.com/en/docs/iot/cb8p-module-datasheet?id=Kahvig14r1yk9) etc. | Uart2/115200 |
-| raspberry pico-w | In Development, to be released in Nov 2024 | | |
 
 ## Flashing
 
@@ -148,7 +185,7 @@ For versions prior to v1.8.0, you need to manually run the following command to 
 $ tos flash upgrade
 ```
 
-## Sample Projects
+## Example Projects <span id="example"></span>
 Each different chip has corresponding examples, and you can set the example project through the `tos set_example` command. Click [tos set_example](https://github.com/tuya/TuyaOpen/blob/master/docs/en/tos_guide.md#setting-example) to learn more details.
 
 ```sh
@@ -234,6 +271,9 @@ TuyaOpen provides a wealth of cloud connectivity application examples, which can
 ## Adding and Adapting New Platforms
 
 TuyaOpen supports adding and adapting new platforms. For specific operations, please refer to [Adding and Adapting New Platforms](./docs/en/new_platform.md).
+
+## Adding and Adapting New Boards
+TuyaOpen supports adding and adapting new boards. For specific operations, please refer to [Adding and Adapting New Boards](./docs/en/new_board.md).
 
 ## FAQ
 1. The supported platform for TuyaOpen are dynamically downloaded through subrepositories. Updating the TuyaOpen repository itself will not automatically update the subrepositories. If you encounter any issues with compilation, please navigate to the corresponding directory in the "platform" folder and use the `git pull` command to update, or delete the corresponding directory in the "platform" folder and download it again.

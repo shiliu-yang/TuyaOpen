@@ -1,4 +1,4 @@
-## Addition and Adaptation of Boards
+## Boards Addition and Adaptation
 
 ### Definition
 

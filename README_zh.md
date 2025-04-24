@@ -14,7 +14,7 @@ TuyaOpen 是一款跨芯片平台、操作系统的 AI+IoT 开发框架。它基
 ## 开始体验
 
 ### 安装依赖
-- buntu and Debian
+- Ubuntu and Debian
 
 ```sh
 $ sudo apt-get install lcov cmake-curses-gui build-essential ninja-build wget git python3 python3-pip python3-venv libc6-i386 libsystemd-dev
@@ -48,7 +48,41 @@ TuyaOpen 通过 tos 命令进行编译、调试等操作，tos 命令会根据�
 tos 命令的详细使用方法，请参考 [tos 命令](./docs/zh/tos_guide.md)。
 
 ### step2. 选择待编译项目
-选择当前编译项目，如 [apps/tuya_cloud/switch_demo](https://github.com/tuya/TuyaOpen/tree/master/apps/tuya_cloud/switch_demo) 项目，或使用命令`tos set_example`，根据平台完成选择，目录 `examples` 会修改为对应平台的示例。
+- 方式1：编译 example
+
+选择待编译 example，可使用命令`tos set_example`，根据平台完成选择，目录 `examples` 会修改为对应平台的示例。
+
+更多 example 信息点击 [示例工程](#example) 
+
+- 方式2：编译 app
+
+选择待编译 app，如 [apps/tuya_cloud/switch_demo](https://github.com/tuya/TuyaOpen/tree/master/apps/tuya_cloud/switch_demo) , 并切换至对应目录。
+
+使用 `tos config_choice` 命令选择编译目标平台或目标板。
+
+```sh
+$ cd apps/tuya_cloud/switch_demo
+$ tos config_choice
+[TuyaOpen/apps/tuya_cloud/switch_demo/config] is empty.
+Using boards default config file.
+========================
+Configs
+  1. BK7231X.config
+  2. ESP32-C3.config
+  3. ESP32.config
+  4. ESP32-S3.config
+  5. LN882H.config
+  6. T2.config
+  7. T3.config
+  8. T5AI.config
+  9. Ubuntu.config
+------------------------
+Please select: 
+```
+
+`tos config_choice` 命令读取项目下 `config` 目录中的配置文件，并会生成当前工程的配置文件 `app_default.config`。
+
+> 运行 `tos config_choice` 切换 config 后，tos 命令会自动清除当前工程下已经编译生成的编译中间文件
 
 ### step3. 编译
 选择当前编译的 examples 或 apps 对应工程，运行如下命令编译：
@@ -66,13 +100,15 @@ $ tos build
 项目名称默认为目录名称，项目版本默认为 `1.0.0`，可通过 `tos menuconfig` 配置中修改。
 
 ### step4. menuconfig 配置 
-选择需配置的 examples 或 apps 对应工程，在对应工程目录下运行如下命令进行菜单化配置：
+如需要修改项目的配置，选择需配置的 examples 或 apps 对应工程，在对应工程目录下运行如下命令进行菜单化配置：
 ```sh
 $ cd apps/tuya_cloud/switch_demo
 $ tos menuconfig
 ```
 
 配置当前工程，配置完成后保存退出，编译工程。
+
+> 运行 `tos menuconfig` 切换芯片或开发板后，tos 命令会自动清除当前工程下已经编译生成的编译中间文件
 
 ## 烧录
 ### GUI 工具烧录
@@ -134,6 +170,8 @@ v1.8.0 之前版本需要手工运行以下升级命令升级：
 $ tos flash upgrade
 ```
 
+更多 TuyaOpen 相关文档请参考 [TuyaOpen 开发指南](https://tuyaopen.readthedocs.io/zh-cn/latest)。
+
 ## 支持 platform 列表
 | 名称 | 支持状态 | 介绍 | 调试日志串口 |
 | ---- | ---- | ---- | ---- |
@@ -144,10 +182,9 @@ $ tos flash upgrade
 | ESP32/ESP32C3/ESP32S3 | 支持 | | Uart0/115200 |
 | LN882H | 支持 |  | Uart1/921600 |
 | BK7231N | 支持 | 支持模组列表:  [CBU](https://developer.tuya.com/cn/docs/iot/cbu-module-datasheet?id=Ka07pykl5dk4u)  [CB3S](https://developer.tuya.com/cn/docs/iot/cb3s?id=Kai94mec0s076) [CB3L](https://developer.tuya.com/cn/docs/iot/cb3l-module-datasheet?id=Kai51ngmrh3qm) [CB3SE](https://developer.tuya.com/cn/docs/iot/CB3SE-Module-Datasheet?id=Kanoiluul7nl2) [CB2S](https://developer.tuya.com/cn/docs/iot/cb2s-module-datasheet?id=Kafgfsa2aaypq) [CB2L](https://developer.tuya.com/cn/docs/iot/cb2l-module-datasheet?id=Kai2eku1m3pyl) [CB1S](https://developer.tuya.com/cn/docs/iot/cb1s-module-datasheet?id=Kaij1abmwyjq2) [CBLC5](https://developer.tuya.com/cn/docs/iot/cblc5-module-datasheet?id=Ka07iqyusq1wm) [CBLC9](https://developer.tuya.com/cn/docs/iot/cblc9-module-datasheet?id=Ka42cqnj9r0i5) [CB8P](https://developer.tuya.com/cn/docs/iot/cb8p-module-datasheet?id=Kahvig14r1yk9) 等 | Uart2/115200 |
-| raspberry pico-w | 开发中，将在 2024-11 发布 | | |
 
 
-## 示例工程
+## 示例工程 <span id="example"></span>
 
 不同的芯片都会对应的示例，需在 TuyaOpen 根目录下通过 `tos set_example` 命令设置示例工程，可点击 [tos set_example](https://github.com/tuya/TuyaOpen/blob/master/docs/zh/tos_guide.md#%E8%AE%BE%E7%BD%AE%E7%A4%BA%E4%BE%8B) 了解详情。
 
@@ -227,6 +264,10 @@ TuyaOpen 提供了丰富的云连接应用示例，相关应用位于 apps 目�
 ## platform 新增与适配
 
 TuyaOpen 支持新增与适配新的 platform，具体操作请参考 [platform 新增与适配](./docs/zh/new_platform.md)。
+
+## board 新增与适配
+
+TuyaOpen 支持新增与适配新的 board，具体操作请参考 [board 新增与适配](./docs/zh/new_board.md)。
 
 ## FAQ
 1. TuyaOpen 支持的 platform 通过子仓库动态下载，更新 TuyaOpen 仓库不会主动更新子仓库，如遇到问题无法正常编译，请至 platform 文件夹下对应的目录下使用 `git pull` 命令更新，或删除 platform 文件夹下对应目录后再次下载。
