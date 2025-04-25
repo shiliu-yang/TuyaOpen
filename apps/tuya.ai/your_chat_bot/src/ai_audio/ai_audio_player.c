@@ -438,6 +438,11 @@ OPERATE_RET ai_audio_player_stop(void)
         tal_system_sleep(5);
     }
 
+    tal_mutex_lock(sg_player.player_mutex);
+    tuya_ring_buff_reset(sg_player.rb_hdl);
+    tal_mutex_unlock(sg_player.player_mutex);
+
+
     tkl_ao_clear_buffer(TKL_AUDIO_TYPE_BOARD, 0);
 
     return rt;

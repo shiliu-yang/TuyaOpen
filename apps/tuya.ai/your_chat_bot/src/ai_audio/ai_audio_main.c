@@ -63,7 +63,7 @@ typedef enum {
 ***********************************************************/
 static AI_AUDIO_INFORM_CB sg_ai_agent_inform_cb = NULL;
 static AI_AUDIO_WORK_MODE_E sg_ai_audio_work_mode = AI_AUDIO_MODE_MANUAL_SINGLE_TALK;
-static AI_AUDIO_STATE_E sg_ai_audio_state = AI_AUDIO_STATE_DETECT_WAKEUP;
+static bool sg_is_chating = false;
 /***********************************************************
 ***********************function define**********************
 ***********************************************************/
@@ -83,13 +83,11 @@ static void __ai_audio_agent_msg_cb(AI_AGENT_MSG_T *msg)
         }
 
         ai_audio_cloud_stop_wait_asr();
-        sg_ai_audio_state = AI_AUDIO_STATE_GET_CLOD_ASR,
 
         event = AI_AUDIO_EVT_HUMAN_ASR_TEXT;
     } 
     break;
     case AI_AGENT_MSG_TP_AUDIO_START: {
-        sg_ai_audio_state = AI_AUDIO_STATE_PLAYER_AI_RESP;
     }
     break;
     case AI_AGENT_MSG_TP_AUDIO_DATA: {
@@ -98,7 +96,7 @@ static void __ai_audio_agent_msg_cb(AI_AGENT_MSG_T *msg)
     break;
     case AI_AGENT_MSG_TP_AUDIO_STOP: {
         ai_audio_player_data_write(msg->data, msg->data_len, 1);
-        sg_ai_audio_state = AI_AUDIO_STATE_PLAYER_LAST_AI_RESP;
+        sg_is_chating = false;
     } 
     break;
     case AI_AGENT_MSG_TP_TEXT_NLG: {
@@ -118,52 +116,33 @@ static void __ai_audio_agent_msg_cb(AI_AGENT_MSG_T *msg)
     }
 }
 
-static void __ai_audio_input_inform_handle(AI_AUDIO_INPUT_EVENT_E event, uint8_t *data, uint32_t len, void *arg)
+static void __ai_audio_input_inform_handle(AI_AUDIO_INPUT_EVENT_E event, void *arg)
 {
     static AI_AUDIO_INPUT_EVENT_E last_evt = 0xFF;
-    static AI_AUDIO_STATE_E last_state  = 0xFF;
 
     AI_AUDIO_INPUT_EVT_CHANGE(last_evt, event);
-    AI_AUDIO_STATE_EVT_CHANGE(last_state, sg_ai_audio_state);
 
-    last_state = sg_ai_audio_state;
     last_evt = event;
 
-    switch (event) {    
-    case AI_AUDIO_INPUT_EVT_IDLE:{
-        ai_audio_cloud_asr_idle();
-        ai_audio_cloud_asr_rb_reset();
-    }
-    break;
-    case AI_AUDIO_INPUT_EVT_ENTER_DETECT:{
-        if(AI_CLOUD_ASR_STATE_UPLOADING == ai_audio_cloud_asr_get_state()) {
-            ai_audio_cloud_asr_input(data, len);
-            ai_audio_cloud_asr_stop();
-            sg_ai_audio_state = AI_AUDIO_STATE_WAIT_CLOUD_ASR;
-        }else {
-            ai_audio_cloud_asr_vad_input(data, len);
-        }
-    }
-    break;
-    case AI_AUDIO_INPUT_EVT_DETECTING:{
-        ai_audio_cloud_asr_vad_input(data, len);
-        sg_ai_audio_state = AI_AUDIO_STATE_DETECT_WAKEUP;
-    }
-    break;
+    switch (event) {  
+    case AI_AUDIO_INPUT_EVT_NONE:
+        //do nothing
+    break;  
     case AI_AUDIO_INPUT_EVT_WAKEUP:{
-        ai_audio_cloud_asr_input(data, len);
-        if(AI_CLOUD_ASR_STATE_IDLE == ai_audio_cloud_asr_get_state()) {
-            ai_audio_cloud_asr_start();
-            sg_ai_audio_state = AI_AUDIO_STATE_UPLAOD;
-    
-            if (sg_ai_agent_inform_cb) {
-                sg_ai_agent_inform_cb(AI_AUDIO_EVT_WAKEUP, NULL, 0, NULL);
-            }
+        if(true == sg_is_chating){
+            ai_audio_cloud_asr_start(true);
+        }else {
+            ai_audio_cloud_asr_start(false);
+        }
+        sg_is_chating = true;
+
+        if (sg_ai_agent_inform_cb) {
+            sg_ai_agent_inform_cb(AI_AUDIO_EVT_WAKEUP, NULL, 0, NULL);
         }
     } 
     break;
-    case AI_AUDIO_INPUT_EVT_AWAKE:{
-        ai_audio_cloud_asr_input(data, len);
+    case AI_AUDIO_INPUT_EVT_AWAKE_STOP:{
+        ai_audio_cloud_asr_stop();
      }
      break;
     }
@@ -205,7 +184,7 @@ OPERATE_RET ai_audio_init(AI_AUDIO_CONFIG_T *cfg)
 
     TUYA_CALL_ERR_RETURN(tkl_ao_set_vol(TKL_AUDIO_TYPE_BOARD, 0, NULL, ai_audio_get_volume()));
 
-    TUYA_CALL_ERR_RETURN(ai_audio_cloud_asr_init(true));
+    TUYA_CALL_ERR_RETURN(ai_audio_cloud_asr_init());
 
     TUYA_CALL_ERR_RETURN(ai_audio_player_init());
 
@@ -275,8 +254,9 @@ OPERATE_RET ai_audio_set_open(bool is_open)
             ai_audio_player_stop();
         }
 
-        ai_audio_cloud_asr_rb_reset();
-        ai_audio_cloud_asr_idle();
+        ai_audio_cloud_asr_set_idle(true);
+
+        sg_is_chating = false;
     }
 
     return OPRT_OK;
