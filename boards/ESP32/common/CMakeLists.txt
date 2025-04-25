@@ -9,6 +9,7 @@ set(FONT_SRC
 set(BOARD_SRC
     "${FONT_SRC}"
     "${COMMON_PATH}/audio/tdd_audio_no_codec.c"
+    "${COMMON_PATH}/audio/tdd_audio_8311_codec.c"
     "${COMMON_PATH}/display/oled_display.c"
     )
 

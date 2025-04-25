@@ -12,16 +12,18 @@
 #define MINIMP3_IMPLEMENTATION
 
 #include "tkl_system.h"
-#include "tkl_audio.h"
 #include "tkl_memory.h"
 #include "tkl_thread.h"
 
 #include "tal_api.h"
 #include "tuya_ringbuf.h"
 
+#include "tdl_audio_manage.h"
+
 #include "ai_media_alert.h"
 #include "minimp3_ex.h"
 #include "ai_audio.h"
+
 /***********************************************************
 ************************macro define************************
 ***********************************************************/
@@ -46,6 +48,7 @@
 ***********************typedef define***********************
 ***********************************************************/
 typedef struct {
+    TDL_AUDIO_HANDLE_T audio_hdl;
     MUTEX_HANDLE player_mutex;
 
     TUYA_RINGBUFF_T rb_hdl;
@@ -160,10 +163,12 @@ static OPERATE_RET __ai_audio_player_mp3_playing(void)
     ctx->mp3_raw_used_len -= ctx->mp3_frame_info.frame_bytes;
     ctx->mp3_raw_head += ctx->mp3_frame_info.frame_bytes;
 
-    TKL_AUDIO_FRAME_INFO_T frame;
-    frame.pbuf = (char *)ctx->mp3_pcm;
-    frame.used_size = samples * 2;
-    tkl_ao_put_frame(0, 0, NULL, &frame);
+    if (NULL == ctx->audio_hdl) {
+        tdl_audio_find(AUDIO_DRIVER_NAME, &ctx->audio_hdl);
+    }
+    if (ctx->audio_hdl) {
+        tdl_audio_play(ctx->audio_hdl, ctx->mp3_pcm, samples * 2);
+    }
 
 __EXIT:
     return rt;
@@ -207,7 +212,7 @@ static void __ai_audio_player_task(void *arg)
         if (stat != ctx->stat && rt == OPRT_OK) {
             AI_AUDIO_PLAYER_STAT_CHANGE(stat);
         }
-        next_timeout = (ctx->stat == AI_AUDIO_PLAYER_STAT_PLAY) ? 5 : 500;
+        next_timeout = (ctx->stat == AI_AUDIO_PLAYER_STAT_PLAY) ? 10 : 500;
 
         switch (ctx->stat) {
         case AI_AUDIO_PLAYER_STAT_IDLE: {
@@ -323,7 +328,7 @@ OPERATE_RET ai_audio_player_init(void)
     TUYA_CALL_ERR_GOTO(tal_mutex_create_init(&sg_player.spk_rb_mutex), __ERR);
 
     // thread init
-    TUYA_CALL_ERR_GOTO(tkl_thread_create_in_psram(&sg_player.thrd_hdl, "ai_player", 1024 * 2, THREAD_PRIO_2,
+    TUYA_CALL_ERR_GOTO(tkl_thread_create_in_psram(&sg_player.thrd_hdl, "ai_player", 1024 * 4, THREAD_PRIO_2,
                                                   __ai_audio_player_task, NULL),
                        __ERR);
 
@@ -435,15 +440,19 @@ OPERATE_RET ai_audio_player_stop(void)
 
     // wait for stop
     while (sg_player.is_playing) {
-        tal_system_sleep(5);
+        tal_system_sleep(10);
     }
 
     tal_mutex_lock(sg_player.player_mutex);
     tuya_ring_buff_reset(sg_player.rb_hdl);
     tal_mutex_unlock(sg_player.player_mutex);
 
-
-    tkl_ao_clear_buffer(TKL_AUDIO_TYPE_BOARD, 0);
+    if (NULL == sg_player.audio_hdl) {
+        tdl_audio_find(AUDIO_DRIVER_NAME, &sg_player.audio_hdl);
+    }
+    if (sg_player.audio_hdl) {
+        tdl_audio_play_stop(sg_player.audio_hdl);
+    }
 
     return rt;
 }
@@ -528,11 +537,11 @@ OPERATE_RET ai_audio_player_play_alert_syn(AI_AUDIO_ALERT_TYPE_E type)
     ai_audio_player_play_alert(type);
 
     while (!ai_audio_player_is_playing()) {
-        tkl_system_sleep(5);
+        tal_system_sleep(10);
     }
 
     while (ai_audio_player_is_playing()) {
-        tkl_system_sleep(5);
+        tal_system_sleep(10);
     }
 
     return OPRT_OK;

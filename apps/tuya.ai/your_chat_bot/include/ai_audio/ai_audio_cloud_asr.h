@@ -2,9 +2,9 @@
  * @file ai_audio_cloud_asr.h
  * @brief Header file for the audio cloud ASR module, which handles audio recording, buffering, and uploading.
  *
- * This header file declares the functions and types necessary for initializing and managing the audio recording process,
- * including setting up buffers, timers, and threads. It also provides functions to write audio data, reset the buffer,
- * post new states, and retrieve the current state.
+ * This header file declares the functions and types necessary for initializing and managing the audio recording
+ * process, including setting up buffers, timers, and threads. It also provides functions to write audio data, reset the
+ * buffer, post new states, and retrieve the current state.
  *
  * @copyright Copyright (c) 2021-2025 Tuya Inc. All Rights Reserved.
  */
@@ -41,7 +41,6 @@ typedef enum {
  * @return OPERATE_RET - OPRT_OK if initialization is successful, otherwise an error code.
  */
 OPERATE_RET ai_audio_cloud_asr_init(void);
-
 
 OPERATE_RET ai_audio_cloud_asr_update_vad_data(void);
 

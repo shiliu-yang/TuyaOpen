@@ -34,23 +34,27 @@ extern "C" {
 typedef enum {
     AI_AUDIO_INPUT_STATE_IDLE,
     AI_AUDIO_INPUT_STATE_DETECTING,   
-    AI_AUDIO_INPUT_STATE_AWAKE,
+    AI_AUDIO_INPUT_STATE_GET_VALID_DATA,
+    AI_AUDIO_INPUT_STATE_ASR_WAKEUP_WORD,
 } AI_AUDIO_INPUT_STATE_E;
 
 typedef enum {
     AI_AUDIO_INPUT_EVT_NONE,
-    AI_AUDIO_INPUT_EVT_WAKEUP,
-    AI_AUDIO_INPUT_EVT_AWAKE_STOP,
+    AI_AUDIO_INPUT_EVT_GET_VALID_VOICE_START,
+    AI_AUDIO_INPUT_EVT_GET_VALID_VOICE_STOP,
+    AI_AUDIO_INPUT_EVT_ASR_WAKEUP_WORD,
+    AI_AUDIO_INPUT_EVT_ASR_WAKEUP_STOP, // Valid audio data can only be retained after the wake-up word is recognized again.
 } AI_AUDIO_INPUT_EVENT_E;
 
 typedef enum {
-    AI_AUDIO_INPUT_WAKEUP_MANUAL, // manual trigger wakeup
-    AI_AUDIO_INPUT_WAKEUP_VAD,    // detect vad
-    AI_AUDIO_INPUT_WAKEUP_MAX,
-} AI_AUDIO_INPUT_WAKEUP_TP_E;
+    AI_AUDIO_INPUT_VALID_METHOD_MANUAL, // Manually control whether to retain valid audio data.
+    AI_AUDIO_INPUT_VALID_METHOD_VAD,    // Valid audio data can only be retained after the VAD (Voice Activity Detection) detects human voices.
+    AI_AUDIO_INPUT_VALID_METHOD_ASR,    // Valid audio data can only be retained after the wake-up word is recognized
+    AI_AUDIO_INPUT_VALID_METHOD_MAX,
+}AI_AUDIO_INPUT_VALID_METHOD_E;
 
 typedef struct {
-    AI_AUDIO_INPUT_WAKEUP_TP_E wakeup_tp;
+    AI_AUDIO_INPUT_VALID_METHOD_E get_valid_data_method;
 } AI_AUDIO_INPUT_CFG_T;
 
 typedef void (*AI_AUDIO_INOUT_INFORM_CB)(AI_AUDIO_INPUT_EVENT_E event, void *arg);
@@ -66,20 +70,13 @@ typedef void (*AI_AUDIO_INOUT_INFORM_CB)(AI_AUDIO_INPUT_EVENT_E event, void *arg
  */
 OPERATE_RET ai_audio_input_init(AI_AUDIO_INPUT_CFG_T *cfg, AI_AUDIO_INOUT_INFORM_CB cb);
 
-/**
- * @brief Enables or disables the wakeup functionality of the audio input system.
- * @param is_enable Boolean flag indicating whether to enable (true) or disable (false) the wakeup functionality.
- * @return OPERATE_RET - OPRT_OK on success, or an error code on failure.
- */
-OPERATE_RET ai_audio_input_enable_wakeup(bool is_enable);
+OPERATE_RET ai_audio_input_enable_get_valid_data(bool is_enable);
 
-/**
- * @brief Manually triggers the wakeup functionality of the audio input system.
- * @param is_wakeup Boolean flag indicating whether to manually trigger (true) or reset (false) the wakeup state.
- * @return OPERATE_RET - OPRT_OK on success, or an error code on failure.
- */
-OPERATE_RET ai_audio_input_manual_set_wakeup(bool is_wakeup);
+OPERATE_RET ai_audio_input_manual_open_get_valid_data(bool is_open);
 
+OPERATE_RET ai_audio_input_stop_asr_awake(void);
+
+OPERATE_RET ai_audio_input_restart_asr_awake_timer(void);
 
 uint32_t ai_audio_get_input_data(uint8_t *buff, uint32_t buff_len);
 
