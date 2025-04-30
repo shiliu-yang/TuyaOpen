@@ -154,8 +154,10 @@ static void __ui_font_init(APP_UI_FONT_T *font)
 
 static void __ui_notification_timeout_cb(TIMER_ID timer_id, void *arg)
 {
+    tuya_lvgl_mutex_lock();
     lv_obj_add_flag(sg_ui.ui.notification_label, LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag(sg_ui.ui.status_label, LV_OBJ_FLAG_HIDDEN);
+    tuya_lvgl_mutex_unlock();
 }
 
 void ui_frame_init(void)
