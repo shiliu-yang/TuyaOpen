@@ -18,6 +18,7 @@
 #include "netmgr.h"
 
 #include "tkl_wifi.h"
+#include "tkl_memory.h"
 
 /***********************************************************
 ************************macro define************************
@@ -63,7 +64,13 @@ static APP_SYSTEM_INFO_T system_info = {0};
 static void __app_free_heap_tm_cb(TIMER_ID timer_id, void *arg)
 {
     uint32_t free_heap = tal_system_get_free_heap_size();
+
+#ifdef PLATFORM_ESP32
+    uint32_t psram_free_heap = tkl_system_psram_get_free_heap_size();
+    PR_INFO("Free heap size:%d, PSRAM free heap size:%d", free_heap, psram_free_heap);
+#else
     PR_INFO("Free heap size:%d", free_heap);
+#endif
 }
 
 static void __app_display_net_status_update(void)
