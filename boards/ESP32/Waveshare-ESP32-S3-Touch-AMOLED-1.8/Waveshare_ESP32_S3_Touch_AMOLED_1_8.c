@@ -10,9 +10,10 @@
 #include "app_board_api.h"
 
 #include "board_config.h"
-#include "oled_display.h"
 
 #include "tdd_audio_8311_codec.h"
+
+#include "tkl_memory.h"
 
 /***********************************************************
 ************************macro define************************
@@ -57,32 +58,57 @@ int app_audio_driver_init(const char *name)
     return tdd_audio_8311_codec_register(name, cfg);
 }
 
-void app_display_init(void)
+OPERATE_RET app_display_init(void)
 {
-    return;
+
+    return OPRT_OK;
 }
 
-void app_display_set_status(const char *status)
+OPERATE_RET app_display_send_msg(TY_DISPLAY_TYPE_E tp, uint8_t *data, int len)
 {
-    return;
-}
+    uint8_t *p_data = NULL;
 
-void app_display_show_notification(const char *notification)
-{
-    return;
-}
+    if (len > 0) {
+        p_data = tkl_system_malloc(len + 1);
+        if (p_data == NULL) {
+            return OPRT_MALLOC_FAILED;
+        }
+        memset(p_data, 0, len + 1);
+        memcpy(p_data, data, len);
+    }
 
-void app_display_set_emotion(const char *emotion)
-{
-    return;
-}
+    // switch (tp) {
+    // case TY_DISPLAY_TP_USER_MSG: {
+    //     oled_set_chat_message(CHAT_ROLE_USER, p_data);
+    // } break;
+    // case TY_DISPLAY_TP_ASSISTANT_MSG: {
+    //     oled_set_chat_message(CHAT_ROLE_ASSISTANT, p_data);
+    // } break;
+    // case TY_DISPLAY_TP_SYSTEM_MSG: {
+    //     oled_set_chat_message(CHAT_ROLE_SYSTEM, p_data);
+    // } break;
+    // case TY_DISPLAY_TP_EMOTION: {
+    //     oled_set_emotion(p_data);
+    // } break;
+    // case TY_DISPLAY_TP_STATUS: {
+    //     oled_set_status(p_data);
+    // } break;
+    // case TY_DISPLAY_TP_NOTIFICATION: {
+    //     oled_show_notification(p_data);
+    // } break;
+    // case TY_DISPLAY_TP_NETWORK: {
+    //     UI_WIFI_STATUS_E status = p_data[0];
+    //     oled_set_wifi_status(status);
+    // } break;
+    // default: {
+    //     return OPRT_INVALID_PARM;
+    // } break;
+    // }
 
-void app_display_set_chat_massage(CHAT_ROLE_E role, const char *content)
-{
-    return;
-}
+    if (p_data != NULL) {
+        tkl_system_free(p_data);
+        p_data = NULL;
+    }
 
-void app_display_set_wifi_status(DIS_WIFI_STATUS_E status)
-{
-    return;
+    return OPRT_OK;
 }

@@ -27,19 +27,25 @@ extern "C" {
 ********************function declaration********************
 ***********************************************************/
 
-int app_audio_driver_init(const char *name);
+OPERATE_RET app_audio_driver_init(const char *name);
 
-void app_display_init(void);
+/**
+ * @brief Initialize the display system
+ *
+ * @param None
+ * @return OPERATE_RET Initialization result, OPRT_OK indicates success
+ */
+OPERATE_RET app_display_init(void);
 
-void app_display_set_status(const char *status);
-
-void app_display_show_notification(const char *notification);
-
-void app_display_set_emotion(const char *emotion);
-
-void app_display_set_chat_massage(CHAT_ROLE_E role, const char *content);
-
-void app_display_set_wifi_status(DIS_WIFI_STATUS_E status);
+/**
+ * @brief Send display message to the display system
+ *
+ * @param tp Type of the display message
+ * @param data Pointer to the message data
+ * @param len Length of the message data
+ * @return OPERATE_RET Result of sending the message, OPRT_OK indicates success
+ */
+OPERATE_RET app_display_send_msg(TY_DISPLAY_TYPE_E tp, uint8_t *data, int len);
 
 #ifdef __cplusplus
 }
