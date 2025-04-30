@@ -15,6 +15,8 @@
 
 #include "tkl_memory.h"
 
+#include "lcd_display.h"
+
 /***********************************************************
 ************************macro define************************
 ***********************************************************/
@@ -60,6 +62,10 @@ int app_audio_driver_init(const char *name)
 
 OPERATE_RET app_display_init(void)
 {
+    extern void __display_sh8601_init(void);
+    __display_sh8601_init();
+
+    ui_frame_init();
 
     return OPRT_OK;
 }
@@ -77,33 +83,40 @@ OPERATE_RET app_display_send_msg(TY_DISPLAY_TYPE_E tp, uint8_t *data, int len)
         memcpy(p_data, data, len);
     }
 
-    // switch (tp) {
-    // case TY_DISPLAY_TP_USER_MSG: {
-    //     oled_set_chat_message(CHAT_ROLE_USER, p_data);
-    // } break;
-    // case TY_DISPLAY_TP_ASSISTANT_MSG: {
-    //     oled_set_chat_message(CHAT_ROLE_ASSISTANT, p_data);
-    // } break;
-    // case TY_DISPLAY_TP_SYSTEM_MSG: {
-    //     oled_set_chat_message(CHAT_ROLE_SYSTEM, p_data);
-    // } break;
-    // case TY_DISPLAY_TP_EMOTION: {
-    //     oled_set_emotion(p_data);
-    // } break;
-    // case TY_DISPLAY_TP_STATUS: {
-    //     oled_set_status(p_data);
-    // } break;
-    // case TY_DISPLAY_TP_NOTIFICATION: {
-    //     oled_show_notification(p_data);
-    // } break;
-    // case TY_DISPLAY_TP_NETWORK: {
-    //     UI_WIFI_STATUS_E status = p_data[0];
-    //     oled_set_wifi_status(status);
-    // } break;
-    // default: {
-    //     return OPRT_INVALID_PARM;
-    // } break;
-    // }
+    switch (tp) {
+    case TY_DISPLAY_TP_USER_MSG: {
+        // oled_set_chat_message(CHAT_ROLE_USER, p_data);
+        ui_set_user_msg(p_data);
+    } break;
+    case TY_DISPLAY_TP_ASSISTANT_MSG: {
+        // oled_set_chat_message(CHAT_ROLE_ASSISTANT, p_data);
+        ui_set_assistant_msg(p_data);
+    } break;
+    case TY_DISPLAY_TP_SYSTEM_MSG: {
+        // oled_set_chat_message(CHAT_ROLE_SYSTEM, p_data);
+        ui_set_system_msg(p_data);
+    } break;
+    case TY_DISPLAY_TP_EMOTION: {
+        // oled_set_emotion(p_data);
+        ui_set_emotion(p_data);
+    } break;
+    case TY_DISPLAY_TP_STATUS: {
+        // oled_set_status(p_data);
+        ui_set_status(p_data);
+    } break;
+    case TY_DISPLAY_TP_NOTIFICATION: {
+        // oled_show_notification(p_data);
+        ui_set_notification(p_data);
+    } break;
+    case TY_DISPLAY_TP_NETWORK: {
+        UI_WIFI_STATUS_E status = p_data[0];
+        // oled_set_wifi_status(status);
+        ui_set_network(status);
+    } break;
+    default: {
+        return OPRT_INVALID_PARM;
+    } break;
+    }
 
     if (p_data != NULL) {
         tkl_system_free(p_data);

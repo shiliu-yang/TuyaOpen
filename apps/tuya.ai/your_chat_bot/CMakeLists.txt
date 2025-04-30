@@ -16,8 +16,14 @@ file(GLOB_RECURSE ai_audio_srcs "${APP_PATH}/src/ai_audio/*.c")
 file(GLOB_RECURSE media_srcs "${APP_PATH}/src/ai_audio/media/*.c")
 list(APPEND APP_SRCS ${ai_audio_srcs} ${media_srcs})
 
+set(ASSETS_SRC "")
+
+if (NOT CONFIG_PLATFORM_CHOICE STREQUAL "ESP32")
+list(APPEND ASSETS_SRC "${APP_PATH}/assets")
+endif()
+
 set(APP_INC 
-            ${APP_PATH}/assets
+            ${ASSETS_SRC}
             ${APP_PATH}/include
             ${APP_PATH}/include/ai_audio
             ${APP_PATH}/include/ai_audio/media
