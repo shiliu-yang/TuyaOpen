@@ -28,6 +28,8 @@ extern "C" {
 
 OPERATE_RET app_chat_bot_init(void);
 
+uint8_t app_chat_bot_get_enable(void);
+
 #ifdef __cplusplus
 }
 #endif

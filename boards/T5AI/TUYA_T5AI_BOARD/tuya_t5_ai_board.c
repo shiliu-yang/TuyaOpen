@@ -7,8 +7,6 @@
 
 #include "tuya_cloud_types.h"
 
-#include "app_board_api.h"
-
 #include "tdd_audio_t5ai.h"
 
 #include "tkl_audio.h"

@@ -22,12 +22,25 @@ typedef uint8_t CHAT_ROLE_E;
 #define CHAT_ROLE_ASSISTANT 1
 #define CHAT_ROLE_SYSTEM    2
 
+typedef enum {
+    TY_DISPLAY_TP_USER_MSG = 0,
+    TY_DISPLAY_TP_ASSISTANT_MSG,
+    TY_DISPLAY_TP_SYSTEM_MSG,
+
+    TY_DISPLAY_TP_EMOTION,
+    TY_DISPLAY_TP_STATUS,
+    TY_DISPLAY_TP_NOTIFICATION,
+    TY_DISPLAY_TP_NETWORK,
+
+    TY_DISPLAY_TP_MAX,
+} TY_DISPLAY_TYPE_E;
+
 // display network status
-typedef uint8_t DIS_WIFI_STATUS_E;
-#define DIS_WIFI_STATUS_DISCONNECTED 0
-#define DIS_WIFI_STATUS_GOOD         1
-#define DIS_WIFI_STATUS_FAIR         2
-#define DIS_WIFI_STATUS_WEAK         3
+typedef uint8_t UI_WIFI_STATUS_E;
+#define UI_WIFI_STATUS_DISCONNECTED 0
+#define UI_WIFI_STATUS_GOOD         1
+#define UI_WIFI_STATUS_FAIR         2
+#define UI_WIFI_STATUS_WEAK         3
 
 /***********************************************************
 ***********************typedef define***********************

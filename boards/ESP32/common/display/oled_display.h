@@ -42,7 +42,7 @@ void oled_set_emotion(const char *emotion);
 
 void oled_set_chat_message(CHAT_ROLE_E role, const char *content);
 
-void oled_set_wifi_status(DIS_WIFI_STATUS_E status);
+void oled_set_wifi_status(UI_WIFI_STATUS_E status);
 
 #ifdef __cplusplus
 }

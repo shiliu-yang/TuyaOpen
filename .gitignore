@@ -15,8 +15,10 @@ tuyadb/
 __pycache__
 .build
 *.using_config
+.mirror
 
 /arduino-tuyaopen
 /examples
 /tools/tyutool/*tyutool_*
+/tools/tyutool/cache/
 /.set_example

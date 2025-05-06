@@ -166,12 +166,10 @@ static void __ai_audio_asr_feed(void *data, uint32_t len)
             uint32_t discard_size = rb_used_size - AI_AUDIO_VOICE_FRAME_LEN_GET(AI_AUDIO_VAD_ACITVE_TM_MS);
             tuya_ring_buff_discard(sg_audio_input.asr.feed_ringbuff, discard_size);
         }
-#if defined(PLATFORM_ESP32) && (PLATFORM_ESP32 == 1)
-        tuya_ring_buff_write(sg_audio_input.asr.feed_ringbuff, data, len);
-#endif
-    } else {
-        tuya_ring_buff_write(sg_audio_input.asr.feed_ringbuff, data, len);
     }
+
+    tuya_ring_buff_write(sg_audio_input.asr.feed_ringbuff, data, len);
+
     tal_mutex_unlock(sg_audio_input.asr.rb_mutex);
 
     return;
@@ -247,7 +245,7 @@ static OPERATE_RET __ai_audio_vad_init(void)
     vad_config.channel_num = 1;
     vad_config.speech_min_ms = 300;
     vad_config.noise_min_ms = 500;
-    vad_config.scale = 2.5;
+    vad_config.scale = 1.0;
     vad_config.frame_duration_ms = 10;
 
     TUYA_CALL_ERR_RETURN(tkl_vad_init(&vad_config));

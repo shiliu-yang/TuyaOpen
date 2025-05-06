@@ -441,7 +441,7 @@ void oled_set_chat_message(CHAT_ROLE_E role, const char *content)
     return;
 }
 
-void oled_set_wifi_status(DIS_WIFI_STATUS_E status)
+void oled_set_wifi_status(UI_WIFI_STATUS_E status)
 {
     if (NULL == ui_hdl.network_label) {
         return;
@@ -450,16 +450,16 @@ void oled_set_wifi_status(DIS_WIFI_STATUS_E status)
     char *wifi_icon = NULL;
 
     switch (status) {
-    case DIS_WIFI_STATUS_DISCONNECTED:
+    case UI_WIFI_STATUS_DISCONNECTED:
         wifi_icon = FONT_AWESOME_WIFI_OFF;
         break;
-    case DIS_WIFI_STATUS_GOOD:
+    case UI_WIFI_STATUS_GOOD:
         wifi_icon = FONT_AWESOME_WIFI;
         break;
-    case DIS_WIFI_STATUS_FAIR:
+    case UI_WIFI_STATUS_FAIR:
         wifi_icon = FONT_AWESOME_WIFI_FAIR;
         break;
-    case DIS_WIFI_STATUS_WEAK:
+    case UI_WIFI_STATUS_WEAK:
         wifi_icon = FONT_AWESOME_WIFI_WEAK;
         break;
     default:

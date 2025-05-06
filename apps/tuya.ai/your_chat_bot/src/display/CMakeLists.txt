@@ -25,8 +25,11 @@ endif()
 list(APPEND APP_MODULE_INC ${GUI_INC})
 list(APPEND APP_MODULE_SCRS ${GUI_SRC})
 
+aux_source_directory(${APP_MODULE_PATH}/material/emoji EMOJI_SCRS)
+
 list(APPEND APP_MODULE_SCRS
-    ${APP_MODULE_PATH}/material/font_awesome_30_4.c
+    ${EMOJI_SCRS}
+    ${APP_MODULE_PATH}/material/font_awesome_16_4.c
     ${APP_MODULE_PATH}/material/font_puhui_18_2.c
     ${APP_MODULE_PATH}/material/icon_listen.c
 )

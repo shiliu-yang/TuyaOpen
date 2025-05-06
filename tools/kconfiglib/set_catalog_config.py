@@ -16,7 +16,9 @@ KCONFIG = "Kconfig"
 
 
 def set_config(board, src_dir, app_dir, output_config):
-    app_name = os.path.basename(app_dir)
+    app_name = "none"
+    if app_dir:
+        app_name = os.path.basename(app_dir)
     context = f'''# CatalogKconfig
 menu "configure project"
     config PROJECT_NAME
@@ -80,7 +82,7 @@ def main():
     output_config = args.output
     # print(f'board: {board}')
     # print(f'src_dir: {src_dir}')
-    # print(f'app_dif: {app_dif}')
+    # print(f'app_dir: {app_dir}')
     # print(f'output_config: {output_config}')
     output_dir = os.path.dirname(output_config)
     if output_dir and not os.path.exists(output_dir):

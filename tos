@@ -22,6 +22,41 @@ fi
 # ==============================================================================
 # executing define
 # ------------------------------------------------------------------------------
+function enable_mirror()
+{
+    if [ -f ${OPEN_SDK_ROOT}/.mirror ]; then
+        MIRROR=$(cat ${OPEN_SDK_ROOT}/.mirror)
+    else
+        echo "get_country_code ..."
+        if command -v python3 &>/dev/null; then
+            PYTHON_CMD=python3
+        elif command -v python &>/dev/null && python --version | grep -q '^Python 3'; then
+            PYTHON_CMD=python
+        else
+            echo "Python 3 is not installed."
+            exit 1
+        fi
+
+        MIRROR=$(${PYTHON_CMD} ${OPEN_SDK_ROOT}/tools/get_conutry.py)
+        echo "MIRROR=${MIRROR}"
+
+        echo ${MIRROR} > ${OPEN_SDK_ROOT}/.mirror
+    fi
+
+    if [ x"$MIRROR" = x"1" ]; then
+        echo "enable git mirror..."
+        bash $OPEN_SDK_ROOT/tools/git-mirror.sh set
+    fi
+}
+
+function disable_mirror()
+{
+    if [ x"$MIRROR" = x"1" ]; then
+        echo "disable git mirror..."
+        bash $OPEN_SDK_ROOT/tools/git-mirror.sh unset
+    fi
+}
+
 function check_ini()
 {
     if [ ! -f $PROJECT_INI ]; then
@@ -47,6 +82,9 @@ function check_submodules()
     show "${fore[green]}" "Check submodules."
     cd $OPEN_SDK_ROOT
     submodules=($(grep "path" .gitmodules | sed 's/^[ \t]*path = //'))
+
+    enable_mirror
+
     for submodule in "${submodules[@]}"
     do
         if [ -z "$(ls -A $submodule)" ]; then
@@ -54,6 +92,9 @@ function check_submodules()
             git submodule update --init $submodule
         fi
     done
+
+    disable_mirror
+
     cd - > /dev/null
 }
 
@@ -67,14 +108,23 @@ function check_arduino()
         show "${fore[yellow]}" "If you want to download it again, please remove it."
         return 0
     fi
+
+    enable_mirror
+
     git clone $ARDUINO_REPO
     if [ ! "0" = "$?" ]; then
         show "${fore[red]}" "Clone repo [$ARDUINO_REPO] failed, please try again."
         if [ -d "$ARDUINO_PATH" ]; then
             show "${fore[yellow]}" "Delete [$ARDUINO_PATH] first."
         fi
+
+        disable_mirror
+
         exit 1
     fi
+
+    disable_mirror
+
     cd $ARDUINO_PATH
     TAG=`git describe --tags --abbrev=0`
     git checkout $TAG
@@ -140,14 +190,22 @@ function download_platform()
         git checkout -q "$PLATFORM_COMMIT"
     else
         show "" "Download platform ..."
+
+        enable_mirror
+
         git clone "$PLATFORM_REPO" "$PLATFORM_PATH"
         if [ ! "0" = "$?" ]; then
             show "${fore[red]}" "Clone repo [$PLATFORM_REPO] failed, please try again."
             if [ -d "$PLATFORM_PATH" ]; then
                 show "${fore[yellow]}" "Delete [$PLATFORM_PATH] first."
             fi
+            
+            disable_mirror
             exit 1
         fi
+
+        disable_mirror
+
         cd "$PLATFORM_PATH"
         git checkout -q "$PLATFORM_COMMIT"
     fi
@@ -634,6 +692,9 @@ function _save_platform_config_exec()
     PLATFORMS_DIR=$OPEN_SDK_ROOT/platform
     PLATFORM_YAML=$PLATFORMS_DIR/platform_config.yaml
     PLATFORM_NAMES=$(cat $PLATFORM_YAML | grep -oP '(?<=^- name: ).*(?=$)')
+    
+    enable_mirror
+
     for NAME in $PLATFORM_NAMES; do
         PLATFORM_INFO=$(cat $PLATFORM_YAML | awk "/^- name: $NAME[[:space:]]*$/{flag=1; next} /^- name:.*$/{flag=0} flag")
         PLATFORM_REPO=$(echo "$PLATFORM_INFO" | grep -oP '(?<=repo: ).*(?=$)')
@@ -654,6 +715,8 @@ function _save_platform_config_exec()
         show "" "$NAME: $COMMIT"
         sed -i "/^- name: $NAME/,/^  commit:/s/^  commit: .*/  commit: $COMMIT/" "$PLATFORM_YAML"
     done
+
+    disable_mirror
 }
 
 function _build_all()

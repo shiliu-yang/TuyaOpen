@@ -43,6 +43,8 @@
 #include "app_chat_bot.h"
 #include "ai_audio.h"
 #include "reset_netcfg.h"
+#include "app_system_info.h"
+#include "lang_config.h"
 
 /* Tuya device handle */
 tuya_iot_client_t ai_client;
@@ -97,6 +99,9 @@ OPERATE_RET audio_dp_obj_proc(dp_obj_recv_t *dpobj)
             uint8_t volume = dp->value.dp_value;
             PR_DEBUG("volume:%d", volume);
             ai_audio_set_volume(volume);
+            char volume_str[20] = {0};
+            snprintf(volume_str, sizeof(volume_str), "%s%d", VOLUME, volume);
+            app_display_send_msg(TY_DISPLAY_TP_NOTIFICATION, (uint8_t *)volume_str, strlen(volume_str));
             break;
         }
         default:
@@ -144,9 +149,16 @@ void user_event_handler_on(tuya_iot_client_t *client, tuya_event_msg_t *event)
         }
 // 软重启，未配网，播报配网提示
 #if defined(ENABLE_CHAT_DISPLAY) && (ENABLE_CHAT_DISPLAY == 1)
-        app_display_set_chat_massage(CHAT_ROLE_SYSTEM, "Device Bind Start");
+        app_display_send_msg(TY_DISPLAY_TP_STATUS, (uint8_t *)ENTERING_WIFI_CONFIG_MODE,
+                             strlen(ENTERING_WIFI_CONFIG_MODE));
 #endif
         ai_audio_player_play_alert(AI_AUDIO_ALERT_NETWORK_CFG);
+        break;
+
+    case TUYA_EVENT_BIND_TOKEN_ON:
+#if defined(ENABLE_CHAT_DISPLAY) && (ENABLE_CHAT_DISPLAY == 1)
+        app_display_send_msg(TY_DISPLAY_TP_STATUS, (uint8_t *)CONNECT_SERVER, strlen(CONNECT_SERVER));
+#endif
         break;
 
     /* MQTT with tuya cloud is connected, device online */
@@ -158,9 +170,8 @@ void user_event_handler_on(tuya_iot_client_t *client, tuya_event_msg_t *event)
         if (first) {
             first = 0;
 #if defined(ENABLE_CHAT_DISPLAY) && (ENABLE_CHAT_DISPLAY == 1)
-            app_display_set_emotion("NATURAL");
-            app_display_set_chat_massage(CHAT_ROLE_SYSTEM, "Device Online");
-            app_display_set_chat_massage(CHAT_ROLE_SYSTEM, "");
+            app_display_send_msg(TY_DISPLAY_TP_STATUS, (uint8_t *)CONNECTED_TO, strlen(CONNECTED_TO));
+            app_system_info_loop_start();
 #endif
             ai_audio_player_play_alert(AI_AUDIO_ALERT_NETWORK_CONNECTED);
             ai_audio_status_upload();
@@ -309,6 +320,7 @@ void user_main(void)
 #if defined(ENABLE_CHAT_DISPLAY) && (ENABLE_CHAT_DISPLAY == 1)
     app_display_init();
 #endif
+    app_system_info();
 
     /* Start tuya iot task */
     tuya_iot_start(&ai_client);

@@ -18,7 +18,7 @@ choice
     bool "press and hold button to start a single conversation."   
 
     config ENABLE_CHAT_MODE_KEY_TRIG_VAD_FREE
-    bool "say the wake-up word to start a single conversation, similar to a smart speaker."   
+    bool "press the button once to start or stop the free conversation."
 
     config ENABLE_CHAT_MODE_ASR_WAKEUP_SINGEL
     bool "say the wake-up word to initiate a single conversation, similar to a smart speaker."  
