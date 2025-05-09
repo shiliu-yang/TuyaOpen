@@ -32,7 +32,9 @@ Tuyaopen Framework 包括：
 
 - 方式1：购买已烧录 TuyaOpen 授权码模块。该授权码已经在出厂时烧录在对应模组中，且不会丢失。TuyaOpen 在启动时通过 `tuya_iot_license_read()` 接口读取授权码。请确认当前设备是否为烧录了 TuyaOpen 授权码。
 
-- 方式2：如当前模组未烧录 TuyaOpen 授权码，可通过 `https://platform.tuya.com/purchase/index?type=6 <https://platform.tuya.com/purchase/index?type=6>`_ 页面购买 ** TuyaOpen 授权码**，然后将 [apps/tuya_cloud/switch_demo/src/tuya_config.h](./src/tuya_config.h) 文件中 `TUYA_DEVICE_UUID` 和 `TUYA_DEVICE_AUTHKEY` 替换为购买成功后获取到的 `uuid` 和 `authkey`。
+- 方式2：如当前模组未烧录 TuyaOpen 授权码，可通过 `https://platform.tuya.com/purchase/index?type=6 <https://platform.tuya.com/purchase/index?type=6>`_ 页面购买 **TuyaOpen 授权码**，然后将 `apps/tuya_cloud/switch_demo/src/tuya_config.h <https://github.com/tuya/TuyaOpen/blob/master/apps/tuya_cloud/switch_demo/src/tuya_config.h>`_ （请根据当前实际编译项目选择对应项目中的 tuya_config.h）文件中 `TUYA_DEVICE_UUID` 和 `TUYA_DEVICE_AUTHKEY` 替换为购买成功后获取到的 `uuid` 和 `authkey`。
+
+- 方式3： 如当前模组未烧录 TuyaOpen 授权码，可通过 `https://item.taobao.com/item.htm?ft=t&id=911596682625&spm=a21dvs.23580594.0.0.621e2c1bzX1OIP <https://item.taobao.com/item.htm?ft=t&id=911596682625&spm=a21dvs.23580594.0.0.621e2c1bzX1OIP>`_ 页面购买 **TuyaOpen 授权码**，然后将 `apps/tuya_cloud/switch_demo/src/tuya_config.h <https://github.com/tuya/TuyaOpen/blob/master/apps/tuya_cloud/switch_demo/src/tuya_config.h>`_ （请根据当前实际编译项目选择对应项目中的 tuya_config.h）文件中 `TUYA_DEVICE_UUID` 和 `TUYA_DEVICE_AUTHKEY` 替换为购买成功后获取到的 `uuid` 和 `authkey`。
 
 
 .. image:: ../../images/zh/authorization_code.png

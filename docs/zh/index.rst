@@ -69,3 +69,4 @@ gitee 镜像
    new_board.md
    contribute_guide.md
    code_style_guide.md
+   faq/faq.rst
