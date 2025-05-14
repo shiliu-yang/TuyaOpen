@@ -45,7 +45,7 @@ Or add the TuyaOpen path to your system environment variables.
 
 TuyaOpen can be compiled and debugged using the tos command, which will search for the TuyaOpen repository based on the path set in the environment variables and execute the corresponding operations.
 
-For detailed usage of the tos command, please refer to [tos command](./docs/en/tos_guide.md).
+For detailed usage of the tos command, please refer to [tos command](./docs/en/tos_guide.rst).
 
 ### Step2. Select the project to be compiled
 
@@ -111,6 +111,8 @@ $ tos menuconfig
 Configure the current project, save and exit after configuration, and then compile the project.
 
 > When you run `tos menuconfig` to switch the chip or development board, the `tos` command will automatically clear the compiled intermediate files in the current project.
+
+For more TuyaOpen-related documentation, please refer to the [TuyaOpen Developer Guide](https://docs.tuyaopen.io/en).
 
 ### Supported platform list
 | Name  | Support Status | Introduction | Debug log serial port |
@@ -270,10 +272,10 @@ TuyaOpen provides a wealth of cloud connectivity application examples, which can
 
 ## Adding and Adapting New Platforms
 
-TuyaOpen supports adding and adapting new platforms. For specific operations, please refer to [Adding and Adapting New Platforms](./docs/en/new_platform.md).
+TuyaOpen supports adding and adapting new platforms. For specific operations, please refer to [Adding and Adapting New Platforms](./docs/en/new_platform.rst).
 
 ## Adding and Adapting New Boards
-TuyaOpen supports adding and adapting new boards. For specific operations, please refer to [Adding and Adapting New Boards](./docs/en/new_board.md).
+TuyaOpen supports adding and adapting new boards. For specific operations, please refer to [Adding and Adapting New Boards](./docs/en/new_board.rst).
 
 ## FAQ
 1. The supported platform for TuyaOpen are dynamically downloaded through subrepositories. Updating the TuyaOpen repository itself will not automatically update the subrepositories. If you encounter any issues with compilation, please navigate to the corresponding directory in the "platform" folder and use the `git pull` command to update, or delete the corresponding directory in the "platform" folder and download it again.
@@ -285,7 +287,7 @@ TuyaOpen supports adding and adapting new boards. For specific operations, pleas
 Distributed under the Apache License Version 2.0. For more information, see `LICENSE`.
 
 ## Contribute Code
-If you are interested in the TuyaOpen and wish to contribute to its development and become a code contributor, please first read the [Contribution Guide](./docs/en/contribute_guide.md).
+If you are interested in the TuyaOpen and wish to contribute to its development and become a code contributor, please first read the [Contribution Guide](./docs/en/contribute_guide.rst).
 
 ## Disclaimer and Liability Clause
 

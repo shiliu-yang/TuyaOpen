@@ -31,7 +31,8 @@ typedef enum {
     AI_AUDIO_PLAYER_STAT_IDLE = 0,
     AI_AUDIO_PLAYER_STAT_START,
     AI_AUDIO_PLAYER_STAT_PLAY,
-    AI_AUDIO_PLAYER_STAT_STOP,
+    AI_AUDIO_PLAYER_STAT_FINISH,
+    AI_AUDIO_PLAYER_STAT_PAUSE,
     AI_AUDIO_PLAYER_STAT_MAX,
 } AI_AUDIO_PLAYER_STATE_E;
 
@@ -65,22 +66,27 @@ typedef enum {
 OPERATE_RET ai_audio_player_init(void);
 
 /**
- * @brief Starts the audio player by posting a start state to the player's state queue.
+ * @brief Starts the audio player with the specified identifier.
  *
- * @param None
- * @return OPERATE_RET - Returns OPRT_OK if the start state is successfully posted, otherwise returns an error code.
+ *
+ * @param id        The identifier for the current playback session. 
+ *                  If NULL, no specific ID is set.
+ * 
+ * @return          Returns OPRT_OK if the player is successfully started.
  */
-OPERATE_RET ai_audio_player_start(void);
+OPERATE_RET ai_audio_player_start(char *id);
 
 /**
  * @brief Writes audio data to the ring buffer and sets the end-of-file flag if necessary.
- *
- * @param data - Pointer to the audio data to be written.
- * @param len - Length of the audio data to be written.
- * @param is_eof - Flag indicating if this is the end of the audio data (1 for true, 0 for false).
- * @return OPERATE_RET - Returns OPRT_OK if the data is successfully written, otherwise returns an error code.
+ * 
+ * @param id        The identifier to validate against the current player's ID.
+ * @param data      Pointer to the audio data to be written into the buffer.
+ * @param len       Length of the audio data to be written.
+ * @param is_eof    Flag indicating whether this block of data is the end of the stream (1 for true, 0 for false).
+ * 
+ * @return          Returns OPRT_OK if the data was successfully written to the buffer, otherwise returns an error code.
  */
-OPERATE_RET ai_audio_player_data_write(uint8_t *data, uint32_t len, uint8_t is_eof);
+OPERATE_RET ai_audio_player_data_write(char *id, uint8_t *data, uint32_t len, uint8_t is_eof);
 
 /**
  * @brief Stops the audio player and clears the audio output buffer.

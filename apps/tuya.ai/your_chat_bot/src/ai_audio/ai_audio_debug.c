@@ -328,6 +328,10 @@ OPERATE_RET ai_audio_debug_data(char *buf, uint32_t len)
     OPERATE_RET rt = OPRT_OK;
     int i = 0;
 
+    if(NULL == buf || 0 == len) {
+        return OPRT_INVALID_PARM;
+    }
+
     // upload buf to the first tcp connection
     rt = __ai_audio_debug_tcp_send(DEBUG_UPLOAD_STREAM_TYPE_RAW, buf, len);
 

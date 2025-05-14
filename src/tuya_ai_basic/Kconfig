@@ -1,7 +1,7 @@
 menu "AI Protocol Config"
     config AI_MAX_FRAGMENT_LENGTH
         int "AI_MAX_FRAGMENT_LENGTH: max fragment length"
-        range 4096 512000
+        range 1024 512000
         default 8192
 
     config ENABLE_AI_PROTO_DEBUG
@@ -45,4 +45,12 @@ menu "AI Protocol Config"
     config AI_WRITE_SOCKET_BUF_SIZE
         int "AI_WRITE_SOCKET_BUF_SIZE: ai server write socket size"
         default 0
+
+    config AI_HEAP_IN_PSRAM
+        bool "AI_HEAP_IN_PSRAM: use psram for heap"
+        default n
+
+    config AI_STACK_IN_PSRAM
+        bool "AI_STACK_IN_PSRAM: use psram for stack"
+        default n
 endmenu

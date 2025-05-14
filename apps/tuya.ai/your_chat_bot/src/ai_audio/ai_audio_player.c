@@ -38,42 +38,38 @@
 #define MP3_PCM_SIZE_MAX           (MAX_NSAMP * MAX_NCHAN * MAX_NGRAN * 2)
 #define PLAYING_NO_DATA_TIMEOUT_MS (5 * 1000)
 
-#define AI_AUDIO_PLAYER_STAT_CHANGE(new_stat)                                                                          \
-    do {                                                                                                               \
-        PR_DEBUG("ai audio player stat changed: %d->%d", ctx->stat, new_stat);                                         \
-        ctx->stat = new_stat;                                                                                          \
-    } while (0)
+#define AI_AUDIO_PLAYER_STAT_CHANGE(last_stat, new_stat)                              \
+    do {                                                                              \
+        if(last_stat != new_stat) {                                                   \
+            PR_DEBUG("ai audio player stat changed: %d->%d", last_stat, new_stat);    \
+        }                                                                             \
+    } while (0)                                                                       \
 
 /***********************************************************
 ***********************typedef define***********************
 ***********************************************************/
 typedef struct {
-    TDL_AUDIO_HANDLE_T audio_hdl;
-    MUTEX_HANDLE player_mutex;
-
-    TUYA_RINGBUFF_T rb_hdl;
-    MUTEX_HANDLE spk_rb_mutex;
-    THREAD_HANDLE thrd_hdl;
+    bool                    is_playing;
+    bool                    is_writing;
     AI_AUDIO_PLAYER_STATE_E stat;
-    TIMER_ID tm_id;
 
-    mp3dec_t *mp3_dec;
-    mp3dec_frame_info_t mp3_frame_info;
+    TDL_AUDIO_HANDLE_T      audio_hdl;
+    MUTEX_HANDLE            mutex;
+    THREAD_HANDLE           thrd_hdl;
 
-    uint8_t *mp3_raw;
-    uint8_t *mp3_raw_head;
-    uint32_t mp3_raw_used_len;
-    uint8_t *mp3_pcm; // mp3 decode to pcm buffer
+    char                   *id;
+    TUYA_RINGBUFF_T         rb_hdl;
+    MUTEX_HANDLE            spk_rb_mutex;
+    uint8_t                 is_eof;
+    TIMER_ID                tm_id;
 
-    uint8_t is_eof;
+    mp3dec_t               *mp3_dec;
+    mp3dec_frame_info_t     mp3_frame_info;
+    uint8_t                *mp3_raw;
+    uint8_t                *mp3_raw_head;
+    uint32_t                mp3_raw_used_len;
+    uint8_t                *mp3_pcm; // mp3 decode to pcm buffer
 
-    QUEUE_HANDLE stat_queue;
-    MUTEX_HANDLE stat_mutex;
-
-    // alert
-    MUTEX_HANDLE alert_mutex;
-
-    uint8_t is_playing;
 } APP_PLAYER_T;
 
 /***********************************************************
@@ -88,23 +84,14 @@ static APP_PLAYER_T sg_player;
 /***********************************************************
 ***********************function define**********************
 ***********************************************************/
-
 static OPERATE_RET __ai_audio_player_mp3_start(void)
 {
     OPERATE_RET rt = OPRT_OK;
-
-    tal_mutex_lock(sg_player.player_mutex);
-
-    if (sg_player.is_playing) {
-        PR_ERR("playing..., stop it first please");
-        return OPRT_COM_ERROR;
-    }
 
     if (NULL == sg_player.mp3_dec) {
         sg_player.mp3_dec = (mp3dec_t *)tkl_system_psram_malloc(sizeof(mp3dec_t));
         if (NULL == sg_player.mp3_dec) {
             PR_ERR("malloc mp3dec_t failed");
-            tal_mutex_unlock(sg_player.player_mutex);
             return OPRT_MALLOC_FAILED;
         }
 
@@ -112,8 +99,6 @@ static OPERATE_RET __ai_audio_player_mp3_start(void)
     }
 
     sg_player.mp3_raw_used_len = 0;
-
-    tal_mutex_unlock(sg_player.player_mutex);
 
     return rt;
 }
@@ -128,7 +113,9 @@ static OPERATE_RET __ai_audio_player_mp3_playing(void)
         return OPRT_COM_ERROR;
     }
 
+    tal_mutex_lock(sg_player.spk_rb_mutex);
     uint32_t rb_used_len = tuya_ring_buff_used_size_get(ctx->rb_hdl);
+    tal_mutex_unlock(sg_player.spk_rb_mutex);
     if (0 == rb_used_len && 0 == ctx->mp3_raw_used_len) {
         // PR_DEBUG("mp3 data is empty");
         rt = OPRT_RECV_DA_NOT_ENOUGH;
@@ -143,10 +130,13 @@ static OPERATE_RET __ai_audio_player_mp3_playing(void)
 
     // read new data
     if (rb_used_len > 0 && ctx->mp3_raw_used_len < MAINBUF_SIZE) {
-        uint32_t read_len =
-            (MAINBUF_SIZE - ctx->mp3_raw_used_len) > rb_used_len ? rb_used_len : (MAINBUF_SIZE - ctx->mp3_raw_used_len);
+        uint32_t read_len = ((MAINBUF_SIZE - ctx->mp3_raw_used_len) > rb_used_len) ?\
+                             rb_used_len : (MAINBUF_SIZE - ctx->mp3_raw_used_len);
+          
+        tal_mutex_lock(sg_player.spk_rb_mutex);                     
         uint32_t rt_len = tuya_ring_buff_read(ctx->rb_hdl, ctx->mp3_raw + ctx->mp3_raw_used_len, read_len);
-        // PR_DEBUG("read_len=%d rt_len: %d", read_len, rt_len);
+        tal_mutex_unlock(sg_player.spk_rb_mutex);  
+        //  PR_DEBUG("read_len=%d rt_len: %d", read_len, rt_len);
 
         ctx->mp3_raw_used_len += rt_len;
     }
@@ -163,97 +153,10 @@ static OPERATE_RET __ai_audio_player_mp3_playing(void)
     ctx->mp3_raw_used_len -= ctx->mp3_frame_info.frame_bytes;
     ctx->mp3_raw_head += ctx->mp3_frame_info.frame_bytes;
 
-    if (NULL == ctx->audio_hdl) {
-        tdl_audio_find(AUDIO_DRIVER_NAME, &ctx->audio_hdl);
-    }
-    if (ctx->audio_hdl) {
-        tdl_audio_play(ctx->audio_hdl, ctx->mp3_pcm, samples * 2);
-    }
+    tdl_audio_play(ctx->audio_hdl, ctx->mp3_pcm, samples * 2);
 
 __EXIT:
     return rt;
-}
-
-static OPERATE_RET __ai_audio_player_stat_post(AI_AUDIO_PLAYER_STATE_E stat)
-{
-    OPERATE_RET rt = OPRT_OK;
-
-    if (NULL == sg_player.stat_mutex || NULL == sg_player.stat_queue) {
-        return OPRT_COM_ERROR;
-    }
-
-    tal_mutex_lock(sg_player.stat_mutex);
-    rt = tal_queue_post(sg_player.stat_queue, &stat, 0);
-    tal_mutex_unlock(sg_player.stat_mutex);
-
-    return rt;
-}
-
-static OPERATE_RET __ai_audio_play_stat_fetch(AI_AUDIO_PLAYER_STATE_E *stat, uint32_t timeout)
-{
-    if (NULL == sg_player.stat_queue) {
-        return OPRT_COM_ERROR;
-    }
-
-    return tal_queue_fetch(sg_player.stat_queue, stat, timeout);
-}
-
-static void __ai_audio_player_task(void *arg)
-{
-    OPERATE_RET rt = OPRT_OK;
-    APP_PLAYER_T *ctx = &sg_player;
-    AI_AUDIO_PLAYER_STATE_E stat = AI_AUDIO_PLAYER_STAT_IDLE;
-    uint32_t next_timeout = 5;
-
-    ctx->stat = AI_AUDIO_PLAYER_STAT_IDLE;
-
-    for (;;) {
-        rt = __ai_audio_play_stat_fetch(&stat, next_timeout);
-        if (stat != ctx->stat && rt == OPRT_OK) {
-            AI_AUDIO_PLAYER_STAT_CHANGE(stat);
-        }
-        next_timeout = (ctx->stat == AI_AUDIO_PLAYER_STAT_PLAY) ? 10 : 500;
-
-        switch (ctx->stat) {
-        case AI_AUDIO_PLAYER_STAT_IDLE: {
-        } break;
-        case AI_AUDIO_PLAYER_STAT_START: {
-            rt = __ai_audio_player_mp3_start();
-            if (rt != OPRT_OK) {
-                __ai_audio_player_stat_post(AI_AUDIO_PLAYER_STAT_IDLE);
-            } else {
-                PR_DEBUG("app player start");
-                __ai_audio_player_stat_post(AI_AUDIO_PLAYER_STAT_PLAY);
-                ctx->is_playing = 1;
-            }
-        } break;
-        case AI_AUDIO_PLAYER_STAT_PLAY: {
-            rt = __ai_audio_player_mp3_playing();
-            if (OPRT_RECV_DA_NOT_ENOUGH == rt) {
-                tal_sw_timer_start(ctx->tm_id, PLAYING_NO_DATA_TIMEOUT_MS, TAL_TIMER_ONCE);
-            } else if (OPRT_OK == rt) {
-                if (tal_sw_timer_is_running(ctx->tm_id)) {
-                    tal_sw_timer_stop(ctx->tm_id);
-                }
-            }
-            uint32_t rb_used_len = tuya_ring_buff_used_size_get(ctx->rb_hdl);
-            if (rb_used_len == 0 && 0 == ctx->mp3_raw_used_len && ctx->is_eof) {
-                PR_DEBUG("app player end");
-                __ai_audio_player_stat_post(AI_AUDIO_PLAYER_STAT_STOP);
-            }
-        } break;
-        case AI_AUDIO_PLAYER_STAT_STOP: {
-            if (tal_sw_timer_is_running(ctx->tm_id)) {
-                tal_sw_timer_stop(ctx->tm_id);
-            }
-            __ai_audio_player_stat_post(AI_AUDIO_PLAYER_STAT_IDLE);
-            ctx->is_playing = 0;
-            ctx->is_eof = 0;
-        } break;
-        default:
-            break;
-        }
-    }
 }
 
 static OPERATE_RET __ai_audio_player_mp3_init(void)
@@ -284,11 +187,95 @@ __ERR:
     return OPRT_COM_ERROR;
 }
 
+static void __ai_audio_player_task(void *arg)
+{
+    OPERATE_RET rt = OPRT_OK;
+    APP_PLAYER_T *ctx = &sg_player;
+    static AI_AUDIO_PLAYER_STATE_E last_state = 0xFF;
+
+    ctx->stat = AI_AUDIO_PLAYER_STAT_IDLE;
+
+    for (;;) {
+        tal_mutex_lock(sg_player.mutex);
+
+        AI_AUDIO_PLAYER_STAT_CHANGE(last_state, ctx->stat);
+        last_state = ctx->stat;
+
+        switch (ctx->stat) {
+        case AI_AUDIO_PLAYER_STAT_IDLE: {
+            if (tal_sw_timer_is_running(ctx->tm_id)) {
+                tal_sw_timer_stop(ctx->tm_id);
+            }
+            ctx->is_eof     = 0;
+        } break;
+        case AI_AUDIO_PLAYER_STAT_START: {
+            rt = __ai_audio_player_mp3_start();
+            if (rt != OPRT_OK) {
+                ctx->stat = AI_AUDIO_PLAYER_STAT_IDLE;
+            } else {
+                ctx->stat = AI_AUDIO_PLAYER_STAT_PLAY;
+            }
+        } break;
+        case AI_AUDIO_PLAYER_STAT_PLAY: {
+            rt = __ai_audio_player_mp3_playing();
+            if (OPRT_RECV_DA_NOT_ENOUGH == rt) {
+                tal_sw_timer_start(ctx->tm_id, PLAYING_NO_DATA_TIMEOUT_MS, TAL_TIMER_ONCE);
+            } else if (OPRT_OK == rt) {
+                if (tal_sw_timer_is_running(ctx->tm_id)) {
+                    tal_sw_timer_stop(ctx->tm_id);
+                }
+            }
+            tal_mutex_lock(ctx->spk_rb_mutex);
+            uint32_t rb_used_len = tuya_ring_buff_used_size_get(ctx->rb_hdl);
+            tal_mutex_unlock(ctx->spk_rb_mutex);
+            if (rb_used_len == 0 && 0 == ctx->mp3_raw_used_len && ctx->is_eof) {
+                PR_DEBUG("app player end");
+                ctx->stat = AI_AUDIO_PLAYER_STAT_FINISH;
+            }
+        } break;
+        case AI_AUDIO_PLAYER_STAT_FINISH: {
+            tal_sw_timer_stop(ctx->tm_id);
+
+            ctx->is_playing = false;
+            ctx->stat       = AI_AUDIO_PLAYER_STAT_IDLE;
+            ctx->is_eof     = 0;
+        } break;
+        case AI_AUDIO_PLAYER_STAT_PAUSE:
+            // do nothing
+        break;
+        default:
+            break;
+        }
+
+        tal_mutex_unlock(sg_player.mutex);
+
+        tal_system_sleep(10);
+    }
+}
+
 static void __app_playing_tm_cb(TIMER_ID timer_id, void *arg)
 {
     PR_DEBUG("app player timeout cb, stop playing");
-    __ai_audio_player_stat_post(AI_AUDIO_PLAYER_STAT_STOP);
+    tal_mutex_lock(sg_player.mutex);
+    sg_player.stat = AI_AUDIO_PLAYER_STAT_FINISH;
+    tal_mutex_unlock(sg_player.mutex);
     return;
+}
+
+static bool __app_player_compare_id(char *id_1, char *id_2)
+{
+
+    if(NULL == id_1 && NULL == id_1) {
+        return true;
+    }
+
+    if(id_1 && id_2) {
+        if(0 == strcmp(id_1, id_2)) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 /**
@@ -306,58 +293,36 @@ OPERATE_RET ai_audio_player_init(void)
 
     PR_DEBUG("app player init...");
 
-    // create mutex
-    TUYA_CALL_ERR_GOTO(tal_mutex_create_init(&sg_player.player_mutex), __ERR);
+    TUYA_CALL_ERR_GOTO(tdl_audio_find(AUDIO_DRIVER_NAME, &sg_player.audio_hdl), __ERR);
 
-    tal_mutex_lock(sg_player.player_mutex);
+    // create mutex
+    TUYA_CALL_ERR_GOTO(tal_mutex_create_init(&sg_player.mutex), __ERR);
 
     TUYA_CALL_ERR_GOTO(tal_sw_timer_create(__app_playing_tm_cb, NULL, &sg_player.tm_id), __ERR);
 
-    // create stat queue
-    TUYA_CALL_ERR_GOTO(tal_mutex_create_init(&sg_player.stat_mutex), __ERR);
-    TUYA_CALL_ERR_GOTO(tal_queue_create_init(&sg_player.stat_queue, sizeof(AI_AUDIO_PLAYER_STATE_E), 10), __ERR);
-
-    // alert
-    TUYA_CALL_ERR_GOTO(tal_mutex_create_init(&sg_player.alert_mutex), __ERR);
-
     TUYA_CALL_ERR_GOTO(__ai_audio_player_mp3_init(), __ERR);
     // ring buffer init
-    TUYA_CALL_ERR_GOTO(tuya_ring_buff_create(MP3_STREAM_BUFF_MAX_LEN, OVERFLOW_PSRAM_STOP_TYPE, &sg_player.rb_hdl),
-                       __ERR);
-    // mutex init
+    TUYA_CALL_ERR_GOTO(tuya_ring_buff_create(MP3_STREAM_BUFF_MAX_LEN, \
+                                             OVERFLOW_PSRAM_STOP_TYPE,\
+                                             &sg_player.rb_hdl), __ERR);
+    //ring buffer mutex init
     TUYA_CALL_ERR_GOTO(tal_mutex_create_init(&sg_player.spk_rb_mutex), __ERR);
 
     // thread init
-    TUYA_CALL_ERR_GOTO(tkl_thread_create_in_psram(&sg_player.thrd_hdl, "ai_player", 1024 * 4, THREAD_PRIO_2,
-                                                  __ai_audio_player_task, NULL),
-                       __ERR);
-
-    tal_mutex_unlock(sg_player.player_mutex);
+    TUYA_CALL_ERR_GOTO(tkl_thread_create_in_psram(&sg_player.thrd_hdl, \
+                                                  "ai_player", \
+                                                   1024 * 4,\
+                                                   THREAD_PRIO_2,
+                                                   __ai_audio_player_task, NULL), __ERR);
 
     PR_DEBUG("app player init success");
 
     return rt;
 
 __ERR:
-    if (sg_player.player_mutex) {
-        tal_mutex_unlock(sg_player.player_mutex);
-        tal_mutex_release(sg_player.player_mutex);
-        sg_player.player_mutex = NULL;
-    }
-
-    if (sg_player.stat_mutex) {
-        tal_mutex_release(sg_player.stat_mutex);
-        sg_player.stat_mutex = NULL;
-    }
-
-    if (sg_player.stat_queue) {
-        tal_queue_free(sg_player.stat_queue);
-        sg_player.stat_queue = NULL;
-    }
-
-    if (sg_player.alert_mutex) {
-        tal_mutex_release(sg_player.alert_mutex);
-        sg_player.alert_mutex = NULL;
+    if (sg_player.mutex) {
+        tal_mutex_release(sg_player.mutex);
+        sg_player.mutex = NULL;
     }
 
     if (sg_player.spk_rb_mutex) {
@@ -374,51 +339,108 @@ __ERR:
 }
 
 /**
- * @brief Starts the audio player by posting a start state to the player's state queue.
+ * @brief Starts the audio player with the specified identifier.
  *
- * @param None
- * @return OPERATE_RET - Returns OPRT_OK if the start state is successfully posted, otherwise returns an error code.
+ *
+ * @param id        The identifier for the current playback session. 
+ *                  If NULL, no specific ID is set.
+ * 
+ * @return          Returns OPRT_OK if the player is successfully started.
  */
-OPERATE_RET ai_audio_player_start(void)
+OPERATE_RET ai_audio_player_start(char *id)
 {
-    return __ai_audio_player_stat_post(AI_AUDIO_PLAYER_STAT_START);
+    tal_mutex_lock(sg_player.mutex);
+ 
+    if(true == sg_player.is_playing) {
+        PR_NOTICE("player is already start");
+        tal_mutex_unlock(sg_player.mutex);
+        return OPRT_OK;
+    }
+
+    if(sg_player.id) {
+        tkl_system_free(sg_player.id);
+        sg_player.id = NULL;
+    }
+
+    if(id) {
+        sg_player.id = tkl_system_malloc(strlen(id) + 1);
+        if(sg_player.id) {
+            strcpy(sg_player.id, id);
+            sg_player.id[strlen(id)] = '\0';
+        }
+    }
+
+    sg_player.is_playing = true;
+    sg_player.stat = AI_AUDIO_PLAYER_STAT_START;
+
+    tal_mutex_unlock(sg_player.mutex);
+
+    PR_NOTICE("ai audio player start");
+
+    return OPRT_OK;
 }
 
 /**
  * @brief Writes audio data to the ring buffer and sets the end-of-file flag if necessary.
- *
- * @param data - Pointer to the audio data to be written.
- * @param len - Length of the audio data to be written.
- * @param is_eof - Flag indicating if this is the end of the audio data (1 for true, 0 for false).
- * @return OPERATE_RET - Returns OPRT_OK if the data is successfully written, otherwise returns an error code.
+ * 
+ * @param id        The identifier to validate against the current player's ID.
+ * @param data      Pointer to the audio data to be written into the buffer.
+ * @param len       Length of the audio data to be written.
+ * @param is_eof    Flag indicating whether this block of data is the end of the stream (1 for true, 0 for false).
+ * 
+ * @return          Returns OPRT_OK if the data was successfully written to the buffer, otherwise returns an error code.
  */
-OPERATE_RET ai_audio_player_data_write(uint8_t *data, uint32_t len, uint8_t is_eof)
+OPERATE_RET ai_audio_player_data_write(char *id, uint8_t *data, uint32_t len, uint8_t is_eof)
 {
-    OPERATE_RET rt = OPRT_OK;
+    uint32_t write_len = 0, alreay_write_len = 0;
 
-    if (NULL == sg_player.rb_hdl) {
-        PR_ERR("ring buffer is NULL");
+    tal_mutex_lock(sg_player.mutex);
+
+    if (AI_AUDIO_PLAYER_STAT_PLAY != sg_player.stat &&\
+        AI_AUDIO_PLAYER_STAT_START != sg_player.stat){
+        tal_mutex_unlock(sg_player.mutex);
         return OPRT_COM_ERROR;
     }
 
-    if (NULL != data && len > 0) {
-        uint32_t rb_free_len = tuya_ring_buff_free_size_get(sg_player.rb_hdl);
-        while (rb_free_len < len) {
-            // PR_DEBUG("---> ring buffer is full, wait...");
-            tal_system_sleep(10);
-            rb_free_len = tuya_ring_buff_free_size_get(sg_player.rb_hdl);
-        }
-
-        tal_mutex_lock(sg_player.player_mutex);
-        tuya_ring_buff_write(sg_player.rb_hdl, data, len);
-        tal_mutex_unlock(sg_player.player_mutex);
+    if(false == __app_player_compare_id(id, sg_player.id)) {
+        PR_NOTICE("the id:%s is not match... curr id:%s", id, sg_player.id);
+        tal_mutex_unlock(sg_player.mutex);
+        return OPRT_INVALID_PARM; 
     }
 
-    tal_mutex_lock(sg_player.player_mutex);
-    sg_player.is_eof = is_eof;
-    tal_mutex_unlock(sg_player.player_mutex);
 
-    return rt;
+    if (NULL != data && len > 0) {    
+        while((alreay_write_len < len) && \
+              (AI_AUDIO_PLAYER_STAT_PLAY == sg_player.stat ||\
+               AI_AUDIO_PLAYER_STAT_START == sg_player.stat)) {
+
+            sg_player.is_writing = true;
+            tal_mutex_lock(sg_player.spk_rb_mutex);
+            uint32_t rb_free_len = tuya_ring_buff_free_size_get(sg_player.rb_hdl);
+            tal_mutex_unlock(sg_player.spk_rb_mutex);
+            if(0 == rb_free_len) {
+                //need unlock mutex before sleep
+                tal_mutex_unlock(sg_player.mutex);
+                tal_system_sleep(3);
+                tal_mutex_lock(sg_player.mutex);
+                continue;
+            }
+    
+            write_len = GET_MIN_LEN(rb_free_len, (len - alreay_write_len));
+    
+            tal_mutex_lock(sg_player.spk_rb_mutex);
+            tuya_ring_buff_write(sg_player.rb_hdl, data + alreay_write_len, write_len);
+            tal_mutex_unlock(sg_player.spk_rb_mutex);
+    
+            alreay_write_len += write_len;
+        };
+        sg_player.is_writing = false;
+    }
+
+    sg_player.is_eof = is_eof;
+    tal_mutex_unlock(sg_player.mutex);
+
+    return OPRT_OK;
 }
 
 /**
@@ -431,28 +453,38 @@ OPERATE_RET ai_audio_player_stop(void)
 {
     OPERATE_RET rt = OPRT_OK;
 
-    if (!sg_player.is_playing) {
-        PR_DEBUG("not playing...");
+    tal_mutex_lock(sg_player.mutex);
+
+    if (false == sg_player.is_playing) {
+        tal_mutex_unlock(sg_player.mutex);
         return OPRT_OK;
     }
 
-    __ai_audio_player_stat_post(AI_AUDIO_PLAYER_STAT_STOP);
+    sg_player.stat = AI_AUDIO_PLAYER_STAT_PAUSE;
 
-    // wait for stop
-    while (sg_player.is_playing) {
-        tal_system_sleep(10);
+    if(sg_player.id) {
+        tkl_system_free(sg_player.id);
+        sg_player.id = NULL;
     }
 
-    tal_mutex_lock(sg_player.player_mutex);
+    while(sg_player.is_writing) {
+        tal_mutex_unlock(sg_player.mutex);
+        tal_system_sleep(3);
+        tal_mutex_lock(sg_player.mutex);
+    }
+
+    tal_mutex_lock(sg_player.spk_rb_mutex);
     tuya_ring_buff_reset(sg_player.rb_hdl);
-    tal_mutex_unlock(sg_player.player_mutex);
+    tal_mutex_unlock(sg_player.spk_rb_mutex);
 
-    if (NULL == sg_player.audio_hdl) {
-        tdl_audio_find(AUDIO_DRIVER_NAME, &sg_player.audio_hdl);
-    }
-    if (sg_player.audio_hdl) {
-        tdl_audio_play_stop(sg_player.audio_hdl);
-    }
+    tdl_audio_play_stop(sg_player.audio_hdl);
+
+    sg_player.is_playing = false;
+    sg_player.stat = AI_AUDIO_PLAYER_STAT_IDLE;
+
+    tal_mutex_unlock(sg_player.mutex);
+
+    PR_NOTICE("ai audio player stop");
 
     return rt;
 }
@@ -466,63 +498,68 @@ OPERATE_RET ai_audio_player_stop(void)
 OPERATE_RET ai_audio_player_play_alert(AI_AUDIO_ALERT_TYPE_E type)
 {
     OPERATE_RET rt = OPRT_OK;
+    char alert_id[64] = {0};
 
-    if (NULL == sg_player.alert_mutex) {
-        PR_ERR("player alert mutex is NULL");
-        return OPRT_COM_ERROR;
-    }
+    snprintf(alert_id, sizeof(alert_id), "alert_%d", type);
 
-    tal_mutex_lock(sg_player.alert_mutex);
-
-    ai_audio_player_start();
+    ai_audio_player_start(alert_id);
 
     switch (type) {
     case AI_AUDIO_ALERT_POWER_ON: {
-        rt = ai_audio_player_data_write((uint8_t *)media_src_power_on, sizeof(media_src_power_on), 1);
+        rt = ai_audio_player_data_write(alert_id, (uint8_t *)media_src_power_on,\
+                                        sizeof(media_src_power_on), 1);
     } break;
     case AI_AUDIO_ALERT_NOT_ACTIVE: {
-        rt = ai_audio_player_data_write((uint8_t *)media_src_not_active, sizeof(media_src_not_active), 1);
+        rt = ai_audio_player_data_write(alert_id, (uint8_t *)media_src_not_active,\
+                                        sizeof(media_src_not_active), 1);
     } break;
     case AI_AUDIO_ALERT_NETWORK_CFG: {
-        rt = ai_audio_player_data_write((uint8_t *)media_src_netcfg_mode, sizeof(media_src_netcfg_mode), 1);
+        rt = ai_audio_player_data_write(alert_id, (uint8_t *)media_src_netcfg_mode,\
+                                        sizeof(media_src_netcfg_mode), 1);
     } break;
     case AI_AUDIO_ALERT_NETWORK_CONNECTED: {
-        rt = ai_audio_player_data_write((uint8_t *)media_src_network_conencted, sizeof(media_src_network_conencted), 1);
+        rt = ai_audio_player_data_write(alert_id, (uint8_t *)media_src_network_conencted,\
+                                        sizeof(media_src_network_conencted), 1);
     } break;
     case AI_AUDIO_ALERT_NETWORK_FAIL: {
-        rt = ai_audio_player_data_write((uint8_t *)media_src_network_fail, sizeof(media_src_network_fail), 1);
+        rt = ai_audio_player_data_write(alert_id, (uint8_t *)media_src_network_fail,\
+                                        sizeof(media_src_network_fail), 1);
     } break;
     case AI_AUDIO_ALERT_NETWORK_DISCONNECT: {
-        rt = ai_audio_player_data_write((uint8_t *)media_src_network_disconnect, sizeof(media_src_network_disconnect),
-                                        1);
+        rt = ai_audio_player_data_write(alert_id, (uint8_t *)media_src_network_disconnect,\
+                                        sizeof(media_src_network_disconnect), 1);
     } break;
     case AI_AUDIO_ALERT_BATTERY_LOW: {
-        rt = ai_audio_player_data_write((uint8_t *)media_src_battery_low, sizeof(media_src_battery_low), 1);
+        rt = ai_audio_player_data_write(alert_id, (uint8_t *)media_src_battery_low,\
+                                        sizeof(media_src_battery_low), 1);
     } break;
     case AI_AUDIO_ALERT_PLEASE_AGAIN: {
-        rt = ai_audio_player_data_write((uint8_t *)media_src_please_again, sizeof(media_src_please_again), 1);
+        rt = ai_audio_player_data_write(alert_id, (uint8_t *)media_src_please_again,\
+                                        sizeof(media_src_please_again), 1);
     } break;
     case AI_AUDIO_ALERT_WAKEUP: {
-        rt = ai_audio_player_data_write((uint8_t *)media_src_wakeup, sizeof(media_src_wakeup), 1);
+        rt = ai_audio_player_data_write(alert_id, (uint8_t *)media_src_wakeup, \
+                                        sizeof(media_src_wakeup), 1);
     } break;
     case AI_AUDIO_ALERT_LONG_KEY_TALK: {
-        rt = ai_audio_player_data_write((uint8_t *)media_src_long_press_dialogue, sizeof(media_src_long_press_dialogue),
-                                        1);
+        rt = ai_audio_player_data_write(alert_id, (uint8_t *)media_src_long_press_dialogue,\
+                                        sizeof(media_src_long_press_dialogue), 1);
     } break;
     case AI_AUDIO_ALERT_KEY_TALK: {
-        rt = ai_audio_player_data_write((uint8_t *)media_src_key_dialogue, sizeof(media_src_key_dialogue), 1);
+        rt = ai_audio_player_data_write(alert_id, (uint8_t *)media_src_key_dialogue,\
+                                        sizeof(media_src_key_dialogue), 1);
     } break;
     case AI_AUDIO_ALERT_WAKEUP_TALK: {
-        rt = ai_audio_player_data_write((uint8_t *)media_src_wake_dialogue, sizeof(media_src_wake_dialogue), 1);
+        rt = ai_audio_player_data_write(alert_id, (uint8_t *)media_src_wake_dialogue, \
+                                        sizeof(media_src_wake_dialogue), 1);
     } break;
     case AI_AUDIO_ALERT_FREE_TALK: {
-        rt = ai_audio_player_data_write((uint8_t *)media_src_free_dialogue, sizeof(media_src_free_dialogue), 1);
+        rt = ai_audio_player_data_write(alert_id, (uint8_t *)media_src_free_dialogue, \
+                                        sizeof(media_src_free_dialogue), 1);
     } break;
     default:
         break;
     }
-
-    tal_mutex_unlock(sg_player.alert_mutex);
 
     return rt;
 }
@@ -535,10 +572,6 @@ OPERATE_RET ai_audio_player_play_alert(AI_AUDIO_ALERT_TYPE_E type)
 OPERATE_RET ai_audio_player_play_alert_syn(AI_AUDIO_ALERT_TYPE_E type)
 {
     ai_audio_player_play_alert(type);
-
-    while (!ai_audio_player_is_playing()) {
-        tal_system_sleep(10);
-    }
 
     while (ai_audio_player_is_playing()) {
         tal_system_sleep(10);

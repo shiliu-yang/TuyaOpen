@@ -123,6 +123,7 @@ typedef uint16_t AI_ATTR_TYPE;
 #define AI_ATTR_BIZ_TAG                42
 #define AI_ATTR_SESSION_ID             43
 #define AI_ATTR_SESSION_STATUS_CODE    44
+#define AI_ATTR_AGENT_TOKEN            45
 #define AI_ATTR_SESSION_CLOSE_ERR_CODE 51
 #define AI_ATTR_EVENT_ID               61
 #define AI_ATTR_EVENT_TS               62
@@ -276,6 +277,7 @@ typedef struct {
     AI_PACKET_PT type;
     uint32_t count;
     AI_ATTRIBUTE_T *attrs[AI_MAX_ATTR_NUM];
+	uint32_t total_len;
     uint32_t len;
     char *data;
 } AI_SEND_PACKET_T;
@@ -322,6 +324,7 @@ typedef struct {
 } AI_AUDIO_ATTR_T;
 
 typedef struct {
+	uint32_t len;
     AI_IMAGE_FORMAT format;
     uint16_t width;
     uint16_t height;
@@ -332,6 +335,7 @@ typedef struct {
 } AI_IMAGE_ATTR_T;
 
 typedef struct {
+	uint32_t len;
     AI_FILE_FORMAT format;
     char file_name[128];
 } AI_FILE_ATTR_BASE_T;
@@ -419,10 +423,11 @@ OPERATE_RET tuya_ai_basic_conn_close(AI_STATUS_CODE code);
  *
  * @param[out] out packet data
  * @param[out] out_len packet data length
+ * @param[out] out_frag packet fragment flag
  *
  * @return OPRT_OK on success. Others on error, please refer to tuya_error_code.h
  */
-OPERATE_RET tuya_ai_basic_pkt_read(char **out, uint32_t *out_len);
+OPERATE_RET tuya_ai_basic_pkt_read(char **out, uint32_t *out_len, AI_FRAG_FLAG *out_frag);
 
 /**
  * @brief send ai ping
@@ -439,6 +444,15 @@ OPERATE_RET tuya_ai_basic_ping(void);
  * @return OPRT_OK on success. Others on error, please refer to tuya_error_code.h
  */
 OPERATE_RET tuya_ai_basic_pkt_send(AI_SEND_PACKET_T *info);
+
+/**
+ * @brief send ai packet fragment
+ *
+ * @param[in] info packet info
+ *
+ * @return OPRT_OK on success. Others on error, please refer to tuya_error_code.h
+ */
+OPERATE_RET tuya_ai_basic_pkt_frag_send(AI_SEND_PACKET_T *info);
 
 /**
  * @brief request atop info
@@ -636,7 +650,7 @@ OPERATE_RET tuya_ai_basic_uuid_v4(char *uuid_str);
  *
  * @return true on need. false on not need
  */
-uint8_t tuya_ai_is_need_attr(AI_FRAG_FLAG frag_flag);
+bool tuya_ai_is_need_attr(AI_FRAG_FLAG frag_flag);
 
 /**
  * @brief parse conn close
@@ -664,4 +678,14 @@ OPERATE_RET tuya_ai_pong(char *data, uint32_t len);
  * @param[in] data data buffer
  */
 void tuya_ai_basic_pkt_free(char *data);
+
+/**
+ * @brief set frag flag
+ *
+ * @param[in] flag fragment flag
+ * @note
+ * The function should be called after the AI basic protocol is initialized.
+ * @return
+ */
+void tuya_ai_basic_set_frag_flag(bool flag);
 #endif

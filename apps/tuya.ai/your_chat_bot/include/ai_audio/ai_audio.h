@@ -12,6 +12,8 @@
 /***********************************************************
 ************************macro define************************
 ***********************************************************/
+#define GET_MIN_LEN(a, b) ((a) < (b) ? (a) : (b))
+
 typedef uint8_t AI_AUDIO_WORK_MODE_E;
 #define AI_AUDIO_MODE_MANUAL_SINGLE_TALK       1
 #define AI_AUDIO_WORK_VAD_FREE_TALK            2
@@ -21,7 +23,9 @@ typedef uint8_t AI_AUDIO_WORK_MODE_E;
 typedef enum {
     AI_AUDIO_EVT_NONE,
     AI_AUDIO_EVT_HUMAN_ASR_TEXT,
-    AI_AUDIO_EVT_AI_REPLIES_TEXT,
+    AI_AUDIO_EVT_AI_REPLIES_TEXT_START,
+    AI_AUDIO_EVT_AI_REPLIES_TEXT_DATA,
+    AI_AUDIO_EVT_AI_REPLIES_TEXT_END,
     AI_AUDIO_EVT_AI_REPLIES_EMO,
     AI_AUDIO_EVT_ASR_WAKEUP,
     AI_AUDIO_EVT_ASR_WAKEUP_END,

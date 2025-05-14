@@ -54,7 +54,7 @@ If the `tuya_iot_license_read()` interface returns OPRT_OK, it indicates that th
 Build and Flash
 ========================================================================
 - Run the `tos config_choice` command to select the current development board in use.
-- If you need to modify the configuration, run the `tso menuconfig` command to make changes.
+- If you need to modify the configuration, run the `tos menuconfig` command to make changes.
 - Run the `tos build` command to compile the project.
 - Use the tos flash command to flash the project in one click.
 

@@ -50,6 +50,7 @@ typedef struct {
     THREAD_HANDLE thread;
     MUTEX_HANDLE mutex;
     AI_SESSION_T session[AI_SESSION_MAX_NUM];
+    AI_BIZ_RECV_CB cb;
 } AI_BASIC_BIZ_T;
 AI_BASIC_BIZ_T *ai_basic_biz;
 
@@ -121,11 +122,7 @@ OPERATE_RET tuya_ai_send_biz_pkt(uint16_t id, AI_BIZ_ATTR_INFO_T *attr, AI_PACKE
         if (payload && head->len) {
             memcpy(image + sizeof(AI_IMAGE_HEAD_T), payload, head->len);
         }
-        if (attr && (attr->flag == AI_HAS_ATTR)) {
-            rt = tuya_ai_basic_image(&(attr->value.image), image, payload_len);
-        } else {
-            rt = tuya_ai_basic_image(NULL, image, payload_len);
-        }
+        rt = tuya_ai_basic_image(&(attr->value.image), image, payload_len);
         Free(image);
     } else if (type == AI_PT_FILE) {
         payload_len = sizeof(AI_FILE_HEAD_T) + head->len;
@@ -139,11 +136,7 @@ OPERATE_RET tuya_ai_send_biz_pkt(uint16_t id, AI_BIZ_ATTR_INFO_T *attr, AI_PACKE
         if (payload && head->len) {
             memcpy(file + sizeof(AI_FILE_HEAD_T), payload, head->len);
         }
-        if (attr && (attr->flag == AI_HAS_ATTR)) {
-            rt = tuya_ai_basic_file(&(attr->value.file), file, payload_len);
-        } else {
-            rt = tuya_ai_basic_file(NULL, file, payload_len);
-        }
+        rt = tuya_ai_basic_file(&(attr->value.file), file, payload_len);
         Free(file);
     } else if (type == AI_PT_TEXT) {
         payload_len = sizeof(AI_TEXT_HEAD_T) + head->len;
@@ -252,24 +245,15 @@ static OPERATE_RET __ai_biz_create_task(void)
     thrd_param.priority = THREAD_PRIO_1;
     thrd_param.thrdname = "ai_biz_thread";
     thrd_param.stackDepth = 4096;
+#if defined(AI_STACK_IN_PSRAM) && (AI_STACK_IN_PSRAM == 1)
+    thrd_param.psram_mode = 1;
+#endif
 
     rt = tal_thread_create_and_start(&ai_basic_biz->thread, NULL, NULL, __ai_biz_thread_cb, NULL, &thrd_param);
     if (OPRT_OK != rt) {
         PR_ERR("ai biz thread create err, rt:%d", rt);
     }
     AI_PROTO_D("create ai biz thread success");
-    return rt;
-}
-
-static OPERATE_RET __ai_biz_del_task(void)
-{
-    OPERATE_RET rt = OPRT_OK;
-    if (!ai_basic_biz->thread) {
-        return rt;
-    }
-    tal_thread_delete(ai_basic_biz->thread);
-    ai_basic_biz->thread = NULL;
-    AI_PROTO_D("del ai biz thread success");
     return rt;
 }
 
@@ -696,93 +680,106 @@ static OPERATE_RET __ai_biz_session_destory(AI_SESSION_ID id, AI_STATUS_CODE cod
     return rt;
 }
 
-OPERATE_RET __ai_biz_recv_handle(char *data, uint32_t len)
+OPERATE_RET __ai_biz_recv_handle(char *data, uint32_t len, AI_FRAG_FLAG frag)
 {
     OPERATE_RET rt = OPRT_OK;
     char *payload = NULL, *attr_buf = NULL;
     void *usr_data = NULL;
+    AI_BIZ_HEAD_INFO_T biz_head = {0};
+    AI_BIZ_RECV_CB cb = NULL;
+    AI_PROTO_D("recv data len:%d, frag:%d", len, frag);
+    if ((frag == AI_PACKET_NO_FRAG) || (frag == AI_PACKET_FRAG_START)) {
+        AI_PAYLOAD_HEAD_T *head = (AI_PAYLOAD_HEAD_T *)data;
+        AI_PACKET_PT type = head->type;
+        AI_ATTR_FLAG attr_flag = head->attribute_flag;
+        uint32_t idx = 0, attr_len = 0;
+        uint32_t offset = sizeof(AI_PAYLOAD_HEAD_T);
+        ai_basic_biz->cb = NULL;
 
-    AI_PAYLOAD_HEAD_T *head = (AI_PAYLOAD_HEAD_T *)data;
-    AI_PACKET_PT type = head->type;
-    AI_ATTR_FLAG attr_flag = head->attribute_flag;
-    uint32_t idx = 0, attr_len = 0;
-    uint32_t offset = sizeof(AI_PAYLOAD_HEAD_T);
+        if (!__ai_is_biz_pkt_vaild(type)) {
+            return OPRT_INVALID_PARM;
+        }
 
-    if (!__ai_is_biz_pkt_vaild(type)) {
-        return OPRT_INVALID_PARM;
-    }
+        AI_BIZ_ATTR_INFO_T attr_info;
+        memset(&attr_info, 0, sizeof(AI_BIZ_ATTR_INFO_T));
+        attr_info.flag = attr_flag;
+        attr_info.type = type;
+        if (attr_flag == AI_HAS_ATTR) {
+            memcpy(&attr_len, data + offset, sizeof(attr_len));
+            attr_len = UNI_NTOHL(attr_len);
+            offset += sizeof(attr_len);
+            attr_buf = data + offset;
+            rt = __ai_parse_biz_attr(type, attr_buf, attr_len, &attr_info);
+            if (OPRT_OK != rt) {
+                return rt;
+            }
+            offset += attr_len;
+        }
 
-    AI_BIZ_ATTR_INFO_T attr_info;
-    memset(&attr_info, 0, sizeof(AI_BIZ_ATTR_INFO_T));
-    attr_info.flag = attr_flag;
-    attr_info.type = type;
-    if (attr_flag == AI_HAS_ATTR) {
-        memcpy(&attr_len, data + offset, sizeof(attr_len));
-        attr_len = UNI_NTOHL(attr_len);
-        offset += sizeof(attr_len);
-        attr_buf = data + offset;
-        rt = __ai_parse_biz_attr(type, attr_buf, attr_len, &attr_info);
+        if (type == AI_PT_SESSION_CLOSE) {
+            AI_SESSION_CLOSE_ATTR_T *close = &attr_info.value.close;
+            return __ai_biz_session_destory(close->id, close->code, false);
+        }
+
+        offset += sizeof(uint32_t);
+        payload = data + offset;
+
+        if (type == AI_PT_EVENT) {
+            rt = __ai_biz_recv_event(&attr_info.value.event, payload);
+            return rt;
+        }
+
+        rt = __ai_parse_biz_head(type, payload, &biz_head, &offset);
         if (OPRT_OK != rt) {
             return rt;
         }
-        offset += attr_len;
-    }
 
-    if (type == AI_PT_SESSION_CLOSE) {
-        AI_SESSION_CLOSE_ATTR_T *close = &attr_info.value.close;
-        return __ai_biz_session_destory(close->id, close->code, false);
-    }
+        uint16_t recv_id = 0;
+        memcpy(&recv_id, payload, sizeof(uint16_t));
+        recv_id = UNI_NTOHS(recv_id);
+        AI_PROTO_D("recv data id:%d", recv_id);
 
-    offset += sizeof(uint32_t);
-    payload = data + offset;
-
-    if (type == AI_PT_EVENT) {
-        rt = __ai_biz_recv_event(&attr_info.value.event, payload);
-        return rt;
-    }
-
-    AI_BIZ_HEAD_INFO_T biz_head = {0};
-    rt = __ai_parse_biz_head(type, payload, &biz_head, &offset);
-    if (OPRT_OK != rt) {
-        return rt;
-    }
-
-    uint16_t recv_id = 0;
-    memcpy(&recv_id, payload, sizeof(uint16_t));
-    recv_id = UNI_NTOHS(recv_id);
-    AI_PROTO_D("recv data id:%d", recv_id);
-
-    AI_BIZ_RECV_CB cb = NULL;
-    tal_mutex_lock(ai_basic_biz->mutex);
-    for (idx = 0; idx < AI_SESSION_MAX_NUM; idx++) {
-        if (ai_basic_biz->session[idx].id[0] != 0) {
-            AI_SESSION_T *session = &ai_basic_biz->session[idx];
-            uint32_t sidx = 0;
-            for (sidx = 0; sidx < session->cfg.recv_num; sidx++) {
-                if (session->cfg.recv[sidx].id == recv_id) {
-                    usr_data = session->cfg.recv[sidx].usr_data;
-                    if (session->cfg.recv[sidx].cb) {
-                        cb = session->cfg.recv[sidx].cb;
-                        break;
+        tal_mutex_lock(ai_basic_biz->mutex);
+        for (idx = 0; idx < AI_SESSION_MAX_NUM; idx++) {
+            if (ai_basic_biz->session[idx].id[0] != 0) {
+                AI_SESSION_T *session = &ai_basic_biz->session[idx];
+                uint32_t sidx = 0;
+                for (sidx = 0; sidx < session->cfg.recv_num; sidx++) {
+                    if (session->cfg.recv[sidx].id == recv_id) {
+                        usr_data = session->cfg.recv[sidx].usr_data;
+                        if (session->cfg.recv[sidx].cb) {
+                            cb = session->cfg.recv[sidx].cb;
+                            break;
+                        }
                     }
                 }
-            }
-            if (cb) {
-                break;
+                if (cb) {
+                    break;
+                }
             }
         }
-    }
-    tal_mutex_unlock(ai_basic_biz->mutex);
-    if (cb) {
-        AI_PROTO_D("recv data id:%d, call cb: %p", recv_id, cb);
-        rt = cb(&attr_info, &biz_head, payload + offset, usr_data);
-        if (rt != OPRT_OK) {
-            PR_ERR("recv data handle failed, rt:%d", rt);
+        tal_mutex_unlock(ai_basic_biz->mutex);
+        if (cb) {
+            AI_PROTO_D("recv data id:%d, call cb: %p", recv_id, cb);
+            rt = cb(&attr_info, &biz_head, payload + offset, usr_data);
+            if (rt != OPRT_OK) {
+                PR_ERR("recv data handle failed, rt:%d", rt);
+            }
+            ai_basic_biz->cb = cb;
         }
-    }
-    if (idx == AI_SESSION_MAX_NUM) {
-        PR_ERR("session not found");
-        return OPRT_COM_ERROR;
+        if (idx == AI_SESSION_MAX_NUM) {
+            PR_ERR("session not found");
+            return OPRT_COM_ERROR;
+        }
+    } else {
+        biz_head.len = len;
+        biz_head.stream_flag = AI_STREAM_ING;
+        if (ai_basic_biz->cb) {
+            rt = ai_basic_biz->cb(NULL, &biz_head, data, usr_data);
+            if (rt != OPRT_OK) {
+                PR_ERR("recv data handle failed, rt:%d", rt);
+            }
+        }
     }
     return rt;
 }
@@ -906,7 +903,7 @@ OPERATE_RET tuya_ai_biz_crt_session(uint32_t bizCode, AI_SESSION_CFG_T *cfg, uin
         }
     }
     if (__ai_biz_need_send_task()) {
-        TUYA_CALL_ERR_RETURN(__ai_biz_create_task());
+        __ai_biz_create_task();
     }
     tal_mutex_unlock(ai_basic_biz->mutex);
 
@@ -938,168 +935,3 @@ int tuya_ai_biz_get_recv_id(void)
     even_number += 2;
     return id;
 }
-
-#if 0 // test
-OPERATE_RET ai_send_get_audio_cb(AI_BIZ_ATTR_INFO_T *attr, AI_BIZ_HEAD_INFO_T *head, char **data)
-{
-    static int flag = 0;
-    if (!flag) {
-        attr->flag = AI_HAS_ATTR;
-        attr->type = AI_PT_AUDIO;
-        attr->value.audio.codec_type = AUDIO_CODEC_ADPCM;
-        attr->value.audio.bit_depth = 16;
-        attr->value.audio.channels = AUDIO_CHANNELS_MONO;
-        attr->value.audio.sample_rate = 16;
-        head->stream_flag = AI_STREAM_START;
-        head->len = 16 * 1024;
-        flag = 1;
-        AI_PROTO_D("send audio start with attr");
-    } else {
-        attr->flag = AI_NO_ATTR;
-        head->stream_flag = AI_STREAM_ING;
-        head->len = 16 * 1024;
-        AI_PROTO_D("send audio start with no attr");
-    }
-    char *buf = Malloc(head->len);
-    TUYA_CHECK_NULL_RETURN(buf, OPRT_MALLOC_FAILED);
-    memset(buf, 0, head->len);
-    buf[0] = 1;
-    buf[1] = 2;
-    *data = buf;
-    return OPRT_OK;
-}
-
-OPERATE_RET ai_send_get_video_cb(AI_BIZ_ATTR_INFO_T *attr, AI_BIZ_HEAD_INFO_T *head, char **data)
-{
-    static int flag = 0;
-    if (!flag) {
-        attr->flag = AI_HAS_ATTR;
-        attr->type = AI_PT_VIDEO;
-        attr->value.video.codec_type = VIDEO_CODEC_MPEG4;
-        attr->value.video.sample_rate = 9000;
-        attr->value.video.width = 640;
-        attr->value.video.height = 480;
-        attr->value.video.fps = 20;
-        attr->value.video.user_data = NULL;
-        attr->value.video.user_len = 0;
-        attr->value.video.session_id_list = NULL;
-        head->stream_flag = AI_STREAM_START;
-        head->len = 16 * 1024;
-        flag = 1;
-        AI_PROTO_D("send video start with attr");
-    } else {
-        attr->flag = AI_NO_ATTR;
-        head->stream_flag = AI_STREAM_ING;
-        head->len = 3 * 1024;
-        attr->value.video.user_data = NULL;
-        attr->value.video.user_len = 0;
-        attr->value.video.session_id_list = NULL;
-        AI_PROTO_D("send video start with no attr");
-    }
-    char *buf = Malloc(head->len);
-    TUYA_CHECK_NULL_RETURN(buf, OPRT_MALLOC_FAILED);
-    memset(buf, 0, head->len);
-    buf[0] = 1;
-    buf[1] = 2;
-    *data = buf;
-    return OPRT_OK;
-}
-
-void ai_send_free(char *data)
-{
-    if (data) {
-        Free(data);
-    }
-}
-
-char *session_id = NULL;
-static int __ai_biz_client_run(void *data)
-{
-    AI_SESSION_CFG_T cfg = {0};
-    cfg.send_num = 4;
-    cfg.recv_num = 2;
-    cfg.send[0].id = tuya_ai_biz_get_send_id();
-    cfg.send[0].type = AI_PT_AUDIO;
-    cfg.send[0].get_cb = NULL;
-    cfg.send[0].free_cb = NULL;
-
-    cfg.send[1].id = tuya_ai_biz_get_send_id();
-    cfg.send[1].type = AI_PT_VIDEO;
-    cfg.send[1].get_cb = ai_send_get_video_cb;
-    cfg.send[1].free_cb = ai_send_free;
-
-    cfg.send[2].id = tuya_ai_biz_get_send_id();
-    cfg.send[2].type = AI_PT_TEXT;
-    cfg.send[2].get_cb = NULL;
-    cfg.send[2].free_cb = NULL;
-
-    cfg.send[3].id = tuya_ai_biz_get_send_id();
-    cfg.send[3].type = AI_PT_IMAGE;
-    cfg.send[3].get_cb = NULL;
-    cfg.send[3].free_cb = NULL;
-
-    cfg.recv[0].id = tuya_ai_biz_get_recv_id();
-    cfg.recv[0].cb = NULL;
-    cfg.recv[0].usr_data = NULL;
-
-    cfg.recv[0].id = tuya_ai_biz_get_recv_id();
-    cfg.recv[0].cb = NULL;
-    cfg.recv[0].usr_data = NULL;
-
-    AI_ATTRIBUTE_T attr = {
-        .type = 1003,
-        .payload_type = ATTR_PT_U8,
-        .length = 1,
-        .value.u8 = 2 // 2表示设备
-    };
-    uint8_t *out = NULL;
-    uint32_t out_len = 0;
-    tuya_pack_user_attrs(&attr, 1, &out, &out_len);
-    session_id = tuya_ai_biz_crt_session(65537, &cfg, out, out_len);
-    if (session_id == NULL) {
-        PR_ERR("create session failed");
-        return OPRT_COM_ERROR;
-    }
-    return OPRT_OK;
-}
-
-static int __ai_biz_client_close(void *data)
-{
-    tuya_ai_biz_del_session(session_id, AI_CODE_OK);
-    return OPRT_OK;
-}
-
-void tuya_ai_send_audio()
-{
-    AI_BIZ_ATTR_INFO_T attr = {0};
-    AI_BIZ_HEAD_INFO_T head = {0};
-    char *payload = NULL;
-    while (1) {
-        ai_send_get_audio_cb(&attr, &head, &payload);
-        tuya_ai_send_biz_pkt(1, &attr, AI_PT_AUDIO, &head, payload);
-        ai_send_free(payload);
-        tal_system_sleep(2000);
-    }
-}
-
-static int __ai_biz_send_manually(void *data)
-{
-    tuya_ai_send_audio();
-    return OPRT_OK;
-}
-
-static int __ai_biz_session_close(void *data)
-{
-    AI_PROTO_D("recv session close event");
-    return OPRT_OK;
-}
-
-void tuya_ai_biz_test()
-{
-    // tal_event_subscribe(EVENT_AI_CLIENT_RUN, "ai_biz", __ai_biz_send_manually, SUBSCRIBE_TYPE_NORMAL);
-    tal_event_subscribe(EVENT_AI_CLIENT_RUN, "ai_biz", __ai_biz_client_run, SUBSCRIBE_TYPE_NORMAL);
-    tal_event_subscribe(EVENT_AI_SESSION_CLOSE, "ai_biz", __ai_biz_session_close, SUBSCRIBE_TYPE_NORMAL);
-    tal_event_subscribe(EVENT_AI_CLIENT_CLOSE, "ai_biz", __ai_biz_client_close, SUBSCRIBE_TYPE_NORMAL);
-    tuya_ai_client_init();
-}
-#endif

@@ -35,7 +35,7 @@
 static OPERATE_RET __ai_event(AI_EVENT_TYPE tp, AI_SESSION_ID sid, AI_EVENT_ID eid, uint8_t *attr, uint32_t len)
 {
     OPERATE_RET rt = OPRT_OK;
-    if ((NULL == eid) || (NULL == sid)) {
+    if ((NULL == eid) || (NULL == sid) || strlen(sid) == 0 || strlen(eid) == 0) {
         PR_ERR("event or session id was null");
         return OPRT_INVALID_PARM;
     }

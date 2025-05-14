@@ -29,9 +29,10 @@
 ************************macro define************************
 ***********************************************************/
 #define AI_AUDIO_INPUT_RB_TIME_MS (10 * 1000)
+#define AI_AUDIO_VAD_ACITVE_TM_MS (300)
 
 #define ASR_PROCE_UNIT_NUM    30
-#define ASR_WAKEUP_TIMEOUT_MS (20000)
+#define ASR_WAKEUP_TIMEOUT_MS (30000)
 /***********************************************************
 ***********************typedef define***********************
 ***********************************************************/
@@ -160,16 +161,17 @@ static OPERATE_RET __ai_audio_asr_deinit(void)
 static void __ai_audio_asr_feed(void *data, uint32_t len)
 {
     tal_mutex_lock(sg_audio_input.asr.rb_mutex);
+
     if (TKL_VAD_STATUS_NONE == tkl_vad_get_status()) {
         uint32_t rb_used_size = tuya_ring_buff_used_size_get(sg_audio_input.asr.feed_ringbuff);
         if (rb_used_size > AI_AUDIO_VOICE_FRAME_LEN_GET(AI_AUDIO_VAD_ACITVE_TM_MS)) {
             uint32_t discard_size = rb_used_size - AI_AUDIO_VOICE_FRAME_LEN_GET(AI_AUDIO_VAD_ACITVE_TM_MS);
             tuya_ring_buff_discard(sg_audio_input.asr.feed_ringbuff, discard_size);
         }
-    }
-
+    } 
+    
     tuya_ring_buff_write(sg_audio_input.asr.feed_ringbuff, data, len);
-
+    
     tal_mutex_unlock(sg_audio_input.asr.rb_mutex);
 
     return;
@@ -189,21 +191,6 @@ static TKL_ASR_WAKEUP_WORD_E __asr_recognize_wakeup_keyword(void)
         return TKL_ASR_WAKEUP_WORD_UNKNOWN;
     }
 
-#if 0
-    tal_mutex_lock(sg_audio_input.asr.rb_mutex);
-    tuya_ring_buff_read(sg_audio_input.asr.feed_ringbuff, sg_audio_input.asr.recognize_buff, sg_audio_input.asr.buff_len);
-    tal_mutex_unlock(sg_audio_input.asr.rb_mutex);
-
-    fc = sg_audio_input.asr.buff_len / uint_size;
-    for (i = 0; i < fc; i++) {
-        PR_DEBUG("i->:%d", i);
-        wakeup_word = tkl_asr_recognize_wakeup_word(sg_audio_input.asr.recognize_buff[i*uint_size], uint_size);
-        if (wakeup_word != TKL_ASR_WAKEUP_WORD_UNKNOWN) {
-            break;
-        }
-        PR_DEBUG("i<-:%d", i);
-    }
-#else
     uint8_t *p_buf = tkl_system_psram_malloc(uint_size);
     if (NULL == p_buf) {
         PR_ERR("malloc fail");
@@ -223,8 +210,6 @@ static TKL_ASR_WAKEUP_WORD_E __asr_recognize_wakeup_keyword(void)
     }
 
     tkl_system_psram_free(p_buf);
-
-#endif
 
     return wakeup_word;
 }
@@ -431,6 +416,13 @@ static void __ai_audio_handle_frame_task(void *arg)
             sg_audio_input.asr.is_need_inform_wakeup_stop = false;
         }
 
+        if(AI_AUDIO_INPUT_EVT_ASR_WAKEUP_WORD == event) {
+            //restart vad detection
+            tkl_vad_stop();
+            __ai_audio_input_rb_reset();
+            tkl_vad_start();
+        }
+
         if ((event != AI_AUDIO_INPUT_EVT_NONE) && sg_audio_input_inform_cb) {
             sg_audio_input_inform_cb(event, NULL);
         }
@@ -495,7 +487,7 @@ OPERATE_RET ai_audio_input_init(AI_AUDIO_INPUT_CFG_T *cfg, AI_AUDIO_INOUT_INFORM
         return OPRT_OK;
     }
 
-    TUYA_CALL_ERR_RETURN(tuya_ring_buff_create(AI_AUDIO_VOICE_FRAME_LEN_GET(AI_AUDIO_INPUT_RB_TIME_MS),
+    TUYA_CALL_ERR_RETURN(tuya_ring_buff_create(AI_AUDIO_VOICE_FRAME_LEN_GET(AI_AUDIO_INPUT_RB_TIME_MS)+1,
                                                OVERFLOW_PSRAM_STOP_TYPE, &sg_audio_input.ringbuff_hdl));
     TUYA_CALL_ERR_RETURN(tal_mutex_create_init(&sg_audio_input.rb_mutex));
 
@@ -611,7 +603,6 @@ OPERATE_RET ai_audio_input_restart_asr_awake_timer(void)
 
 uint32_t ai_audio_get_input_data(uint8_t *buff, uint32_t buff_len)
 {
-    uint32_t rb_used_size = 0;
     uint32_t read_len = 0;
 
     if (NULL == buff || 0 == buff_len) {
@@ -619,9 +610,7 @@ uint32_t ai_audio_get_input_data(uint8_t *buff, uint32_t buff_len)
     }
 
     tal_mutex_lock(sg_audio_input.rb_mutex);
-    rb_used_size = tuya_ring_buff_used_size_get(sg_audio_input.ringbuff_hdl);
-    read_len = (buff_len <= rb_used_size) ? buff_len : rb_used_size;
-    tuya_ring_buff_read(sg_audio_input.ringbuff_hdl, buff, read_len);
+    read_len = tuya_ring_buff_read(sg_audio_input.ringbuff_hdl, buff, buff_len);
     tal_mutex_unlock(sg_audio_input.rb_mutex);
 
     return read_len;

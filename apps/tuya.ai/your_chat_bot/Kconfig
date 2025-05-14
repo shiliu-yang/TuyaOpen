@@ -22,9 +22,6 @@ choice
 
     config ENABLE_CHAT_MODE_ASR_WAKEUP_SINGEL
     bool "say the wake-up word to initiate a single conversation, similar to a smart speaker."  
-
-    config ENABLE_CHAT_MODE_ASR_WAKEUP_FREE
-    bool "saying the wake-up word, you can have a free conversation."
 endchoice
 
 if(ENABLE_CHAT_MODE_ASR_WAKEUP_SINGEL || ENABLE_CHAT_MODE_ASR_WAKEUP_FREE)

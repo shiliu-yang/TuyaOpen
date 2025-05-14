@@ -34,10 +34,11 @@
  *
  * @param[in] data data
  * @param[in] len data length
+ * @param[in] frag data fragment flag
  *
  * @return OPRT_OK on success. Others on error, please refer to tuya_error_code.h
  */
-typedef OPERATE_RET (*AI_BASIC_DATA_HANDLE)(char *data, uint32_t len);
+typedef OPERATE_RET (*AI_BASIC_DATA_HANDLE)(char *data, uint32_t len, AI_FRAG_FLAG frag);
 
 /**
  * @brief register data handle cb
@@ -59,4 +60,18 @@ OPERATE_RET tuya_ai_client_init(void);
  * @return true is ready, false is not ready
  */
 uint8_t tuya_ai_client_is_ready(void);
+
+/**
+ * @brief start ai client ping
+ *
+ * @return OPRT_OK on success. Others on error, please refer to tuya_error_code.h
+ */
+void tuya_ai_client_start_ping(void);
+
+/**
+ * @brief stop ai client ping
+ *
+ * @return OPRT_OK on success. Others on error, please refer to tuya_error_code.h
+ */
+void tuya_ai_client_stop_ping(void);
 #endif

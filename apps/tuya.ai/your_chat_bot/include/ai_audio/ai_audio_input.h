@@ -25,7 +25,6 @@ extern "C" {
 // PCM frame size: 320 bytes
 #define AI_AUDIO_PCM_FRAME_TM_MS (10)
 #define AI_AUDIO_PCM_FRAME_SIZE  (320)
-#define AI_AUDIO_VAD_ACITVE_TM_MS (300+300)    // vad active duration
 
 #define AI_AUDIO_VOICE_FRAME_LEN_GET(tm_ms) ((tm_ms) / AI_AUDIO_PCM_FRAME_TM_MS * AI_AUDIO_PCM_FRAME_SIZE)
 /***********************************************************

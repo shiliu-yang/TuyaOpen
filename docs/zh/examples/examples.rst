@@ -75,5 +75,5 @@ TuyaOpen 提供了丰富的示例工程，方便开发者快速上手，了解 T
 编译示例
 ========================
 1. 运行 `tos config_choice` 命令， 选择当前运行的开发板或 platform。
-2. 如需修改配置，请先运行 `tso menuconfig` 命令修改配置。
+2. 如需修改配置，请先运行 `tos menuconfig` 命令修改配置。
 3. 运行 `tos build` 命令，编译工程。

@@ -42,14 +42,12 @@ typedef enum {
  */
 OPERATE_RET ai_audio_cloud_asr_init(void);
 
-OPERATE_RET ai_audio_cloud_asr_update_vad_data(void);
-
 /**
  * @brief Starts the audio cloud ASR process.
  * @param None
  * @return OPERATE_RET - OPRT_OK if the start operation is successful, otherwise an error code.
  */
-OPERATE_RET ai_audio_cloud_asr_start(bool is_forced_intrrupt);
+OPERATE_RET ai_audio_cloud_asr_start(void);
 
 /**
  * @brief Stops the audio cloud ASR process.
@@ -70,7 +68,7 @@ OPERATE_RET ai_audio_cloud_stop_wait_asr(void);
  * @param None
  * @return OPERATE_RET - OPRT_OK if the operation is successful, otherwise an error code.
  */
-OPERATE_RET ai_audio_cloud_asr_set_idle(bool is_forced_intrrupt);
+OPERATE_RET ai_audio_cloud_asr_set_idle(bool is_forced);
 
 /**
  * @brief Get the current state of the audio could asr process.

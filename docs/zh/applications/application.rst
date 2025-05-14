@@ -59,7 +59,7 @@ Tuyaopen Framework 包括：
 编译烧录
 ========================
 - 运行 `tos config_choice` 命令， 选择当前运行的开发板或 platform。
-- 如需修改配置，请先运行 `tso menuconfig` 命令修改配置。
+- 如需修改配置，请先运行 `tos menuconfig` 命令修改配置。
 - 运行 `tos build` 命令，编译工程。
 - 使用 tos flash 命令进行一键烧录。
 

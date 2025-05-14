@@ -6,20 +6,34 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = 'TuyaOpen 开发指南'
-copyright = '2025, 杭州涂鸦信息技术有限公司'
+project = 'TuyaOpen Development Guide'
+copyright = '2021-%Y, Tuya Inc'
 author = 'Tuya'
 release = '1.2.0'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
-extensions = ['myst_parser','sphinx_markdown_tables','sphinx_copybutton']
+extensions = [
+    'sphinx.ext.autodoc',
+    'sphinx.ext.viewcode',
+    'sphinx.ext.todo',
+    'myst_parser',
+    'sphinx_markdown_tables',
+    'sphinx_copybutton',
+    'sphinxcontrib.mermaid',
+    'sphinx_design',
+    'sphinx_sitemap',
+]
 
 templates_path = ['_templates']
 exclude_patterns = []
+source_suffix = ['.rst', '.md']
 
-language = 'zh_CN'
+language = 'en'
+
+# 语法高亮设置
+pygments_style = 'friendly'
 
 html_logo = '../images/TuyaOpen.png'
 

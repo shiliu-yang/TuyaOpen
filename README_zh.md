@@ -45,7 +45,7 @@ $ export PATH=$PATH:$PWD
 
 TuyaOpen 通过 tos 命令进行编译、调试等操作，tos 命令会根据环境变量中设置的路径查找 TuyaOpen 仓库，并执行对应操作。
 
-tos 命令的详细使用方法，请参考 [tos 命令](./docs/zh/tos_guide.md)。
+tos 命令的详细使用方法，请参考 [tos 命令](./docs/zh/tos_guide.rst)。
 
 ### step2. 选择待编译项目
 - 方式1：编译 example
@@ -170,7 +170,7 @@ v1.8.0 之前版本需要手工运行以下升级命令升级：
 $ tos flash upgrade
 ```
 
-更多 TuyaOpen 相关文档请参考 [TuyaOpen 开发指南](https://tuyaopen.readthedocs.io/zh-cn/latest)。
+更多 TuyaOpen 相关文档请参考 [TuyaOpen 开发指南](https://docs.tuyaopen.io/zh)。
 
 ## 支持 platform 列表
 | 名称 | 支持状态 | 介绍 | 调试日志串口 |
@@ -263,11 +263,11 @@ TuyaOpen 提供了丰富的云连接应用示例，相关应用位于 apps 目�
 
 ## platform 新增与适配
 
-TuyaOpen 支持新增与适配新的 platform，具体操作请参考 [platform 新增与适配](./docs/zh/new_platform.md)。
+TuyaOpen 支持新增与适配新的 platform，具体操作请参考 [platform 新增与适配](./docs/zh/new_platform.rst)。
 
 ## board 新增与适配
 
-TuyaOpen 支持新增与适配新的 board，具体操作请参考 [board 新增与适配](./docs/zh/new_board.md)。
+TuyaOpen 支持新增与适配新的 board，具体操作请参考 [board 新增与适配](./docs/zh/new_board.rst)。
 
 ## FAQ
 1. TuyaOpen 支持的 platform 通过子仓库动态下载，更新 TuyaOpen 仓库不会主动更新子仓库，如遇到问题无法正常编译，请至 platform 文件夹下对应的目录下使用 `git pull` 命令更新，或删除 platform 文件夹下对应目录后再次下载。
@@ -278,7 +278,7 @@ TuyaOpen 支持新增与适配新的 board，具体操作请参考 [board 新增
 本项目的分发遵循 Apache License 版本 2.0。有关更多信息，请参见 LICENSE 文件。
 
 ## 贡献代码
-如果您对 TuyaOpen 感兴趣，并希望参与 TuyaOpen 的开发并成为代码贡献者，请先参阅 [贡献指南](./docs/zh/contribute_guide.md)。
+如果您对 TuyaOpen 感兴趣，并希望参与 TuyaOpen 的开发并成为代码贡献者，请先参阅 [贡献指南](./docs/zh/contribute_guide.rst)。
 
 ## 免责与责任条款
 

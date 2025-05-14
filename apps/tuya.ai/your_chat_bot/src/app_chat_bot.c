@@ -8,20 +8,23 @@
 
 #include "tkl_wifi.h"
 #include "tkl_gpio.h"
+#include "tkl_memory.h"
 #include "tal_api.h"
 #include "tuya_ringbuf.h"
 
 #include "tdd_button_gpio.h"
 #include "tdl_button_manage.h"
 
-#include "app_board_api.h"
+#include "app_display.h"
 #include "ai_audio.h"
 #include "app_chat_bot.h"
 
 /***********************************************************
 ************************macro define************************
 ***********************************************************/
-#define APP_BUTTON_NAME "app_button"
+#define APP_BUTTON_NAME        "app_button"
+#define AI_AUDIO_TEXT_BUFF_LEN (1024)
+#define AI_AUDIO_TEXT_SHOW_LEN (80 * 3)
 
 typedef uint8_t APP_CHAT_MODE_E;
 /*Press and hold button to start a single conversation.*/
@@ -157,6 +160,9 @@ static OPERATE_RET __app_led_init(TUYA_GPIO_NUM_E pin, TUYA_GPIO_LEVEL_E active_
 
 static void __app_ai_audio_inform_cb(AI_AUDIO_EVENT_E event, uint8_t *data, uint32_t len, void *arg)
 {
+    static uint8_t *p_ai_text = NULL;
+    static uint32_t ai_text_len = 0;
+
     switch (event) {
     case AI_AUDIO_EVT_HUMAN_ASR_TEXT: {
         if (len > 0 && data) {
@@ -166,9 +172,45 @@ static void __app_ai_audio_inform_cb(AI_AUDIO_EVENT_E event, uint8_t *data, uint
 #endif
         }
     } break;
-    case AI_AUDIO_EVT_AI_REPLIES_TEXT: {
+    case AI_AUDIO_EVT_AI_REPLIES_TEXT_START: {
 #if defined(ENABLE_CHAT_DISPLAY) && (ENABLE_CHAT_DISPLAY == 1)
-        app_display_send_msg(TY_DISPLAY_TP_ASSISTANT_MSG, data, len);
+#if defined(ENABLE_GUI_STREAM_AI_TEXT) && (ENABLE_GUI_STREAM_AI_TEXT == 1)
+        app_display_send_msg(TY_DISPLAY_TP_ASSISTANT_MSG_STREAM_START, data, len);
+#else
+        if (NULL == p_ai_text) {
+            p_ai_text = tkl_system_psram_malloc(AI_AUDIO_TEXT_BUFF_LEN);
+            if (NULL == p_ai_text) {
+                return;
+            }
+        }
+
+        ai_text_len = 0;
+#endif
+#endif
+    } break;
+    case AI_AUDIO_EVT_AI_REPLIES_TEXT_DATA: {
+#if defined(ENABLE_CHAT_DISPLAY) && (ENABLE_CHAT_DISPLAY == 1)
+#if defined(ENABLE_GUI_STREAM_AI_TEXT) && (ENABLE_GUI_STREAM_AI_TEXT == 1)
+        app_display_send_msg(TY_DISPLAY_TP_ASSISTANT_MSG_STREAM_DATA, data, len);
+#else
+        memcpy(p_ai_text + ai_text_len, data, len);
+
+        ai_text_len += len;
+        if (ai_text_len >= AI_AUDIO_TEXT_SHOW_LEN) {
+            app_display_send_msg(TY_DISPLAY_TP_ASSISTANT_MSG, p_ai_text, ai_text_len);
+            ai_text_len = 0;
+        }
+#endif
+#endif
+    } break;
+    case AI_AUDIO_EVT_AI_REPLIES_TEXT_END: {
+#if defined(ENABLE_CHAT_DISPLAY) && (ENABLE_CHAT_DISPLAY == 1)
+#if defined(ENABLE_GUI_STREAM_AI_TEXT) && (ENABLE_GUI_STREAM_AI_TEXT == 1)
+        app_display_send_msg(TY_DISPLAY_TP_ASSISTANT_MSG_STREAM_END, data, len);
+#else
+        app_display_send_msg(TY_DISPLAY_TP_ASSISTANT_MSG, p_ai_text, ai_text_len);
+        ai_text_len = 0;
+#endif
 #endif
     } break;
     case AI_AUDIO_EVT_AI_REPLIES_EMO: {
@@ -190,6 +232,10 @@ static void __app_ai_audio_inform_cb(AI_AUDIO_EVENT_E event, uint8_t *data, uint
     } break;
     case AI_AUDIO_EVT_ASR_WAKEUP: {
         __app_led_set_state(1);
+
+#if defined(ENABLE_GUI_STREAM_AI_TEXT) && (ENABLE_GUI_STREAM_AI_TEXT == 1)
+        app_display_send_msg(TY_DISPLAY_TP_ASSISTANT_MSG_STREAM_END, data, len);
+#endif
     } break;
     case AI_AUDIO_EVT_ASR_WAKEUP_END: {
         __app_led_set_state(0);

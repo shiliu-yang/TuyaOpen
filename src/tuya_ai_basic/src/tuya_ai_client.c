@@ -41,7 +41,6 @@
 #define AI_CLIENT_STACK_SIZE 4096
 #endif
 
-#pragma pack(1)
 typedef struct {
     uint32_t min;
     uint32_t max;
@@ -71,7 +70,6 @@ typedef struct {
     uint8_t heartbeat_lost_cnt;
     AI_BASIC_DATA_HANDLE cb;
 } AI_BASIC_CLIENT_T;
-#pragma pack()
 
 static AI_BASIC_CLIENT_T *ai_basic_client = NULL;
 
@@ -148,8 +146,9 @@ static OPERATE_RET __ai_conn_close(void)
 {
     OPERATE_RET rt = OPRT_OK;
     tal_event_publish(EVENT_AI_CLIENT_CLOSE, NULL);
+    tuya_ai_client_stop_ping();
     tuya_ai_basic_conn_close(AI_CODE_CLOSE_BY_CLIENT);
-    __ai_client_set_state(AI_STATE_SETUP);
+    __ai_client_set_state(AI_STATE_IDLE);
     return rt;
 }
 
@@ -244,7 +243,7 @@ static void __ai_handle_pong(char *data, uint32_t len)
 {
     tuya_ai_pong(data, len);
     tal_workq_start_delayed(ai_basic_client->alive_work, (ai_basic_client->heartbeat_interval * 1000), LOOP_ONCE);
-    PR_NOTICE("recv ai pong");
+    PR_NOTICE("ai pong");
 }
 
 static OPERATE_RET __ai_running(void)
@@ -252,27 +251,33 @@ static OPERATE_RET __ai_running(void)
     OPERATE_RET rt = OPRT_OK;
     char *de_buf = NULL;
     uint32_t de_len = 0;
+    AI_FRAG_FLAG frag = AI_PACKET_NO_FRAG;
 
-    rt = tuya_ai_basic_pkt_read(&de_buf, &de_len);
+    rt = tuya_ai_basic_pkt_read(&de_buf, &de_len, &frag);
     if (OPRT_RESOURCE_NOT_READY == rt) {
         return OPRT_OK;
     } else if ((OPRT_OK != rt) || (de_buf == NULL)) {
         AI_PROTO_D("recv and parse data failed, rt:%d", rt);
         return rt;
     }
-
-    AI_PACKET_PT pkt_type = tuya_ai_basic_get_pkt_type(de_buf);
-    AI_PROTO_D("ai recv data type:%d, %d", pkt_type, de_len);
     __ai_stop_alive_time();
-    if (pkt_type == AI_PT_PONG) {
-        __ai_handle_pong(de_buf, de_len);
-    } else if (pkt_type == AI_PT_CONN_REFRESH_RESP) {
-        __ai_handle_refresh_resp(de_buf, de_len);
-    } else if (pkt_type == AI_PT_CONN_CLOSE) {
-        __ai_handle_conn_close(de_buf, de_len);
+    if ((frag == AI_PACKET_NO_FRAG) || (frag == AI_PACKET_FRAG_START)) {
+        AI_PACKET_PT pkt_type = tuya_ai_basic_get_pkt_type(de_buf);
+        AI_PROTO_D("ai recv data type:%d, %d", pkt_type, de_len);
+        if (pkt_type == AI_PT_PONG) {
+            __ai_handle_pong(de_buf, de_len);
+        } else if (pkt_type == AI_PT_CONN_REFRESH_RESP) {
+            __ai_handle_refresh_resp(de_buf, de_len);
+        } else if (pkt_type == AI_PT_CONN_CLOSE) {
+            __ai_handle_conn_close(de_buf, de_len);
+        } else {
+            if (ai_basic_client->cb) {
+                ai_basic_client->cb(de_buf, de_len, frag);
+            }
+        }
     } else {
         if (ai_basic_client->cb) {
-            ai_basic_client->cb(de_buf, de_len);
+            ai_basic_client->cb(de_buf, de_len, frag);
         }
     }
 
@@ -374,6 +379,9 @@ static OPERATE_RET __ai_client_create_task(void)
     thrd_param.priority = THREAD_PRIO_1;
     thrd_param.thrdname = "ai_client_thread";
     thrd_param.stackDepth = AI_CLIENT_STACK_SIZE;
+#if defined(AI_STACK_IN_PSRAM) && (AI_STACK_IN_PSRAM == 1)
+    thrd_param.psram_mode = 1;
+#endif
 
     rt = tal_thread_create_and_start(&ai_basic_client->thread, NULL, NULL, __ai_client_thread_cb, NULL, &thrd_param);
     if (OPRT_OK != rt) {
@@ -422,6 +430,19 @@ uint8_t tuya_ai_client_is_ready(void)
         }
     }
     return false;
+}
+
+void tuya_ai_client_stop_ping(void)
+{
+    if (ai_basic_client) {
+        tal_workq_stop_delayed(ai_basic_client->alive_work);
+        __ai_stop_alive_time();
+    }
+}
+
+void tuya_ai_client_start_ping(void)
+{
+    __ai_ping(NULL);
 }
 
 OPERATE_RET tuya_ai_client_init(void)
