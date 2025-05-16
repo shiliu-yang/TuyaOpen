@@ -14,6 +14,9 @@ release = '1.2.0'
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
+# 新增站点地图基础URL配置
+html_baseurl = 'https://github.com/tuya/TuyaOpen'
+
 extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.viewcode',
@@ -47,7 +50,7 @@ html_theme = 'sphinx_rtd_theme'
 html_static_path = ['_static']
 
 html_theme_options = {
-    'display_version': True,
+    # 'display_version': True,
     'prev_next_buttons_location': 'both',
     'style_external_links': False,
     'sticky_navigation': True,
@@ -76,3 +79,6 @@ html_context = {
     # 页面路径配置（自动生成编辑链接）
     "conf_py_path": "/docs/en/",  # 配置文件的仓库相对路径
 }
+
+highlight_language = 'c'  # 默认高亮C语言代码
+primary_domain = 'c'      # 主文档域为C语言

@@ -27,10 +27,10 @@
 /***********************************************************
 ************************macro define************************
 ***********************************************************/
-#define MAX_MASSAGE_NUM 20
-#define STREAM_BUFF_MAX_LEN  1024
+#define MAX_MASSAGE_NUM           20
+#define STREAM_BUFF_MAX_LEN       1024
 #define STREAM_TEXT_SHOW_WORD_NUM 5
-#define ONE_WORD_MAX_LEN 4
+#define ONE_WORD_MAX_LEN          4
 
 /***********************************************************
 ***********************typedef define***********************
@@ -567,6 +567,11 @@ void ui_set_network(char *wifi_icon)
     }
 
     lv_label_set_text(sg_ui.ui.network_label, wifi_icon);
+}
+
+void ui_set_chat_mode(const char *chat_mode)
+{
+    ;
 }
 
 void ui_set_status_bar_pad(int32_t value)

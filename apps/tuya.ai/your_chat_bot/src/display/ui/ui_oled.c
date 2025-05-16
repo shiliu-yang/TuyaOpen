@@ -335,6 +335,11 @@ void ui_set_network(char *wifi_icon)
     lv_label_set_text(sg_ui.ui.network_label, wifi_icon);
 }
 
+void ui_set_chat_mode(const char *chat_mode)
+{
+    ;
+}
+
 void ui_set_status_bar_pad(int32_t value)
 {
     if (sg_ui.ui.status_bar == NULL) {

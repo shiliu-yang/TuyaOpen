@@ -24,7 +24,7 @@
 ***********************************************************/
 #define APP_BUTTON_NAME        "app_button"
 #define AI_AUDIO_TEXT_BUFF_LEN (1024)
-#define AI_AUDIO_TEXT_SHOW_LEN (80 * 3)
+#define AI_AUDIO_TEXT_SHOW_LEN (60 * 3)
 
 typedef uint8_t APP_CHAT_MODE_E;
 /*Press and hold button to start a single conversation.*/
@@ -46,6 +46,7 @@ typedef struct {
     APP_CHAT_MODE_E mode;
     AI_AUDIO_WORK_MODE_E auido_mode;
     AI_AUDIO_ALERT_TYPE_E mode_alert;
+    char *display_text;
     bool is_open;
 } CHAT_WORK_MODE_INFO_T;
 
@@ -68,6 +69,7 @@ const CHAT_WORK_MODE_INFO_T cAPP_WORK_HOLD = {
     .mode = APP_CHAT_MODE_KEY_PRESS_HOLD_SINGLE,
     .auido_mode = AI_AUDIO_MODE_MANUAL_SINGLE_TALK,
     .mode_alert = AI_AUDIO_ALERT_LONG_KEY_TALK,
+    .display_text = HOLD_TALK,
     .is_open = true,
 };
 
@@ -75,6 +77,7 @@ const CHAT_WORK_MODE_INFO_T cAPP_WORK_TRIG_VAD = {
     .mode = APP_CHAT_MODE_KEY_TRIG_VAD_FREE,
     .auido_mode = AI_AUDIO_WORK_VAD_FREE_TALK,
     .mode_alert = AI_AUDIO_ALERT_KEY_TALK,
+    .display_text = TRIG_TALK,
     .is_open = false,
 };
 
@@ -82,6 +85,7 @@ const CHAT_WORK_MODE_INFO_T cAPP_WORK_WAKEUP_SINGLE = {
     .mode = APP_CHAT_MODE_ASR_WAKEUP_SINGLE,
     .auido_mode = AI_AUDIO_WORK_ASR_WAKEUP_SINGLE_TALK,
     .mode_alert = AI_AUDIO_ALERT_WAKEUP_TALK,
+    .display_text = WAKEUP_TALK,
     .is_open = true,
 };
 
@@ -89,6 +93,7 @@ const CHAT_WORK_MODE_INFO_T cAPP_WORK_WAKEUP_FREE = {
     .mode = APP_CHAT_MODE_ASR_WAKEUP_FREE,
     .auido_mode = AI_AUDIO_WORK_ASR_WAKEUP_FREE_TALK,
     .mode_alert = AI_AUDIO_ALERT_FREE_TALK,
+    .display_text = FREE_TALK,
     .is_open = true,
 };
 
@@ -377,5 +382,10 @@ OPERATE_RET app_chat_bot_init(void)
 
     __app_chat_bot_enable(sg_chat_bot.work->is_open);
 
+    PR_NOTICE("work:%s",  sg_chat_bot.work->display_text);
+
+#if defined(ENABLE_CHAT_DISPLAY) && (ENABLE_CHAT_DISPLAY == 1)
+    app_display_send_msg(TY_DISPLAY_TP_CHAT_MODE, sg_chat_bot.work->display_text, strlen(sg_chat_bot.work->display_text));
+#endif
     return OPRT_OK;
 }

@@ -51,6 +51,7 @@ typedef struct {
     lv_obj_t *network_label;
     lv_obj_t *notification_label;
     lv_obj_t *mute_label;
+    lv_obj_t *chat_mode_label;
 } APP_UI_T;
 
 typedef struct {
@@ -182,17 +183,17 @@ int ui_init(UI_FONT_T *ui_font)
     lv_label_set_text(sg_ui.ui.chat_message_label, "");
 
     // Status bar
-    lv_obj_set_flex_flow(sg_ui.ui.status_bar, LV_FLEX_FLOW_ROW);
+    // lv_obj_set_flex_flow(sg_ui.ui.status_bar, LV_FLEX_FLOW_ROW);
     lv_obj_set_style_pad_all(sg_ui.ui.status_bar, 0, 0);
     lv_obj_set_style_border_width(sg_ui.ui.status_bar, 0, 0);
     lv_obj_set_style_pad_column(sg_ui.ui.status_bar, 0, 0);
     lv_obj_set_style_pad_left(sg_ui.ui.status_bar, 2, 0);
     lv_obj_set_style_bg_color(sg_ui.ui.status_bar, sg_ui.theme.background, 0);
 
-    // Network status
-    sg_ui.ui.network_label = lv_label_create(sg_ui.ui.status_bar);
-    lv_obj_set_style_text_font(sg_ui.ui.network_label, sg_ui.font.icon, 0);
-    lv_obj_set_style_text_color(sg_ui.ui.network_label, sg_ui.theme.text, 0);
+    sg_ui.ui.chat_mode_label = lv_label_create(sg_ui.ui.status_bar);
+    lv_obj_set_style_text_color(sg_ui.ui.chat_mode_label, sg_ui.theme.text, 0);
+    lv_label_set_text(sg_ui.ui.chat_mode_label, "");
+    lv_obj_align(sg_ui.ui.chat_mode_label, LV_ALIGN_LEFT_MID, 5, 0);
 
     // Notification label
     sg_ui.ui.notification_label = lv_label_create(sg_ui.ui.status_bar);
@@ -200,6 +201,7 @@ int ui_init(UI_FONT_T *ui_font)
     lv_obj_set_style_text_align(sg_ui.ui.notification_label, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_text_color(sg_ui.ui.notification_label, sg_ui.theme.text, 0);
     lv_label_set_text(sg_ui.ui.notification_label, "");
+    lv_obj_align(sg_ui.ui.notification_label, LV_ALIGN_CENTER, 0, 0);
     lv_obj_add_flag(sg_ui.ui.notification_label, LV_OBJ_FLAG_HIDDEN);
 
     // Status label
@@ -209,12 +211,13 @@ int ui_init(UI_FONT_T *ui_font)
     lv_obj_set_style_text_align(sg_ui.ui.status_label, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_text_color(sg_ui.ui.status_label, sg_ui.theme.text, 0);
     lv_label_set_text(sg_ui.ui.status_label, INITIALIZING);
+    lv_obj_align(sg_ui.ui.status_label, LV_ALIGN_CENTER, 0, 0);
 
-    // Mute label
-    sg_ui.ui.mute_label = lv_label_create(sg_ui.ui.status_bar);
-    lv_label_set_text(sg_ui.ui.mute_label, "");
-    lv_obj_set_style_text_font(sg_ui.ui.mute_label, sg_ui.font.icon, 0);
-    lv_obj_set_style_text_color(sg_ui.ui.mute_label, sg_ui.theme.text, 0);
+    // Network status
+    sg_ui.ui.network_label = lv_label_create(sg_ui.ui.status_bar);
+    lv_obj_set_style_text_font(sg_ui.ui.network_label, sg_ui.font.icon, 0);
+    lv_obj_set_style_text_color(sg_ui.ui.network_label, sg_ui.theme.text, 0);
+    lv_obj_align(sg_ui.ui.network_label, LV_ALIGN_RIGHT_MID, -5, 0);
 
     return 0;
 }
@@ -304,6 +307,15 @@ void ui_set_network(char *wifi_icon)
     }
 
     lv_label_set_text(sg_ui.ui.network_label, wifi_icon);
+}
+
+void ui_set_chat_mode(const char *chat_mode)
+{
+    if (sg_ui.ui.chat_mode_label == NULL || NULL == chat_mode) {
+        return;
+    }
+
+    lv_label_set_text(sg_ui.ui.chat_mode_label, chat_mode);
 }
 
 void ui_set_status_bar_pad(int32_t value)

@@ -10,7 +10,8 @@
 #include "app_board_api.h"
 
 #include "board_config.h"
-#include "oled_display.h"
+
+#include "lcd_st7789.h"
 
 #if USE_8311
 #include "tdd_audio_8311_codec.h"
@@ -70,12 +71,17 @@ int app_audio_driver_init(const char *name)
 #endif
 }
 
-OPERATE_RET app_display_init(void)
+int board_display_init(void)
 {
-    return OPRT_OK;
+    return lcd_st7789_init();
 }
 
-OPERATE_RET app_display_send_msg(TY_DISPLAY_TYPE_E tp, uint8_t *data, int len)
+void *board_display_get_panel_io_handle(void)
 {
-    return OPRT_OK;
+    return lcd_st7789_get_panel_io_handle();
+}
+
+void *board_display_get_panel_handle(void)
+{
+    return lcd_st7789_get_panel_handle();
 }

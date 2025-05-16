@@ -65,7 +65,17 @@ void ui_set_notification(const char *notification);
 
 void ui_set_network(char *wifi_icon);
 
+void ui_set_chat_mode(const char *chat_mode);
+
 void ui_set_status_bar_pad(int32_t value);
+
+#if defined(ENABLE_GUI_STREAM_AI_TEXT) && (ENABLE_GUI_STREAM_AI_TEXT == 1)
+void ui_set_assistant_msg_stream_start(void);
+
+void ui_set_assistant_msg_stream_data(const char *text);
+
+void ui_set_assistant_msg_stream_end(void);
+#endif
 
 #ifdef __cplusplus
 }
