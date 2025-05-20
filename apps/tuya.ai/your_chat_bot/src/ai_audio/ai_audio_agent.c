@@ -91,14 +91,16 @@ static OPERATE_RET __ai_agent_audio_recv(AI_BIZ_ATTR_INFO_T *attr, AI_BIZ_HEAD_I
         AI_AGENT_MSG_T ai_msg;
 
         if (len > 0) {
-            ai_msg.type = AI_AGENT_MSG_TP_AUDIO_DATA, ai_msg.data_len = len;
+            ai_msg.type = AI_AGENT_MSG_TP_AUDIO_DATA;
+            ai_msg.data_len = len;
             ai_msg.data = (uint8_t *)data;
 
             sg_ai.cbs.ai_agent_msg_cb(&ai_msg);
         }
 
         if (AI_STREAM_END == head->stream_flag) {
-            ai_msg.type = AI_AGENT_MSG_TP_AUDIO_STOP, ai_msg.data_len = 0;
+            ai_msg.type = AI_AGENT_MSG_TP_AUDIO_STOP;
+            ai_msg.data_len = 0;
             ai_msg.data = NULL;
 
             sg_ai.cbs.ai_agent_msg_cb(&ai_msg);
