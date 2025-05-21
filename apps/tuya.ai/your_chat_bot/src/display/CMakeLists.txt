@@ -14,7 +14,7 @@ if (CONFIG_PLATFORM_CHOICE STREQUAL "ESP32")
     list(APPEND APP_MODULE_SRCS
             ${APP_MODULE_PATH}/tuya_lvgl_for_esp32.c
         )
-else(CONFIG_PLATFORM_CHOICE STREQUAL "T5AI")
+elseif(CONFIG_PLATFORM_CHOICE STREQUAL "T5AI")
     list(APPEND APP_MODULE_SRCS
             ${APP_MODULE_PATH}/tuya_lvgl.c
         )
@@ -38,8 +38,6 @@ set(APP_MODULE_INC
     ${APP_MODULE_PATH}/font
     ${APP_MODULE_PATH}/ui
 )
-
-# message(FATAL_ERROR "APP_MODULE_SRCS: ${APP_MODULE_SRCS}")
 
 ########################################
 # Target Configure
