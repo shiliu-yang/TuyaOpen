@@ -11,13 +11,13 @@
  *
  */
 
-#include "tkl_display.h"
+// #include "tkl_display.h"
 #include "tal_api.h"
 
 #include "lvgl.h"
-#include "lv_port_disp.h"
-#include "tuya_lcd_device.h"
-#include "tuya_lvgl.h"
+// #include "lv_port_disp.h"
+// #include "tuya_lcd_device.h"
+// #include "tuya_lvgl.h"
 /***********************************************************
 ************************macro define************************
 ***********************************************************/
@@ -32,11 +32,11 @@
 static MUTEX_HANDLE sg_lvgl_mutex_hdl = NULL;
 static THREAD_HANDLE sg_lvgl_thrd_hdl = NULL;
 
-static TKL_DISP_DEVICE_S sg_display_device = {
-    .device_id = 0,
-    .device_port = TKL_DISP_LCD,
-    .device_info = NULL,
-};
+// static TKL_DISP_DEVICE_S sg_display_device = {
+//     .device_id = 0,
+//     .device_port = TKL_DISP_LCD,
+//     .device_info = NULL,
+// };
 
 /***********************************************************
 ***********************function define**********************
@@ -53,7 +53,7 @@ static void __lvgl_task(void *args)
     while (1) {
         tal_mutex_lock(sg_lvgl_mutex_hdl);
 
-        sleep_time = lv_timer_handler();
+        // sleep_time = lv_timer_handler();
 
         tal_mutex_unlock(sg_lvgl_mutex_hdl);
 
@@ -77,16 +77,16 @@ OPERATE_RET tuya_lvgl_init(void)
 {
     OPERATE_RET rt = OPRT_OK;
 
-    // register lcd device
-    TUYA_CALL_ERR_RETURN(tuya_lcd_device_register(sg_display_device.device_id));
+    //     // register lcd device
+    //     TUYA_CALL_ERR_RETURN(tuya_lcd_device_register(sg_display_device.device_id));
 
-    /*lvgl init*/
-    lv_init();
-    lv_tick_set_cb(lv_tick_get_cb);
-    lv_port_disp_init(&sg_display_device);
-#ifdef LVGL_ENABLE_TOUCH
-    lv_port_indev_init();
-#endif
+    //     /*lvgl init*/
+    //     lv_init();
+    //     lv_tick_set_cb(lv_tick_get_cb);
+    //     lv_port_disp_init(&sg_display_device);
+    // #ifdef LVGL_ENABLE_TOUCH
+    //     lv_port_indev_init();
+    // #endif
 
     TUYA_CALL_ERR_RETURN(tal_mutex_create_init(&sg_lvgl_mutex_hdl));
 

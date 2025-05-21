@@ -6,7 +6,20 @@ if (CONFIG_ENABLE_CHAT_DISPLAY STREQUAL "y")
 
 set(APP_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR})
 
-aux_source_directory(${APP_MODULE_PATH} APP_MODULE_SRCS)
+set(APP_MODULE_SRCS)
+list(APPEND APP_MODULE_SRCS
+        ${APP_MODULE_PATH}/app_display.c
+    )
+if (CONFIG_PLATFORM_CHOICE STREQUAL "ESP32")
+    list(APPEND APP_MODULE_SRCS
+            ${APP_MODULE_PATH}/tuya_lvgl_for_esp32.c
+        )
+else(CONFIG_PLATFORM_CHOICE STREQUAL "T5AI")
+    list(APPEND APP_MODULE_SRCS
+            ${APP_MODULE_PATH}/tuya_lvgl.c
+        )
+endif()
+
 aux_source_directory(${APP_MODULE_PATH}/font FONT_SRCS)
 aux_source_directory(${APP_MODULE_PATH}/font/emoji EMOJI_SRCS)
 aux_source_directory(${APP_MODULE_PATH}/ui UI_SRCS)
