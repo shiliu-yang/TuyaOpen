@@ -22,8 +22,11 @@
 #include "my_include.h"
 #endif
 
-// #include "tuya_iot_config.h"
-// #include "tkl_memory.h"
+#ifdef __has_include
+    #if __has_include("tuya_cloud_types.h")
+        #include "tuya_cloud_types.h"
+    #endif
+#endif
 
 /*====================
    COLOR SETTINGS
