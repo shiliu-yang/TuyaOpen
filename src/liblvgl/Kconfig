@@ -3,10 +3,6 @@ config ENABLE_LIBLVGL
     default n
 
 if (ENABLE_LIBLVGL)
-    config ENABLE_PLATFORM_LVGL
-        bool "enable platform lvgl"
-        default n
-
     if (!ENABLE_PLATFORM_LVGL)
         config ENABLE_LVGL_DEMO
             bool "enable lvgl demo"

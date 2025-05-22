@@ -9,16 +9,16 @@ set(APP_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR})
 set(APP_MODULE_SRCS)
 list(APPEND APP_MODULE_SRCS
         ${APP_MODULE_PATH}/app_display.c
+        ${APP_MODULE_PATH}/tuya_lvgl.c
     )
-if (CONFIG_PLATFORM_CHOICE STREQUAL "ESP32")
-    list(APPEND APP_MODULE_SRCS
-            ${APP_MODULE_PATH}/tuya_lvgl_for_esp32.c
-        )
-elseif(CONFIG_PLATFORM_CHOICE STREQUAL "T5AI")
-    list(APPEND APP_MODULE_SRCS
-            ${APP_MODULE_PATH}/tuya_lvgl.c
-        )
-endif()
+# if (CONFIG_PLATFORM_CHOICE STREQUAL "ESP32")
+#     list(APPEND APP_MODULE_SRCS
+#             ${APP_MODULE_PATH}/tuya_lvgl_for_esp32.c
+#         )
+# elseif(CONFIG_PLATFORM_CHOICE STREQUAL "T5AI")
+#     list(APPEND APP_MODULE_SRCS
+#         )
+# endif()
 
 aux_source_directory(${APP_MODULE_PATH}/font FONT_SRCS)
 aux_source_directory(${APP_MODULE_PATH}/font/emoji EMOJI_SRCS)
