@@ -23,7 +23,7 @@ if(NOT EXISTS "${DOT_CONFIG_DIR}/${CMAKE_CONFIG}")
     message(STATUS "[KCONFIG] Use dot-config to generate cmake-config.")
     execute_process(
         COMMAND
-        python3 ${KCONFIG_TOOLS}/conf2cmake.py -c "${DOT_CONFIG_DIR}/${DOT_CONFIG}" -o "${DOT_CONFIG_DIR}/${CMAKE_CONFIG}"
+        python ${KCONFIG_TOOLS}/conf2cmake.py -c "${DOT_CONFIG_DIR}/${DOT_CONFIG}" -o "${DOT_CONFIG_DIR}/${CMAKE_CONFIG}"
         )
 endif()
 
@@ -35,6 +35,6 @@ if(NOT EXISTS "${HEADER_DIR}/${HEADER_FILE}")
         ${CMAKE_COMMAND} -E make_directory ${HEADER_DIR}
 
         COMMAND
-        python3 ${KCONFIG_TOOLS}/conf2h.py -c "${DOT_CONFIG_DIR}/${DOT_CONFIG}" -i "${HEADER_IN_PATH}" -p "${HEADER_PARAM_LIST}" -o "${HEADER_DIR}/${HEADER_FILE}"
+        python ${KCONFIG_TOOLS}/conf2h.py -c "${DOT_CONFIG_DIR}/${DOT_CONFIG}" -i "${HEADER_IN_PATH}" -p "${HEADER_PARAM_LIST}" -o "${HEADER_DIR}/${HEADER_FILE}"
         )
 endif()
