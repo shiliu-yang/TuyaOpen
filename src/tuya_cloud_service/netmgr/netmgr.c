@@ -59,6 +59,30 @@ typedef struct {
 static netmgr_t s_netmgr = {0};
 
 /**
+ * @brief Dumps the list of registered network connections to the log.
+ *
+ * This function iterates through the linked list of network connections starting from
+ * the given connection pointer and logs the type, priority, and status of each connection.
+ * If the input pointer is NULL, it logs that no network connections are registered.
+ *
+ * @param[in] conn Pointer to the head of the network connection list (netmgr_conn_base_t).
+ */
+static void __netmgr_conn_list_dump(netmgr_conn_base_t *conn)
+{
+    if (NULL == conn) {
+        PR_NOTICE("No network connections registered.");
+        return;
+    }
+
+    PR_NOTICE("Registered network connections:");
+    while (conn) {
+        PR_NOTICE("  type: %s, pri: %d, status: %s", NETMGR_TYPE_TO_STR(conn->type), conn->pri,
+                  NETMGR_STATUS_TO_STR(conn->status));
+        conn = conn->next;
+    }
+}
+
+/**
  * @brief get active connection status and
  *
  * @return netconn_type_t: the connection should be used
@@ -230,17 +254,30 @@ OPERATE_RET __netmgr_conn_register(netmgr_type_e type, netmgr_conn_base_t *conn)
         if (cur_conn->pri < conn->pri) {
             if (prev_conn == NULL) {
                 // insert at the head
-                prev_conn = s_netmgr.conn;
                 s_netmgr.conn = conn;
-                conn->next = prev_conn;
-                break;
+                conn->next = cur_conn;
             } else {
-                // insert in the middle or tail
+                // insert in the middle
                 prev_conn->next = conn;
                 conn->next = cur_conn;
             }
+            break;
         }
+
+        prev_conn = cur_conn;
         cur_conn = cur_conn->next;
+    }
+
+    // If we reached the end of the list, insert at the tail
+    if (cur_conn == NULL) {
+        if (prev_conn == NULL) {
+            // This should not happen as we already handled empty list case above
+            s_netmgr.conn = conn;
+            conn->next = NULL;
+        } else {
+            prev_conn->next = conn;
+            conn->next = NULL;
+        }
     }
 
 __EXIT:
