@@ -22,7 +22,7 @@
 #include "tal_wired.h"
 #include "mqtt_bind.h"
 
-netmgr_conn_wired_t s_netmgr_wired = {.base = {.pri = 1,
+netmgr_conn_wired_t s_netmgr_wired = {.base = {.pri = 2,
                                                .type = NETCONN_WIRED,
                                                .status = NETMGR_LINK_DOWN,
                                                .open = netconn_wired_open,

@@ -35,6 +35,7 @@ typedef enum {
     NETCONN_AUTO = 1 << 0,
     NETCONN_WIFI = 1 << 1,
     NETCONN_WIRED = 1 << 2,
+    NETCONN_CELLULAR = 1 << 3,
 } netmgr_type_e;
 
 /**

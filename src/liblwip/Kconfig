@@ -242,5 +242,9 @@ menu "configure enable/disable liblwip"
 			config ENABLE_LWIP_DHCP
 				bool "ENABLE_LWIP_DHCP: enable tuya lwip dhcp"
 				default n
-		endif    
+
+			config LWIP_PPP_SUPPORT
+				bool "LWIP_PPP_SUPPORT: enable tuya lwip Point-to-Point Protocol over Ethernet"
+				default n
+		endif
 endmenu

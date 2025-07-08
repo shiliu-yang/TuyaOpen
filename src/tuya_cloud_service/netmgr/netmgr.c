@@ -41,6 +41,11 @@ extern netmgr_conn_wifi_t s_netmgr_wifi;
 extern netmgr_conn_wired_t s_netmgr_wired;
 #endif
 
+#ifdef ENABLE_CELLULAR
+#include "netconn_cellular.h"
+extern netmgr_conn_cellular_t s_netmgr_cellular;
+#endif
+
 #ifdef ENABLE_BLUETOOTH
 #include "ble_mgr.h"
 #endif
@@ -285,6 +290,12 @@ OPERATE_RET netmgr_init(netmgr_type_e type)
 #ifdef ENABLE_WIRED
     if (type & NETCONN_WIRED) {
         __netmgr_conn_register(NETCONN_WIRED, (netmgr_conn_base_t *)&s_netmgr_wired);
+    }
+#endif
+
+#ifdef ENABLE_CELLULAR
+    if (type & NETCONN_CELLULAR) {
+        __netmgr_conn_register(NETCONN_CELLULAR, (netmgr_conn_base_t *)&s_netmgr_cellular);
     }
 #endif
 
