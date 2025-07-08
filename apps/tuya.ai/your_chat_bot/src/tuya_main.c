@@ -311,6 +311,9 @@ void user_main(void)
 #if defined(ENABLE_WIFI) && (ENABLE_WIFI == 1)
     type |= NETCONN_WIFI;
 #endif
+#if defined(ENABLE_CELLULAR) && (ENABLE_CELLULAR == 1)
+    type |= NETCONN_CELLULAR;
+#endif
 #if defined(ENABLE_WIRED) && (ENABLE_WIRED == 1)
     type |= NETCONN_WIRED;
 #endif

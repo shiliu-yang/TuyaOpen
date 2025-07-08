@@ -78,6 +78,8 @@
 #include "netif/ppp/ppp_impl.h"
 #include "netif/ppp/magic.h"
 
+#include "tkl_system.h" /* For tkl_system_get_tick_count() */
+
 #if PPP_MD5_RANDM /* Using MD5 for better randomness if enabled */
 
 #include "netif/ppp/pppcrypt.h"
@@ -114,7 +116,7 @@ static void magic_churnrand(char *rand_data, u32_t rand_len) {
       u32_t rand;
 #endif /* LWIP_RAND */
     } sys_data;
-    magic_randomseed += sys_jiffies();
+    magic_randomseed += tkl_system_get_tick_count(); // sys_jiffies();
     sys_data.jiffies = magic_randomseed;
 #ifdef LWIP_RAND
     sys_data.rand = LWIP_RAND();
@@ -220,7 +222,7 @@ static u32_t magic_randomseed;      /* Seed used for random number generation. *
  * event.
  */
 void magic_init(void) {
-  magic_randomseed += sys_jiffies();
+  magic_randomseed += tkl_system_get_tick_count(); // sys_jiffies();
 #ifndef LWIP_RAND
   /* Initialize the Borland random number generator. */
   srand((unsigned)magic_randomseed);
@@ -244,7 +246,7 @@ void magic_randomize(void) {
     /* The initialization function also updates the seed. */
   } else {
 #endif /* LWIP_RAND */
-    magic_randomseed += sys_jiffies();
+    magic_randomseed += tkl_system_get_tick_count(); // sys_jiffies();
 #ifndef LWIP_RAND
   }
 #endif /* LWIP_RAND */

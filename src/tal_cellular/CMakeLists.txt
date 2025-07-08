@@ -4,42 +4,18 @@
 #/
 
 # MODULE_PATH
-if (CONFIG_ENABLE_LIBLWIP STREQUAL "y")
+# if (CONFIG_ENABLE_WIRED STREQUAL "y")
 
 set(MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR})
 
 # MODULE_NAME
 get_filename_component(MODULE_NAME ${MODULE_PATH} NAME)
 
-set(LWIP lwip-2.1.2)
-
 # LIB_SRCS
-file(GLOB_RECURSE  LWIP_SRCS  
-"${MODULE_PATH}/${LWIP}/src/core/*.c"
-"${MODULE_PATH}/${LWIP}/src/api/*.c")
-
-list(APPEND LWIP_SRCS ${MODULE_PATH}/${LWIP}/src/netif/ethernet.c)
-
-file(GLOB_RECURSE  LIB_SRCS  "${MODULE_PATH}/port/*.c")
-list(APPEND LIB_SRCS ${LWIP_SRCS})
+aux_source_directory(${MODULE_PATH}/src LIB_SRCS)
 
 # LIB_PUBLIC_INC
-set(LIB_PUBLIC_INC 
-    ${MODULE_PATH}/${LWIP}/src/include
-    ${MODULE_PATH}/${LWIP}/src/include/lwip
-    ${MODULE_PATH}/${LWIP}/src/include/lwip/apps
-    ${MODULE_PATH}/${LWIP}/src/include/compat
-    )
-
-set(LIB_OPTIONS "-w")
-
-# ppp
-if (CONFIG_LWIP_PPP_SUPPORT STREQUAL "y")
-    file(GLOB_RECURSE PPP_SRCS "${MODULE_PATH}/${LWIP}/src/netif/ppp/*.c")
-    list(APPEND LIB_SRCS
-        ${PPP_SRCS}
-    )
-endif()
+set(LIB_PUBLIC_INC ${MODULE_PATH}/include)
 
 ########################################
 # Target Configure
@@ -59,10 +35,6 @@ target_include_directories(${MODULE_NAME}
         ${LIB_PUBLIC_INC}
     )
 
-target_compile_options(${MODULE_NAME}
-    PRIVATE
-        ${LIB_OPTIONS}
-    )
 
 ########################################
 # Layer Configure
@@ -72,4 +44,4 @@ set(COMPONENT_LIBS "${COMPONENT_LIBS}" PARENT_SCOPE)
 list(APPEND COMPONENT_PUBINC ${LIB_PUBLIC_INC})
 set(COMPONENT_PUBINC "${COMPONENT_PUBINC}" PARENT_SCOPE)
 
-endif()
+# endif()

@@ -41,6 +41,11 @@ extern netmgr_conn_wifi_t s_netmgr_wifi;
 extern netmgr_conn_wired_t s_netmgr_wired;
 #endif
 
+#ifdef ENABLE_CELLULAR
+#include "netconn_cellular.h"
+extern netmgr_conn_cellular_t s_netmgr_cellular;
+#endif
+
 #ifdef ENABLE_BLUETOOTH
 #include "ble_mgr.h"
 #endif
@@ -65,6 +70,8 @@ static netmgr_t s_netmgr = {0};
  */
 static netmgr_type_e __get_active_conn()
 {
+    return NETCONN_WIFI;
+
     netmgr_t *netmgr = &s_netmgr;
     if (netmgr->type & NETCONN_WIFI && netmgr->type & NETCONN_WIRED) {
         netmgr_status_e wifi_status = NETMGR_LINK_DOWN;
@@ -152,12 +159,19 @@ OPERATE_RET netmgr_init(netmgr_type_e type)
     }
 #endif
 
+#ifdef ENABLE_CELLULAR
+    if (type & NETCONN_CELLULAR) {
+        __netmgr_conn_register(NETCONN_CELLULAR, (netmgr_conn_base_t *)&s_netmgr_cellular);
+    }
+#endif
+
 #ifdef ENABLE_WIFI
     if (type & NETCONN_WIFI) {
         __netmgr_conn_register(NETCONN_WIFI, (netmgr_conn_base_t *)&s_netmgr_wifi);
     }
 #endif
     s_netmgr.active = __get_active_conn();
+    PR_DEBUG("---> netmgr active %d", s_netmgr.active);
     s_netmgr.inited = TRUE;
 
     tuya_lan_init(tuya_iot_client_get());
@@ -217,7 +231,7 @@ OPERATE_RET netmgr_conn_get(netmgr_type_e type, netmgr_conn_config_type_e cmd, v
         return OPRT_RESOURCE_NOT_READY;
     }
 
-    PR_TRACE("netmgr conn %d get %d para %p", type, cmd, param);
+    PR_ERR("netmgr conn %d get %d para %p", type, cmd, param);
     OPERATE_RET rt = OPRT_OK;
     if (NETCONN_AUTO == type) {
         TUYA_CALL_ERR_RETURN(s_netmgr.conn[s_netmgr.active]->get(cmd, param));
