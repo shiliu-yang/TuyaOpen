@@ -59,30 +59,6 @@ typedef struct {
 static netmgr_t s_netmgr = {0};
 
 /**
- * @brief Dumps the list of registered network connections to the log.
- *
- * This function iterates through the linked list of network connections starting from
- * the given connection pointer and logs the type, priority, and status of each connection.
- * If the input pointer is NULL, it logs that no network connections are registered.
- *
- * @param[in] conn Pointer to the head of the network connection list (netmgr_conn_base_t).
- */
-static void __netmgr_conn_list_dump(netmgr_conn_base_t *conn)
-{
-    if (NULL == conn) {
-        PR_NOTICE("No network connections registered.");
-        return;
-    }
-
-    PR_NOTICE("Registered network connections:");
-    while (conn) {
-        PR_NOTICE("  type: %s, pri: %d, status: %s", NETMGR_TYPE_TO_STR(conn->type), conn->pri,
-                  NETMGR_STATUS_TO_STR(conn->status));
-        conn = conn->next;
-    }
-}
-
-/**
  * @brief get active connection status and
  *
  * @return netconn_type_t: the connection should be used
@@ -198,6 +174,7 @@ static void __netmgr_event_cb(netmgr_type_e type, netmgr_status_e status)
                      active_status);
             s_netmgr.status = active_status;
             s_netmgr.active = active_conn;
+            tal_event_publish(EVENT_LINK_TYPE_CHG, (void *)s_netmgr.active);
             tal_event_publish(EVENT_LINK_STATUS_CHG, (void *)s_netmgr.status);
         } else if (active_status != s_netmgr.status) {
             // active_status changed
@@ -210,6 +187,7 @@ static void __netmgr_event_cb(netmgr_type_e type, netmgr_status_e status)
             PR_DEBUG("netmgr conn type changed [%s] --> [%s]", NETMGR_TYPE_TO_STR(s_netmgr.active),
                      NETMGR_TYPE_TO_STR(active_conn));
             s_netmgr.active = active_conn;
+            tal_event_publish(EVENT_LINK_TYPE_CHG, (void *)s_netmgr.active);
         }
     }
 
