@@ -29,7 +29,11 @@ extern "C" {
  *
  */
 #define NETMGR_TYPE_TO_STR(type)                                                                                       \
-    ((type) == NETCONN_WIFI ? "wifi" : (type) == NETCONN_WIRED ? "wired" : (type) == NETCONN_AUTO ? "auto" : "unknown")
+    ((type) == NETCONN_WIFI       ? "wifi"                                                                             \
+     : (type) == NETCONN_WIRED    ? "wired"                                                                            \
+     : (type) == NETCONN_CELLULAR ? "cellular"                                                                         \
+     : (type) == NETCONN_AUTO     ? "auto"                                                                             \
+                                  : "unknown")
 
 typedef enum {
     NETCONN_AUTO = 1 << 0,

@@ -66,6 +66,12 @@ OPERATE_RET netconn_cellular_open(void *config)
 
     netmgr_conn_cellular_t *netmgr_cellular = &s_netmgr_cellular;
 
+    // init
+    TAL_CELLULAR_BASE_CFG_T cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    strcpy(cfg.apn, "");
+    tal_cellular_init(&cfg);
+
     netmgr_cellular->base.status = NETMGR_LINK_DOWN;
     TUYA_CALL_ERR_RETURN(tal_cellular_set_status_cb(__netconn_cellular_event));
 
@@ -93,7 +99,7 @@ OPERATE_RET netconn_cellular_set(netmgr_conn_config_type_e cmd, void *param)
         netmgr_cellular->base.event_cb(NETCONN_CELLULAR, netmgr_cellular->base.status);
     } break;
     default: {
-        rt = NETCONN_CMD_IP;
+        rt = OPRT_NOT_SUPPORTED;
     } break;
     }
 
@@ -103,8 +109,6 @@ OPERATE_RET netconn_cellular_set(netmgr_conn_config_type_e cmd, void *param)
 OPERATE_RET netconn_cellular_get(netmgr_conn_config_type_e cmd, void *param)
 {
     OPERATE_RET rt = OPRT_OK;
-
-    return OPRT_NOT_SUPPORTED;
 
     netmgr_conn_cellular_t *netmgr_cellular = &s_netmgr_cellular;
 

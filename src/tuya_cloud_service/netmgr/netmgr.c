@@ -398,7 +398,7 @@ OPERATE_RET netmgr_conn_get(netmgr_type_e type, netmgr_conn_config_type_e cmd, v
 
             rt = cur_conn->get(cmd, param);
             if (OPRT_OK != rt) {
-                PR_ERR("netmgr conn %s get failed, cmd %d", NETMGR_TYPE_TO_STR(type), cmd);
+                PR_ERR("netmgr conn %s get failed, cmd %d, rt = %d", NETMGR_TYPE_TO_STR(type), cmd, rt);
                 return rt;
             }
             break;

@@ -198,7 +198,7 @@
 /**
  * PPP_SUPPORT==1: Enable PPP.
  */
-#ifdef LWIP_PPP_SUPPORT
+#ifdef ENABLE_LWIP_PPP_SUPPORT
 #define PPP_SUPPORT 1
 
 /**
@@ -232,6 +232,6 @@
 /*PPP DEBUG*/
 // #define PRINTPKT_SUPPORT                1
 // #define PPP_PROTOCOLNAME                1
-#endif /* CONFIG_LWIP_PPP_SUPPORT */
+#endif /* ENABLE_LWIP_PPP_SUPPORT */
 
 #endif /* LWIP_HDR_LWIPOPTS_H */
