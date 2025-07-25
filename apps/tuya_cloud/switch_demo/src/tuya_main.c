@@ -283,6 +283,9 @@ void user_main()
 
     reset_netconfig_check();
 
+#include "at_test.h"
+    at_test_init();
+
     for (;;) {
         /* Loop to receive packets, and handles client keepalive */
         tuya_iot_yield(&client);
@@ -303,26 +306,30 @@ void main(int argc, char *argv[])
 }
 #else
 
-/* Tuya thread handle */
-static THREAD_HANDLE ty_app_thread = NULL;
+// /* Tuya thread handle */
+// static THREAD_HANDLE ty_app_thread = NULL;
 
-/**
- * @brief  task thread
- *
- * @param[in] arg:Parameters when creating a task
- * @return none
- */
-static void tuya_app_thread(void *arg)
+// /**
+//  * @brief  task thread
+//  *
+//  * @param[in] arg:Parameters when creating a task
+//  * @return none
+//  */
+// static void tuya_app_thread(void *arg)
+// {
+//     user_main();
+
+//     tal_thread_delete(ty_app_thread);
+//     ty_app_thread = NULL;
+// }
+
+// void tuya_app_main(void)
+// {
+//     THREAD_CFG_T thrd_param = {4096, 4, "tuya_app_main"};
+//     tal_thread_create_and_start(&ty_app_thread, NULL, NULL, tuya_app_thread, NULL, &thrd_param);
+// }
+void main(int argc, char *argv[])
 {
     user_main();
-
-    tal_thread_delete(ty_app_thread);
-    ty_app_thread = NULL;
-}
-
-void tuya_app_main(void)
-{
-    THREAD_CFG_T thrd_param = {4096, 4, "tuya_app_main"};
-    tal_thread_create_and_start(&ty_app_thread, NULL, NULL, tuya_app_thread, NULL, &thrd_param);
 }
 #endif
