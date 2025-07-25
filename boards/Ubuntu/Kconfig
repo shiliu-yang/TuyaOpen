@@ -5,7 +5,7 @@ config PLATFORM_CHOICE
 
 config OPERATING_SYSTEM
     int 
-    default 100
+    default 98
     ---help---
         100     /* LINUX */
         98      /* RTOS */

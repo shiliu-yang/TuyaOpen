@@ -144,6 +144,20 @@ void tal_uart_rx_reg_irq_cb(TUYA_UART_NUM_E port_id, TAL_UART_IRQ_CB rx_cb);
  */
 int tal_uart_get_rx_data_size(TUYA_UART_NUM_E port_num);
 
+/**
+ * @brief clear rx data
+ *
+ * @param[in] port_num: uart port num, id index starts from 0
+ *                     in linux platform,
+ *                         high 16 bits aslo means uart type,
+ *                                   it's value must be one of the
+ * TUYA_UART_TYPE_E type the low 16bit - means uart port id you can input like
+ * this TUYA_UART_PORT_ID(TUYA_UART_SYS, 2)
+ *
+ * @return none
+ */
+OPERATE_RET tal_uart_rx_clear(TUYA_UART_NUM_E port_num);
+
 #ifdef __cplusplus
 }
 #endif
