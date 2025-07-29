@@ -47,7 +47,7 @@ static OPERATE_RET __tdd_transport_uart_open(TDD_TRANSPORT_HANDLE_T handle)
     cfg.base_cfg.databits = TUYA_UART_DATA_LEN_8BIT;
     cfg.base_cfg.stopbits = TUYA_UART_STOP_LEN_1BIT;
     cfg.base_cfg.parity = TUYA_UART_PARITY_TYPE_NONE;
-    cfg.rx_buffer_size = 1024;
+    cfg.rx_buffer_size = 5 * 1024;
     cfg.open_mode = O_BLOCK;
 
     TUYA_CALL_ERR_RETURN(tal_uart_init(hdl->cfg.uart_num, &cfg));

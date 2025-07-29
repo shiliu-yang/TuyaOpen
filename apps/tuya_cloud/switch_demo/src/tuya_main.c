@@ -211,7 +211,7 @@ bool user_network_check(void)
 void user_main()
 {
     int ret = OPRT_OK;
-
+#if 0
     //! open iot development kit runtim init
     cJSON_InitHooks(&(cJSON_Hooks){.malloc_fn = tal_malloc, .free_fn = tal_free});
     tal_log_init(TAL_LOG_LEVEL_DEBUG, 1024, (TAL_LOG_OUTPUT_CB)tkl_log_output);
@@ -235,6 +235,9 @@ void user_main()
     tal_cli_init();
     tuya_authorize_init();
     tuya_app_cli_init();
+
+#include "at_test.h"
+    at_test_init();
 
     reset_netconfig_start();
 
@@ -283,13 +286,35 @@ void user_main()
 
     reset_netconfig_check();
 
-#include "at_test.h"
-    at_test_init();
-
     for (;;) {
         /* Loop to receive packets, and handles client keepalive */
         tuya_iot_yield(&client);
     }
+#else
+    cJSON_InitHooks(&(cJSON_Hooks){.malloc_fn = tal_malloc, .free_fn = tal_free});
+    tal_log_init(TAL_LOG_LEVEL_DEBUG, 1024, (TAL_LOG_OUTPUT_CB)tkl_log_output);
+
+#include "at_parser.h"
+    AT_PARSER_CFG_T cfg = {
+        .line_ending = LINE_ENDING_CRLF,
+    };
+    static AT_PARSER_HANDLE at_parser_handle = NULL;
+    ret = at_parser_init(&at_parser_handle, &cfg);
+    if (ret != OPRT_OK) {
+        PR_ERR("at_parser_init failed: %d", ret);
+        return;
+    }
+
+    char test_data[] = {0x0D, 0x0A, 0x4F, 0x4B, 0x0D, 0x0A, 0x0D, 0x0A, 0x4D, 0x4C, 0x33, 0x30, 0x37, 0x52, 0x0D,
+                        0x0A, 0x0D, 0x0A, 0x4F, 0x4B, 0x0D, 0x0A, 0x0D, 0x0A, 0x2B, 0x43, 0x50, 0x49, 0x4E, 0x3A,
+                        0x20, 0x52, 0x45, 0x41, 0x44, 0x59, 0x0D, 0x0A, 0x0D, 0x0A, 0x4F, 0x4B, 0x0D, 0x0A};
+
+    at_parser_input(at_parser_handle, test_data, sizeof(test_data));
+
+    for (;;) {
+        tal_system_sleep(1000);
+    }
+#endif
 }
 
 /**

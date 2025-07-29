@@ -406,20 +406,21 @@ int tal_uart_write(TUYA_UART_NUM_E port_num, const uint8_t *data, uint32_t len)
 
     int tx_bytes = 0;
     int ret;
-    if ((uart_info->open_mode & O_ASYNC_WRITE) == 0) {
-        while (tx_bytes != len) {
-            ret = tkl_uart_write(port_num, (void *)&data[tx_bytes], 1);
-            if (ret != 1) {
-                break;
-            }
-            tx_bytes++;
-        }
-    }
-#ifdef CONFIG_UART_WRITE_ASYNC
-    else {
-        tx_bytes = uart_async_write(uart_info, data, len);
-    }
-#endif
+    //     if ((uart_info->open_mode & O_ASYNC_WRITE) == 0) {
+    //         while (tx_bytes != len) {
+    //             ret = tkl_uart_write(port_num, (void *)&data[tx_bytes], 1);
+    //             if (ret != 1) {
+    //                 break;
+    //             }
+    //             tx_bytes++;
+    //         }
+    //     }
+    // #ifdef CONFIG_UART_WRITE_ASYNC
+    //     else {
+    //         tx_bytes = uart_async_write(uart_info, data, len);
+    //     }
+    // #endif
+    tx_bytes = tkl_uart_write(port_num, data, len);
 
     return tx_bytes;
 }

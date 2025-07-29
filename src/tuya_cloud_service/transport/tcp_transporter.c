@@ -93,7 +93,8 @@ OPERATE_RET tuya_tcp_transporter_connect(tuya_transporter_t t, const char *host,
     // socket bind random port
     NW_IP_S nw_ip = {0};
     netmgr_conn_get(NETCONN_AUTO, NETCONN_CMD_IP, &nw_ip);
-    tcp_transporter->config.bindAddr = tal_net_str2addr(nw_ip.ip);
+    // tcp_transporter->config.bindAddr = tal_net_str2addr(nw_ip.ip);
+    tcp_transporter->config.bindAddr = 0;
 
     if ((tcp_transporter->config.bindPort || tcp_transporter->config.bindAddr) &&
         (OPRT_OK != tal_net_bind(tcp_transporter->socket_fd, tcp_transporter->config.bindAddr,

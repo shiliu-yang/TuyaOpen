@@ -144,7 +144,7 @@ OPERATE_RET tdl_transport_send(TDL_TRANSPORT_HANDLE handle, const uint8_t *data,
 
     TUYA_CHECK_NULL_RETURN(node->intfs.send, OPRT_INVALID_PARM);
 
-    PR_DEBUG("Sending %s to transport: %s", (char *)data, node->name);
+    // PR_DEBUG("Sending %s to transport: %s", (char *)data, node->name);
     rt = node->intfs.send(node->tdd_handle, data, len);
     if (rt < 0) {
         PR_ERR("Transport send error: %d", rt);
