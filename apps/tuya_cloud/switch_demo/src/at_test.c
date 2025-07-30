@@ -122,15 +122,23 @@ void at_test_init(void)
         PR_DEBUG("Received line %d: %.*s", i, current->length, current->data);
         current = current->next;
     }
+    AT_LINE_T *tmp_line = line;
+    do {
+        AT_LINE_T *next_line = tmp_line->next;
+        at_parser_free_line(tmp_line);
+        tmp_line = next_line;
+    } while (tmp_line != NULL);
 
     // AT+MDNSGIP="h6.iot-dns.com"
+
+    // rt = at_parser_response_pattern_regist(sg_at_client.parser_hdl, &dns_pattern);
+
     send_cmd = "AT+MDNSGIP=\"h6.iot-dns.com\"\r";
     rt = at_client_send(send_cmd, strlen(send_cmd), 1000, &line, &line_num);
     if (rt != OPRT_OK) {
         PR_ERR("Failed to send DNS query command: %d", rt);
         return;
     }
-    tal_system_sleep(10 * 1000);
 
     PR_DEBUG("Received %d lines after sending command: %s", line_num, send_cmd);
     current = line;
@@ -138,6 +146,19 @@ void at_test_init(void)
         PR_DEBUG("Received line %d: %.*s", i, current->length, current->data);
         current = current->next;
     }
+    tmp_line = line;
+    do {
+        AT_LINE_T *next_line = tmp_line->next;
+        at_parser_free_line(tmp_line);
+        tmp_line = next_line;
+    } while (tmp_line != NULL);
+    at_client_get_one_line(&line);
+    tmp_line = line;
+    do {
+        AT_LINE_T *next_line = tmp_line->next;
+        at_parser_free_line(tmp_line);
+        tmp_line = next_line;
+    } while (tmp_line != NULL);
 
     //  AT+MIPOPEN=0,"TCP","47.103.71.77",443
     send_cmd = "AT+MIPOPEN=0,\"TCP\",\"47.103.71.77\",443\r";
@@ -152,6 +173,19 @@ void at_test_init(void)
         PR_DEBUG("Received line %d: %.*s", i, current->length, current->data);
         current = current->next;
     }
+    tmp_line = line;
+    do {
+        AT_LINE_T *next_line = tmp_line->next;
+        at_parser_free_line(tmp_line);
+        tmp_line = next_line;
+    } while (tmp_line != NULL);
+    at_client_get_one_line(&line);
+    tmp_line = line;
+    do {
+        AT_LINE_T *next_line = tmp_line->next;
+        at_parser_free_line(tmp_line);
+        tmp_line = next_line;
+    } while (tmp_line != NULL);
 
     //  AT+MIPCFG="encoding",0,1,1
     send_cmd = "AT+MIPCFG=\"encoding\",0,1,1\r";
