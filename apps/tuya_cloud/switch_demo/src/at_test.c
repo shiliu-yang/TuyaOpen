@@ -7,6 +7,7 @@
 
 #include "at_test.h"
 #include "at_client.h"
+#include "at_parser.h"
 
 #include "tal_log.h"
 #include "tal_mutex.h"
@@ -64,7 +65,126 @@ void at_test_init(void)
         PR_ERR("Failed to initialize AT client: %d", rt);
         return;
     }
+#if 0
+    char *send_cmd = "AT\r";
+    rt = at_client_send(send_cmd, strlen(send_cmd), 1000, NULL);
+    if (rt != OPRT_OK) {
+        PR_ERR("Failed to send AT command: %d", rt);
+        return;
+    }
 
+    // AT+MDNSGIP="h6.iot-dns.com"
+    send_cmd = "AT+MDNSGIP=\"h6.iot-dns.com\"\r";
+    rt = at_client_send(send_cmd, strlen(send_cmd), 1000, NULL); // Send a DNS query command
+    if (rt != OPRT_OK) {
+        PR_ERR("Failed to send DNS query command: %d", rt);
+        return;
+    }
+
+    //  AT+MIPOPEN=0,"TCP","47.103.71.77",443
+    send_cmd = "AT+MIPOPEN=0,\"TCP\",\"47.103.71.77\",443\r";
+    rt = at_client_send(send_cmd, strlen(send_cmd), 1000, NULL);
+    if (rt != OPRT_OK) {
+        PR_ERR("Failed to open TCP connection: %d", rt);
+        return;
+    }
+
+    //  AT+MIPCFG="encoding",0,1,1
+    send_cmd = "AT+MIPCFG=\"encoding\",0,1,1\r";
+    rt = at_client_send(send_cmd, strlen(send_cmd), 1000, NULL);
+    if (rt != OPRT_OK) {
+        PR_ERR("Failed to configure encoding: %d", rt);
+        return;
+    }
+
+    //  AT+MIPSEND=0,118,"16030300710100006D0303CEC602610BDE261A593BED29F2DC9B5D18E1C49E96B82EFB97A7AAD9D6CEAF6B000008C027C02BC02F00FF0100003C00000013001100000E68362E696F742D646E732E636F6D000D0006000404030401000A000400020017000B0002010000010001020016000000170000"
+    send_cmd = "AT+MIPSEND=0,118,"
+               "\"16030300710100006D0303CEC602610BDE261A593BED29F2DC9B5D18E1C49E96B82EFB97A7AAD9D6CEAF6B000008C027C02BC"
+               "02F00FF0100003C00000013001100000E68362E696F742D646E732E636F6D000D0006000404030401000A000400020017000B00"
+               "02010000010001020016000000170000\"\r";
+    rt = at_client_send(send_cmd, strlen(send_cmd), 1000, NULL);
+    if (rt != OPRT_OK) {
+        PR_ERR("Failed to send data: %d", rt);
+        return;
+    }
+#else
+    char *send_cmd = "AT\r";
+    AT_LINE_T *line = NULL;
+    uint32_t line_num = 0;
+    rt = at_client_send(send_cmd, strlen(send_cmd), 1000, &line, &line_num);
+    if (rt != OPRT_OK) {
+        PR_ERR("Failed to send AT command: %d", rt);
+        return;
+    }
+    PR_DEBUG("Received %d lines after sending command: %s", line_num, send_cmd);
+    AT_LINE_T *current = line;
+    for (uint32_t i = 0; i < line_num; i++) {
+        PR_DEBUG("Received line %d: %.*s", i, current->length, current->data);
+        current = current->next;
+    }
+
+    // AT+MDNSGIP="h6.iot-dns.com"
+    send_cmd = "AT+MDNSGIP=\"h6.iot-dns.com\"\r";
+    rt = at_client_send(send_cmd, strlen(send_cmd), 1000, &line, &line_num);
+    if (rt != OPRT_OK) {
+        PR_ERR("Failed to send DNS query command: %d", rt);
+        return;
+    }
+    tal_system_sleep(10 * 1000);
+
+    PR_DEBUG("Received %d lines after sending command: %s", line_num, send_cmd);
+    current = line;
+    for (uint32_t i = 0; i < line_num; i++) {
+        PR_DEBUG("Received line %d: %.*s", i, current->length, current->data);
+        current = current->next;
+    }
+
+    //  AT+MIPOPEN=0,"TCP","47.103.71.77",443
+    send_cmd = "AT+MIPOPEN=0,\"TCP\",\"47.103.71.77\",443\r";
+    rt = at_client_send(send_cmd, strlen(send_cmd), 1000, &line, &line_num);
+    if (rt != OPRT_OK) {
+        PR_ERR("Failed to open TCP connection: %d", rt);
+        return;
+    }
+    PR_DEBUG("Received %d lines after sending command: %s", line_num, send_cmd);
+    current = line;
+    for (uint32_t i = 0; i < line_num; i++) {
+        PR_DEBUG("Received line %d: %.*s", i, current->length, current->data);
+        current = current->next;
+    }
+
+    //  AT+MIPCFG="encoding",0,1,1
+    send_cmd = "AT+MIPCFG=\"encoding\",0,1,1\r";
+    rt = at_client_send(send_cmd, strlen(send_cmd), 1000, &line, &line_num);
+    if (rt != OPRT_OK) {
+        PR_ERR("Failed to configure encoding: %d", rt);
+        return;
+    }
+    PR_DEBUG("Received %d lines after sending command: %s", line_num, send_cmd);
+    current = line;
+    for (uint32_t i = 0; i < line_num; i++) {
+        PR_DEBUG("Received line %d: %.*s", i, current->length, current->data);
+        current = current->next;
+    }
+
+    //  AT+MIPSEND=0,118,"16030300710100006D0303CEC602610BDE261A593BED29F2DC9B5D18E1C49E96B82EFB97A7AAD9D6CEAF6B000008C027C02BC02F00FF0100003C00000013001100000E68362E696F742D646E732E636F6D000D0006000404030401000A000400020017000B0002010000010001020016000000170000"
+    send_cmd = "AT+MIPSEND=0,118,"
+               "\"16030300710100006D0303CEC602610BDE261A593BED29F2DC9B5D18E1C49E96B82EFB97A7AAD9D6CEAF6B000008C027C02BC"
+               "02F00FF0100003C00000013001100000E68362E696F742D646E732E636F6D000D0006000404030401000A000400020017000B00"
+               "02010000010001020016000000170000\"\r";
+    rt = at_client_send(send_cmd, strlen(send_cmd), 1000, &line, &line_num);
+    if (rt != OPRT_OK) {
+        PR_ERR("Failed to send data: %d", rt);
+        return;
+    }
+    PR_DEBUG("Received %d lines after sending command: %s", line_num, send_cmd);
+    current = line;
+    for (uint32_t i = 0; i < line_num; i++) {
+        PR_DEBUG("Received line %d: %.*s", i, current->length, current->data);
+        current = current->next;
+    }
+
+#endif
     // Initialize AT test module
     PR_DEBUG("AT test module initialized successfully");
 }

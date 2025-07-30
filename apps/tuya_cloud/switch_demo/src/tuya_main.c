@@ -294,6 +294,7 @@ void user_main()
     cJSON_InitHooks(&(cJSON_Hooks){.malloc_fn = tal_malloc, .free_fn = tal_free});
     tal_log_init(TAL_LOG_LEVEL_DEBUG, 1024, (TAL_LOG_OUTPUT_CB)tkl_log_output);
 
+#if 0
 #include "at_parser.h"
     AT_PARSER_CFG_T cfg = {
         .line_ending = LINE_ENDING_CRLF,
@@ -309,8 +310,11 @@ void user_main()
                         0x0A, 0x0D, 0x0A, 0x4F, 0x4B, 0x0D, 0x0A, 0x0D, 0x0A, 0x2B, 0x43, 0x50, 0x49, 0x4E, 0x3A,
                         0x20, 0x52, 0x45, 0x41, 0x44, 0x59, 0x0D, 0x0A, 0x0D, 0x0A, 0x4F, 0x4B, 0x0D, 0x0A};
 
-    at_parser_input(at_parser_handle, test_data, sizeof(test_data));
-
+    at_parser_line_input(at_parser_handle, test_data, sizeof(test_data));
+#elif 1
+#include "at_test.h"
+    at_test_init();
+#endif
     for (;;) {
         tal_system_sleep(1000);
     }

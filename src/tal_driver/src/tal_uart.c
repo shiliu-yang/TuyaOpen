@@ -343,6 +343,8 @@ int tal_uart_read(TUYA_UART_NUM_E port_num, uint8_t *data, uint32_t len)
     }
 #endif
 
+    // PR_HEXDUMP_DEBUG("tal_uart read data", data, read_count);
+
     tal_semaphore_post(uart_info->rx_ring_sem);
     return read_count;
 }
@@ -420,6 +422,7 @@ int tal_uart_write(TUYA_UART_NUM_E port_num, const uint8_t *data, uint32_t len)
     //         tx_bytes = uart_async_write(uart_info, data, len);
     //     }
     // #endif
+    PR_HEXDUMP_DEBUG("tal_uart write data", data, len);
     tx_bytes = tkl_uart_write(port_num, data, len);
 
     return tx_bytes;
