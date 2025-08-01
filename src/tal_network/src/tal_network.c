@@ -56,6 +56,8 @@
 #include "tkl_network.h"
 #endif
 
+#include "tkl_network.h"
+
 #if (defined(ENABLE_LIBLWIP) && (ENABLE_LIBLWIP == 1)) || 100 == OPERATING_SYSTEM
 #define NET_USING_POSIX        1
 #define TAL_TO_SYS_FD_SET(fds) ((fd_set *)fds)
@@ -98,6 +100,9 @@ const NETWORK_ERRNO_TRANS_S unw_errno_trans[] = {{EINTR, UNW_EINTR},
                                                  {ENOMEM, UNW_ENOMEM},
                                                  {EMSGSIZE, UNW_EMSGSIZE}};
 #endif
+
+#undef NET_USING_POSIX
+#define NET_USING_POSIX 0
 
 /**
  * @brief Get error code of network

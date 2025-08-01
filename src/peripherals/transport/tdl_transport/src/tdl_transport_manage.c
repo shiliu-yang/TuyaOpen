@@ -59,7 +59,7 @@ static TDL_TRANSPORT_LIST_T g_transport_list = {.head = LIST_HEAD_INIT(g_transpo
 
 OPERATE_RET tdl_transport_find(char *name, TDL_TRANSPORT_HANDLE *handle)
 {
-    OPERATE_RET rt = OPRT_OK;
+    // OPERATE_RET rt = OPRT_OK;
 
     TUYA_CHECK_NULL_RETURN(name, OPRT_INVALID_PARM);
     TUYA_CHECK_NULL_RETURN(handle, OPRT_INVALID_PARM);
@@ -156,7 +156,7 @@ OPERATE_RET tdl_transport_send(TDL_TRANSPORT_HANDLE handle, const uint8_t *data,
 
 uint32_t tdl_transport_read(TDL_TRANSPORT_HANDLE handle, uint8_t *data, uint32_t len)
 {
-    OPERATE_RET rt = OPRT_OK;
+    // OPERATE_RET rt = OPRT_OK;
     uint32_t recv_len = 0;
 
     TUYA_CHECK_NULL_RETURN(handle, 0);

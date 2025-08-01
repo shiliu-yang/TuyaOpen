@@ -319,7 +319,7 @@ OPERATE_RET netmgr_init(netmgr_type_e type)
     }
 
 #ifdef ENABLE_BLUETOOTH
-    tuya_ble_init(&(tuya_ble_cfg_t){.client = tuya_iot_client_get(), .device_name = "TYBLE"});
+    // tuya_ble_init(&(tuya_ble_cfg_t){.client = tuya_iot_client_get(), .device_name = "TYBLE"});
 #endif
 
     return rt;

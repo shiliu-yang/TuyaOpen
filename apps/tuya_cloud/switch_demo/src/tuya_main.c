@@ -205,13 +205,14 @@ bool user_network_check(void)
 {
     netmgr_status_e status = NETMGR_LINK_DOWN;
     netmgr_conn_get(NETCONN_AUTO, NETCONN_CMD_STATUS, &status);
+    status = NETMGR_LINK_UP;
     return status == NETMGR_LINK_DOWN ? false : true;
 }
 
 void user_main()
 {
     int ret = OPRT_OK;
-#if 0
+#if 1
     //! open iot development kit runtim init
     cJSON_InitHooks(&(cJSON_Hooks){.malloc_fn = tal_malloc, .free_fn = tal_free});
     tal_log_init(TAL_LOG_LEVEL_DEBUG, 1024, (TAL_LOG_OUTPUT_CB)tkl_log_output);
@@ -232,21 +233,22 @@ void user_main()
     });
     tal_sw_timer_init();
     tal_workq_init();
-    tal_cli_init();
-    tuya_authorize_init();
-    tuya_app_cli_init();
+    // tal_cli_init();
+    // tuya_authorize_init();
+    // tuya_app_cli_init();
 
 #include "at_test.h"
     at_test_init();
+    tal_system_sleep(3 * 1000);
 
     reset_netconfig_start();
 
-    if (OPRT_OK != tuya_authorize_read(&license)) {
-        license.uuid = TUYA_OPENSDK_UUID;
-        license.authkey = TUYA_OPENSDK_AUTHKEY;
-        PR_WARN("Replace the TUYA_OPENSDK_UUID and TUYA_OPENSDK_AUTHKEY contents, otherwise the demo cannot work.\n \
+    // if (OPRT_OK != tuya_authorize_read(&license)) {
+    license.uuid = TUYA_OPENSDK_UUID;
+    license.authkey = TUYA_OPENSDK_AUTHKEY;
+    PR_WARN("Replace the TUYA_OPENSDK_UUID and TUYA_OPENSDK_AUTHKEY contents, otherwise the demo cannot work.\n \
                 Visit https://platform.tuya.com/purchase/index?type=6 to get the open-sdk uuid and authkey.");
-    }
+    // }
     // PR_DEBUG("uuid %s, authkey %s", license.uuid, license.authkey);
     /* Initialize Tuya device configuration */
     ret = tuya_iot_init(&client, &(const tuya_iot_config_t){
@@ -276,9 +278,10 @@ void user_main()
 #endif
     netmgr_init(type);
 
-#if defined(ENABLE_WIFI) && (ENABLE_WIFI == 1)
-    netmgr_conn_set(NETCONN_WIFI, NETCONN_CMD_NETCFG, &(netcfg_args_t){.type = NETCFG_TUYA_BLE | NETCFG_TUYA_WIFI_AP});
-#endif
+    // #if defined(ENABLE_WIFI) && (ENABLE_WIFI == 1)
+    //     netmgr_conn_set(NETCONN_WIFI, NETCONN_CMD_NETCFG, &(netcfg_args_t){.type = NETCFG_TUYA_BLE |
+    //     NETCFG_TUYA_WIFI_AP});
+    // #endif
 
     PR_DEBUG("tuya_iot_init success");
     /* Start tuya iot task */
@@ -335,30 +338,30 @@ void main(int argc, char *argv[])
 }
 #else
 
-// /* Tuya thread handle */
-// static THREAD_HANDLE ty_app_thread = NULL;
+/* Tuya thread handle */
+static THREAD_HANDLE ty_app_thread = NULL;
 
-// /**
-//  * @brief  task thread
-//  *
-//  * @param[in] arg:Parameters when creating a task
-//  * @return none
-//  */
-// static void tuya_app_thread(void *arg)
-// {
-//     user_main();
-
-//     tal_thread_delete(ty_app_thread);
-//     ty_app_thread = NULL;
-// }
-
-// void tuya_app_main(void)
-// {
-//     THREAD_CFG_T thrd_param = {4096, 4, "tuya_app_main"};
-//     tal_thread_create_and_start(&ty_app_thread, NULL, NULL, tuya_app_thread, NULL, &thrd_param);
-// }
-void main(int argc, char *argv[])
+/**
+ * @brief  task thread
+ *
+ * @param[in] arg:Parameters when creating a task
+ * @return none
+ */
+static void tuya_app_thread(void *arg)
 {
     user_main();
+
+    tal_thread_delete(ty_app_thread);
+    ty_app_thread = NULL;
 }
+
+void tuya_app_main(void)
+{
+    THREAD_CFG_T thrd_param = {4096, 4, "tuya_app_main"};
+    tal_thread_create_and_start(&ty_app_thread, NULL, NULL, tuya_app_thread, NULL, &thrd_param);
+}
+// void main(int argc, char *argv[])
+// {
+//     user_main();
+// }
 #endif

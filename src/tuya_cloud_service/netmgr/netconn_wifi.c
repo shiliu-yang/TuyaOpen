@@ -15,6 +15,7 @@
 #include "tal_api.h"
 #include "cJSON.h"
 #include "ap_netcfg.h"
+#include "mqtt_bind.h"
 
 #ifdef ENABLE_BLUETOOTH
 #include "ble_mgr.h"
@@ -328,6 +329,8 @@ OPERATE_RET netconn_wifi_open(void *config)
         __netconn_wifi_info_get(&netmgr_wifi->conn.wifi_conn_info);
         __netconn_wifi_connect();
     }
+
+    tuya_iot_token_get_port_register(tuya_iot_client_get(), mqtt_bind_token_get);
 
     return rt;
 }
