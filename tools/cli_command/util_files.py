@@ -6,14 +6,24 @@ import json
 import shutil
 from typing import Union, List
 
-from tools.cli_command.util import get_logger
+from tools.cli_command.util import (
+    get_logger, get_running_env, do_subprocess
+)
 
 
 def rm_rf(file_path):
-    if os.path.isfile(file_path):
-        os.remove(file_path)
-    elif os.path.isdir(file_path):
-        shutil.rmtree(file_path)
+    if not os.path.exists(file_path):
+        return True
+    if "windows" == get_running_env():
+        if os.path.isfile(file_path):
+            cmd = f"del /F /Q \"{file_path}\""
+        else:
+            cmd = f"rmdir /S /Q \"{file_path}\""
+    else:
+        cmd = f"rm -rf \"{file_path}\""
+    ret = do_subprocess(cmd)
+    if ret != 0:
+        return False
     return True
 
 
@@ -47,6 +57,33 @@ def copy_directory(source, target) -> bool:
     os.makedirs(target, exist_ok=True)
     shutil.copytree(source, target, dirs_exist_ok=True)
     pass
+
+
+def move_directory(source, target, force=False) -> bool:
+    logger = get_logger()
+    if os.path.exists(target) and not force:
+        logger.error(f"Can't move to {target}, because it already exists.")
+        return False
+
+    try:
+        rm_rf(target)
+        shutil.move(source, target)
+    except Exception as e:
+        logger.error(f"Move error: {str(e)}.")
+        return False
+
+    return True
+
+
+def create_directory(target) -> bool:
+    logger = get_logger()
+    try:
+        os.makedirs(target, exist_ok=True)
+    except Exception as e:
+        logger.error(f"Create {target}: {str(e)}.")
+        return False
+
+    return True
 
 
 def _find_files(file_type: str, target_dir: str, max_depth: int) -> List[str]:
@@ -84,9 +121,22 @@ def get_files_from_path(types: Union[str, List[str]],
     return result
 
 
+def get_subdir_from_path(target_path):
+    ans = []
+    if not os.path.isdir(target_path):
+        return ans
+
+    for entry in os.scandir(target_path):
+        if entry.is_dir():
+            ans.append(entry.name)
+
+    return ans
+
+
 def parser_para_file(json_file):
+    logger = get_logger()
     if not os.path.isfile(json_file):
-        print(f"Error: Not found [{json_file}].")
+        logger.error(f"Error: Not found [{json_file}].")
         return {}
     try:
         f = open(json_file, 'r', encoding='utf-8')
@@ -96,3 +146,47 @@ def parser_para_file(json_file):
         print(f"Parser json error:  [{str(e)}].")
         return {}
     return json_data
+
+
+def replace_string_in_file(file_path, old_str, new_str) -> bool:
+    logger = get_logger()
+    if not os.path.isfile(file_path):
+        logger.error(f"Error: Not found [{file_path}].")
+        return False
+    try:
+        with open(file_path, 'r', encoding='utf-8') as file:
+            content = file.read()
+
+        modified_content = content.replace(old_str, new_str)
+
+        with open(file_path, 'w', encoding='utf-8') as file:
+            file.write(modified_content)
+
+        logger.debug(f"replace [{old_str}] to [{new_str}] in [{file_path}].")
+    except Exception as e:
+        print(f"Replace string in {file_path} error:  [{str(e)}].")
+        return False
+
+    return True
+
+
+def check_text_in_file(file_path, target_text):
+    logger = get_logger()
+
+    if not os.path.isfile(file_path):
+        logger.warning(f"Not a file: {file_path}.")
+        return False
+
+    if len(target_text) == 0:
+        logger.warning("Text is empty.")
+        return False
+
+    try:
+        with open(file_path, 'r', encoding='utf-8') as file:
+            for line in file:
+                if target_text in line:
+                    return True
+        return False
+    except Exception as e:
+        logger.error(f"Error: {str(e)}")
+        return False

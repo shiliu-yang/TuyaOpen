@@ -1,295 +1,100 @@
 <p align="center">
-<img src="https://images.tuyacn.com/fe-static/docs/img/412f2712-273c-4da6-89e9-2969060a291a.png" width="60%" >
+<img src="https://images.tuyacn.com/fe-static/docs/img/c128362b-eb25-4512-b5f2-ad14aae2395c.jpg" width="100%" >
+</p>
+
+<p align="center">
+  <a href="https://tuyaopen.ai/zh/docs/quick_start/enviroment-setup">快速开始</a> ·
+  <a href="https://developer.tuya.com/cn/docs/iot/ai-agent-management?id=Kdxr4v7uv4fud">涂鸦 AI Agent</a> ·
+  <a href="https://tuyaopen.ai/zh/docs/about-tuyaopen">文档中心</a> ·
+  <a href="https://tuyaopen.ai/zh/docs/hardware-specific/t5-ai-board/overview-t5-ai-board">硬件资源</a>
+</p>
+
+<p align="center">
+    <a href="https://tuyaopen.ai" target="_blank">
+        <img alt="Static Badge" src="https://img.shields.io/badge/Product-F04438"></a>
+    <a href="https://tuyaopen.ai/zh/pricing" target="_blank">
+        <img alt="Static Badge" src="https://img.shields.io/badge/free-pricing?logo=free&color=%20%23155EEF&label=pricing&labelColor=%20%23528bff"></a>
+    <a href="https://discord.gg/cbGrBjx7" target="_blank">
+        <img src="https://img.shields.io/badge/Discord-Join%20Chat-5462eb?logo=discord&labelColor=%235462eb&logoColor=%23f5f5f5&color=%235462eb"
+            alt="chat on Discord"></a>
+    <a href="https://www.youtube.com/@tuya2023" target="_blank">
+        <img src="https://img.shields.io/badge/YouTube-Subscribe-red?logo=youtube&labelColor=white"
+            alt="Subscribe on YouTube"></a>
+    <a href="https://x.com/tuyasmart" target="_blank">
+        <img src="https://img.shields.io/twitter/follow/tuyasmart?logo=X&color=%20%23f5f5f5"
+            alt="follow on X(Twitter)"></a>
+    <a href="https://www.linkedin.com/company/tuya-smart/" target="_blank">
+        <img src="https://custom-icon-badges.demolab.com/badge/LinkedIn-0A66C2?logo=linkedin-white&logoColor=fff"
+            alt="follow on LinkedIn"></a>
+    <a href="https://github.com/tuya/tuyaopen/graphs/commit-activity?branch=dev" target="_blank">
+        <img alt="Commits last month (dev branch)" src="https://img.shields.io/github/commit-activity/m/tuya/tuyaopen/dev?labelColor=%2332b583&color=%2312b76a"></a>
+    <a href="https://github.com/langgenius/dify/" target="_blank">
+        <img alt="Issues closed" src="https://img.shields.io/github/issues-search?query=repo%3Atuya%2Ftuyaopen%20is%3Aclosed&label=issues%20closed&labelColor=%20%237d89b0&color=%20%235d6b98"></a>
+</p>
+
+<p align="center">
+  <a href="./README.md"><img alt="README in English" src="https://img.shields.io/badge/English-d9d9d9"></a>
+  <a href="./README_zh.md"><img alt="简体中文版自述文件" src="https://img.shields.io/badge/简体中文-d9d9d9"></a>
 </p>
 
 
-[English](https://github.com/tuya/TuyaOpen/blob/master/README.md) | 简体中文
+## 概述
 
-## 简介
+TuyaOpen 是一个开源的 AI+IoT 开发框架，旨在帮助开发者快速创建智能互联设备。它支持多种芯片平台和类 RTOS 操作系统，能够无缝集成多模态 AI 能力，包括音频、视频和传感器数据处理。
 
-TuyaOpen 是一款跨芯片平台、操作系统的 AI+IoT 开发框架。它基于通用南向接口设计，支持 Bluetooth、Wi-Fi、Ethernet 等通信协议，提供了物联网开发的核心功能，包括配网，激活，控制，升级等；它具备强大的安全合规能力，包括设备认证、数据加密、通信加密等，满足全球各个国家和地区的数据合规需求。
+### 🚀 使用 TuyaOpen，你可以：
+- 开发具备语音技术的硬件产品，如 `ASR`（Automatic Speech Recognition）、`KWS`（Keyword Spotting）、`TTS`（Text-to-Speech）、`STT`（Speech-to-Text）
+- 集成主流 LLMs 及 AI 平台，包括 `Deepseek`、`ChatGPT`、`Claude`、`Gemini` 等
+- 构建具备 `多模态AI能力` 的智能设备，包括文本、语音、视觉和基于传感器的功能
+- 创建自定义产品，并无缝连接至涂鸦云，实现 `远程控制`、`监控` 和 `OTA 升级`
+- 开发兼容 `Google Home` 和 `Amazon Alexa` 的设备
+- 设计自定义的 `Powered by Tuya` 硬件
+- 支持广泛的硬件应用，包括 `蓝牙`、`Wi-Fi`、`以太网` 等多种连接方式
+- 受益于强大的内置 `安全性`、`设备认证` 和 `数据加密` 能力
 
-基于 TuyaOpen 开发的 AI+IoT 产品，如果使用 tuya_cloud_service 组件的功能，就可以使用涂鸦APP、云服务提供的强大生态能力，并与 Power By Tuya 设备互联互通。
+无论你是在开发智能家居产品、工业 IoT 解决方案，还是定制 AI 应用，TuyaOpen 都能为你提供快速入门和跨平台扩展的工具与示例。
 
-同时 TuyaOpen 将不断拓展，提供更多云平台接入功能，及语音、视频、人脸识别等功能。
 
-## 开始体验
 
-### 安装依赖
+### TuyaOpen SDK 框架
+<p align="center">
+<img src="https://images.tuyacn.com/fe-static/docs/img/25713212-9840-4cf5-889c-6f55476a59f9.jpg" width="80%" >
+</p>
 
-- Ubuntu and Debian
+---
 
-```sh
-$ sudo apt-get install lcov cmake-curses-gui build-essential ninja-build wget git python3 python3-pip python3-venv libc6-i386 libsystemd-dev
-```
+### 支持的目标平台
+| Name                  | Support Status | Introduction                                                 | Debug log serial port |
+| --------------------- | -------------- | ------------------------------------------------------------ | --------------------- |
+| Ubuntu                | Supported      | 可直接运行于如 ubuntu 等 Linux 主机。                        |                       |
+| Tuya T2               | Supported      | 支持的模块列表: [T2-U](https://developer.tuya.com/en/docs/iot/T2-U-module-datasheet?id=Kce1tncb80ldq) | Uart2/115200          |
+| Tuya T3               | Supported      | 支持的模块列表: [T3-U](https://developer.tuya.com/en/docs/iot/T3-U-Module-Datasheet?id=Kdd4pzscwf0il) [T3-U-IPEX](https://developer.tuya.com/en/docs/iot/T3-U-IPEX-Module-Datasheet?id=Kdn8r7wgc24pt) [T3-2S](https://developer.tuya.com/en/docs/iot/T3-2S-Module-Datasheet?id=Ke4h1uh9ect1s) [T3-3S](https://developer.tuya.com/en/docs/iot/T3-3S-Module-Datasheet?id=Kdhkyow9fuplc) [T3-E2](https://developer.tuya.com/en/docs/iot/T3-E2-Module-Datasheet?id=Kdirs4kx3uotg) 等 | Uart1/460800          |
+| Tuya T5               | Supported      | 支持的模块列表: [T5-E1](https://developer.tuya.com/en/docs/iot/T5-E1-Module-Datasheet?id=Kdar6hf0kzmfi) [T5-E1-IPEX](https://developer.tuya.com/en/docs/iot/T5-E1-IPEX-Module-Datasheet?id=Kdskxvxe835tq) 等 | Uart1/460800          |
+| ESP32/ESP32C3/ESP32S3 | Supported      |                                                              | Uart0/115200          |
+| LN882H                | Supported      |                                                              | Uart1/921600          |
+| BK7231N               | Supported      | 支持的模块列表: [CBU](https://developer.tuya.com/en/docs/iot/cbu-module-datasheet?id=Ka07pykl5dk4u) [CB3S](https://developer.tuya.com/en/docs/iot/cb3s?id=Kai94mec0s076) [CB3L](https://developer.tuya.com/en/docs/iot/cb3l-module-datasheet?id=Kai51ngmrh3qm) [CB3SE](https://developer.tuya.com/en/docs/iot/CB3SE-Module-Datasheet?id=Kanoiluul7nl2) [CB2S](https://developer.tuya.com/en/docs/iot/cb2s-module-datasheet?id=Kafgfsa2aaypq) [CB2L](https://developer.tuya.com/en/docs/iot/cb2l-module-datasheet?id=Kai2eku1m3pyl) [CB1S](https://developer.tuya.com/en/docs/iot/cb1s-module-datasheet?id=Kaij1abmwyjq2) [CBLC5](https://developer.tuya.com/en/docs/iot/cblc5-module-datasheet?id=Ka07iqyusq1wm) [CBLC9](https://developer.tuya.com/en/docs/iot/cblc9-module-datasheet?id=Ka42cqnj9r0i5) [CB8P](https://developer.tuya.com/en/docs/iot/cb8p-module-datasheet?id=Kahvig14r1yk9) 等 | Uart2/115200          |
 
-- macOS
-  请运行 `tos.py check` 检查系统依赖并根据提示安装相应组件。
+# 开发者文档
 
-### 克隆仓库
+更多 TuyaOpen 相关文档，请参考 [TuyaOpen 开发者指南](https://tuyaopen.ai/docs/about-tuyaopen)。
 
-```sh
-$ git clone https://github.com/tuya/TuyaOpen.git
-```
+## 许可证
 
-tuyeopen 仓库中包含多个子模块，tos.py 工具会在编译前检查并自动下载子模块，也可以使用 `git submodule update --init` 命令手工下载。
+本项目基于 Apache License Version 2.0 发布。更多信息请参见 `LICENSE`。
 
-## 设置与编译
 
-### step1. 激活 `tos.py`
 
-```sh
-$ cd TuyaOpen
-$ . ./export.sh
-```
+## 代码贡献
 
-验证，使用命令 `tos.py version` 以及 `tos.py check`，出现如下信息
+如果你对 TuyaOpen 感兴趣，并希望参与开发成为代码贡献者，请先阅读 [贡献指南](https://tuyaopen.ai/docs/contribute/contribute-guide)。
 
-```sh
-❯ tos.py version
-[INFO]: Running tos.py ...
-[INFO]: v1.3.0
+## 免责声明
 
-❯ tos.py check
-[INFO]: Running tos.py ...
-[INFO]: [git] (2.43.0 >= 2.0.0) is ok.
-[INFO]: [cmake] (4.0.2 >= 3.28.0) is ok.
-[INFO]: [make] (4.3 >= 3.0.0) is ok.
-[INFO]: [ninja] (1.11.1 >= 1.6.0) is ok.
-[INFO]: Downloading submoudules ...
-[INFO]: [do subprocess]: cd /home/huatuo/work/open/TuyaOpen && git submodule update --init
-[INFO]: Download submoudules successfully.
-```
+用户需明确知晓，本项目可能包含由第三方开发的子模块。这些子模块可能会独立于本项目进行更新。鉴于这些子模块的更新频率不可控，本项目无法保证其始终为最新版本。因此，若用户在使用本项目过程中遇到与子模块相关的问题，建议根据需要自行更新，或向本项目提交 issue。
 
-使用如下命令退出激活 `tos.py`
-
-```sh
-deactivate
-```
-
-TuyaOpen 通过 `tos.py` 命令进行编译、调试等操作，`tos.py` 命令会根据环境变量中设置的路径查找 TuyaOpen 仓库，并执行对应操作。
-
-tos.py 命令的详细使用方法，请参考 [tos.py 命令](https://tuyaopen.ai/zh/docs/quick_start/tos-guide)。
-
-### step2. 选择待编译项目
-
-选择待编译 app 或 example，如 [apps/tuya_cloud/switch_demo](https://github.com/tuya/TuyaOpen/tree/master/apps/tuya_cloud/switch_demo) , 并切换至对应目录。
-
-使用 `tos.py config choice` 命令选择编译目标平台或目标板。
-
-```sh
-$ cd apps/tuya_cloud/switch_demo
-$ tos.py config choice
-[TuyaOpen/apps/tuya_cloud/switch_demo/config] is empty.
-Using boards default config file.
-========================
-Configs
-  1. BK7231X.config
-  2. ESP32-C3.config
-  3. ESP32.config
-  4. ESP32-S3.config
-  5. LN882H.config
-  6. T2.config
-  7. T3.config
-  8. T5AI.config
-  9. Ubuntu.config
-------------------------
-Please select: 
-```
-
-`tos.py config choice` 命令读取项目下 `config` 目录中的配置文件，并会生成当前工程的配置文件 `app_default.config`。
-
-> 运行 `tos.py config choice` 切换 config 后，tos.py 命令会自动清除当前工程下已经编译生成的编译中间文件
-
-### step3. 编译
-
-选择当前编译的 examples 或 apps 对应工程，运行如下命令编译：
-
-```sh
-$ cd apps/tuya_cloud/switch_demo
-$ tos.py build
-```
-
-编译完成后目标文件位于当前编译项目 `.build/<project>/bin` 目录下，如 `apps/tuya_cloud/switch_demo/.build/bin` 目录。
-编译后的目标文件包括：
-
-- switch_demo_QIO_1.0.0.bin：包括 boot 在内的完整固件，用于烧录。
-- switch_demo_UA_1.0.0.bin：未包括 boot 的应用固件，使用该文件需根据不同的 platform/chip 烧录该 bin 至对应的地址，否则可能无法正常运行。
-- switch_demo_UG_1.0.0.bin：用于 OTA 升级的 bin 文件，无法直接烧录后运行。
-
-
-项目名称默认为目录名称，项目版本默认为 `1.0.0`，可通过 `tos.py config menu` 配置中修改。
-
-### step4. menu config 配置 
-
-如需要修改项目的配置，选择需配置的 examples 或 apps 对应工程，在对应工程目录下运行如下命令进行菜单化配置：
-
-```sh
-$ cd apps/tuya_cloud/switch_demo
-$ tos.py config menu
-```
-
-配置当前工程，配置完成后保存退出，编译工程。
-
-> 运行 `tos.py config menu` 切换芯片或开发板后，`tos.py` 命令会自动清除当前工程下已经编译生成的编译中间文件
-
-## 烧录
-
-### GUI 工具烧录
-
-tyutool gui 烧录工具已支持 T2/T3/T5AI/BK7231N/LN882H/ESP32 等多种芯片串口烧录，支持 windows/Linux/macOS 等操作系统，请根据运行操作系统选择对应的 GUI 烧录工具。
-
-- windows：[tyutool_win](https://images.tuyacn.com/smart/embed/package/vscode/data/ide_serial/win_tyutool_gui.zip)
-- Linux：[tyutool_linux.tar](https://images.tuyacn.com/smart/embed/package/vscode/data/ide_serial/tyutool_gui.tar.gz)
-- macOS_x86：[tyutool_mac_x86](https://images.tuyacn.com/smart/embed/package/vscode/data/ide_serial/darwin_x86_tyutool_gui.tar.gz)
-- macOS_arm64：[tyutool_mac_arm64.zip](https://images.tuyacn.com/smart/embed/package/vscode/data/ide_serial/darwin_arm64_tyutool_gui.tar.gz)
-
-## 命令行烧录
-
-可通过 `tos.py flash` 命令一键烧录
-
-1. 在 Linux 环境下需要先使用如下命令设置串口权限，否则运行会报错。
-
-```sh
-$ sudo usermod -aG dialout $USER
-```
-
-设置完成后需重启系统方可生效。
-
-2. 在需要编译完成后的项目中运行 `tos.py flash` 命令一键烧录，`tos.py flash` 会根据当前运行的环境自动下载对应的 tyutool 工具，并自动烧录。
-
-```sh
-$ cd apps/tuya_cloud/switch_demo
-$ tos.py flash
-tyutool params:
-[INFO]: tyut_logger init done.
-[INFO]: Run Tuya Uart Tool.
-[INFO]: Use default baudrate: [921600]
-[INFO]: Use default start address: [0x00]
---------------------
-1. /dev/ttyS0
-2. /dev/ttyACM0
-3. /dev/ttyACM1
-^^^^^^^^^^^^^^^^^^^^
-Select serial port: 3                              ## 选择正确的串口
-[INFO]: Waiting Reset ...
-[INFO]: unprotect flash OK.
-[INFO]: sync baudrate 921600 success
-Erasing: ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 4 bytes/s   0:00:04 / 0:00:00
-[INFO]: Erase flash success
-Writing: ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 16 bytes/s   0:00:18 / 0:00:00
-[INFO]: Write flash success
-[INFO]: CRC check success
-[INFO]: Reboot done
-[INFO]: Flash write success.
-```
-
-> 注：烧录过程中需要根据芯片实际情况进入 boot 后才可以进行串口烧录。
-> 烧录过程中如果串口没有响应，请检查串口是否正确选择，或串口是否被其他程序占用。
-
-更多 TuyaOpen 相关文档请参考 [TuyaOpen 开发指南](https://docs.tuyaopen.io/zh)。
-
-## 支持 platform 列表
-
-| 名称                  | 支持状态 | 介绍                                                         | 调试日志串口 |
-| --------------------- | -------- | ------------------------------------------------------------ | ------------ |
-| Ubuntu                | 支持     | 可在 ubuntu 等 Linux 主机上直接运行                          |              |
-| T2                    | 支持     | 支持模组列表:  [T2-U](https://developer.tuya.com/cn/docs/iot/T2-U-module-datasheet?id=Kce1tncb80ldq) | Uart2/115200 |
-| T3                    | 支持     | 支持模组列表:  [T3-U](https://developer.tuya.com/cn/docs/iot/T3-U-Module-Datasheet?id=Kdd4pzscwf0il) [T3-U-IPEX](https://developer.tuya.com/cn/docs/iot/T3-U-IPEX-Module-Datasheet?id=Kdn8r7wgc24pt) [T3-2S](https://developer.tuya.com/cn/docs/iot/T3-2S-Module-Datasheet?id=Ke4h1uh9ect1s) [T3-3S](https://developer.tuya.com/cn/docs/iot/T3-3S-Module-Datasheet?id=Kdhkyow9fuplc) [T3-E2](https://developer.tuya.com/cn/docs/iot/T3-E2-Module-Datasheet?id=Kdirs4kx3uotg) 等 | Uart1/460800 |
-| T5AI                  | 支持     | 支持模组列表: [T5-E1](https://developer.tuya.com/cn/docs/iot/T5-E1-Module-Datasheet?id=Kdar6hf0kzmfi) [T5-E1-IPEX](https://developer.tuya.com/cn/docs/iot/T5-E1-IPEX-Module-Datasheet?id=Kdskxvxe835tq) 等 | Uart1/460800 |
-| ESP32/ESP32C3/ESP32S3 | 支持     |                                                              | Uart0/115200 |
-| LN882H                | 支持     |                                                              | Uart1/921600 |
-| BK7231N               | 支持     | 支持模组列表:  [CBU](https://developer.tuya.com/cn/docs/iot/cbu-module-datasheet?id=Ka07pykl5dk4u)  [CB3S](https://developer.tuya.com/cn/docs/iot/cb3s?id=Kai94mec0s076) [CB3L](https://developer.tuya.com/cn/docs/iot/cb3l-module-datasheet?id=Kai51ngmrh3qm) [CB3SE](https://developer.tuya.com/cn/docs/iot/CB3SE-Module-Datasheet?id=Kanoiluul7nl2) [CB2S](https://developer.tuya.com/cn/docs/iot/cb2s-module-datasheet?id=Kafgfsa2aaypq) [CB2L](https://developer.tuya.com/cn/docs/iot/cb2l-module-datasheet?id=Kai2eku1m3pyl) [CB1S](https://developer.tuya.com/cn/docs/iot/cb1s-module-datasheet?id=Kaij1abmwyjq2) [CBLC5](https://developer.tuya.com/cn/docs/iot/cblc5-module-datasheet?id=Ka07iqyusq1wm) [CBLC9](https://developer.tuya.com/cn/docs/iot/cblc9-module-datasheet?id=Ka42cqnj9r0i5) [CB8P](https://developer.tuya.com/cn/docs/iot/cb8p-module-datasheet?id=Kahvig14r1yk9) 等 | Uart2/115200 |
-
-
-## 示例工程 <span id="example"></span>
-
-TuyaOpen 提供了丰富的示例工程，方便开发者快速上手，了解 TuyaOpen 的使用。
-
-```sh
-$ examples
-├── ble
-│   ├── ble_central
-│   └── ble_peripher
-├── get-started
-│   └── sample_project
-├── peripherals
-│   ├── adc
-│   ├── gpio
-│   ├── i2c
-│   ├── pwm
-│   ├── spi
-│   ├── timer
-│   └── watchdog
-├── protocols
-│   ├── http_client
-│   ├── https_client
-│   ├── mqtt
-│   ├── tcp_client
-│   └── tcp_server
-├── system
-│   ├── os_event
-│   ├── os_kv
-│   ├── os_mutex
-│   ├── os_queue
-│   ├── os_semaphore
-│   ├── os_sw_timer
-│   └── os_thread
-└── wifi
-    ├── ap
-    ├── low_power
-    ├── scan
-    └── sta
-```
-
-每个示例工程下对应有 README.md 文件，详细介绍了示例工程的配置、编译、运行等操作。
-
-example 编译方式与 app 编译方式一致，使用 `tos.py config choice` 命令选择编译目标平台或目标板，然后使用 `tos.py build` 编译。
-
-## AI 应用
-
-tuya.ai 是一个综合性的 AI 服务平台,提供以下核心能力:
-
-- 音频处理服务
-- 视频处理服务  
-- 多模态 AI 服务
-
-详细使用说明请参考 [tuya.ai 文档](apps/tuya.ai/README_zh.md)
-
-## 云连接应用
-
-TuyaOpen 提供了丰富的云连接应用示例，相关应用位于 apps 目录下，可点击 [云连接应用](apps/tuya_cloud/README_zh.md)。
-
-## platform 新增与适配
-
-TuyaOpen 支持新增与适配新的 platform，具体操作请参考 [platform 新增与适配](https://tuyaopen.ai/zh/docs/new_hardware/adding-new-chip-platform-support)。
-
-## board 新增与适配
-
-TuyaOpen 支持新增与适配新的 board，具体操作请参考 [board 新增与适配](https://tuyaopen.ai/zh/docs/new_hardware/adding-new-board-support)。
-
-## FAQ
-
-1. TuyaOpen 支持的 platform 通过子仓库动态下载，更新 TuyaOpen 仓库不会主动更新子仓库，如遇到问题无法正常编译，请至 platform 文件夹下对应的目录下使用 `git pull` 命令更新，或删除 platform 文件夹下对应目录后再次下载。
-
-2. TuyaOpen 连提供了丰富的云连接应用示例，如发现无法正常连接或无法正常激活设备，请参考 [云连接应用](apps/tuya_cloud/README_zh.md)。
-
-## License
-
-本项目的分发遵循 Apache License 版本 2.0。有关更多信息，请参见 LICENSE 文件。
-
-## 贡献代码
-
-如果您对 TuyaOpen 感兴趣，并希望参与 TuyaOpen 的开发并成为代码贡献者，请先参阅 [贡献指南](https://tuyaopen.ai/zh/docs/contribute/contribute-guide)。
-
-## 免责与责任条款
-
-用户应明确知晓，本项目可能包含由第三方开发的子模块（submodules），这些子模块可能独立于本项目进行更新。鉴于这些子模块的更新频率不受控制，本项目无法确保这些子模块始终为最新版本。因此，用户在使用本项目时，若遇到与子模块相关的问题，建议自行根据需要进行更新或于本项目提交问题（issue）。
-
-若用户决定将本项目用于商业目的，应充分认识到其中可能涉及的功能性和安全性风险。在此情况下，用户应对产品的所有功能性和安全性问题承担全部责任，应进行全面的功能和安全测试，以确保其满足特定的商业需求。本公司不对因用户使用本项目或其子模块而造成的任何直接、间接、特殊、偶然或惩罚性损害承担责任。
+如用户决定将本项目用于商业用途，应充分认识到其中可能存在的功能和安全风险。在此情况下，用户应对所有功能和安全问题自行承担责任，并进行全面的功能和安全性测试，以确保其满足特定业务需求。本公司不对因用户使用本项目或其子模块而导致的任何直接、间接、特殊、偶发或惩罚性损害承担责任。
 
 ## 相关链接
 
-- Arduino 版 TuyaOpen：[https://github.com/tuya/arduino-TuyaOpen](https://github.com/tuya/arduino-TuyaOpen)
-- Luanode 版 TuyaOpen：[https://github.com/tuya/luanode-TuyaOpen](https://github.com/tuya/luanode-TuyaOpen)
-- 
+- Arduino for TuyaOpen: [https://github.com/tuya/arduino-TuyaOpen](https://github.com/tuya/arduino-TuyaOpen)
+- Luanode for TuyaOpen：[https://github.com/tuya/luanode-TuyaOpen](https://github.com/tuya/luanode-TuyaOpen)

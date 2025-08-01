@@ -123,8 +123,12 @@ def set_global_params():
         cache_path, "CatalogKconfig")
     GLOBAL_PARAMS["using_config"] = os.path.join(
         cache_path, "using.config")
+
+    open_cache_path = os.path.join(open_root, ".cache")
     GLOBAL_PARAMS["env_json"] = os.path.join(
-        open_root, ".env.json")
+        open_cache_path, ".env.json")
+    GLOBAL_PARAMS["dont_update_platform"] = os.path.join(
+        open_cache_path, ".dont_prompt_update_platform")
 
     GLOBAL_PARAMS["build_param_root"] = os.path.join(
         build_path, "build")
@@ -136,10 +140,17 @@ def set_global_params():
 
     tyutool_root = os.path.join(tools_root, "tyutool")
     GLOBAL_PARAMS["tyutool_root"] = tyutool_root
-    tyutool_cli = os.path.join(tyutool_root, "tyutool_cli")
-    if get_running_env() == "windows":
-        tyutool_cli += ".exe"
+    tyutool_cli = os.path.join(tyutool_root, "tyutool_cli.py")
     GLOBAL_PARAMS["tyutool_cli"] = tyutool_cli
+
+    porting_root = os.path.join(tools_root, "porting")
+    GLOBAL_PARAMS["porting_root"] = porting_root
+
+    app_template_root = os.path.join(tools_root, "app_template")
+    GLOBAL_PARAMS["app_template_root"] = app_template_root
+
+    board_template_root = os.path.join(tools_root, "board_template")
+    GLOBAL_PARAMS["board_template_root"] = board_template_root
 
     pass
 
@@ -208,7 +219,7 @@ def set_country_code():
 
         COUNTRY_CODE = country
     except requests.exceptions.RequestException as e:
-        logger.warn(f"country code error: {e}")
+        logger.warning(f"country code error: {e}")
 
     return COUNTRY_CODE
 
@@ -241,8 +252,8 @@ def get_running_env():
     linux/darwin_x86/darwin_arm64/windows
     '''
     global RUNNING_ENV
-    if len(COUNTRY_CODE):
-        return COUNTRY_CODE
+    if len(RUNNING_ENV):
+        return RUNNING_ENV
     return set_running_env()
 
 
@@ -278,6 +289,7 @@ def env_write(key: str, value):
 
     env_data[key] = value
     json_str = json.dumps(env_data, indent=4, ensure_ascii=False)
+    os.makedirs(os.path.dirname(env_json), exist_ok=True)
     with open(env_json, 'w') as f:
         f.write(json_str)
     pass
