@@ -10,11 +10,13 @@ set(APP_PATH ${CMAKE_CURRENT_LIST_DIR})
 get_filename_component(APP_NAME ${APP_PATH} NAME)
 
 # APP_SRCS
-aux_source_directory(${APP_PATH}/src APP_SRCS)
+# aux_source_directory(${APP_PATH}/src APP_SRCS)
+file(GLOB_RECURSE APP_SRCS "${APP_PATH}/src/*.c")
 
 # APP_INC
 set(APP_INC
     ${APP_PATH}/src
+    ${APP_PATH}/src/at_modem
 )
 
 ########################################

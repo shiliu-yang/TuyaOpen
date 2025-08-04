@@ -39,6 +39,8 @@
 #include "qrencode_print.h"
 #endif
 
+#include "app_at_modem.h"
+
 #ifndef PROJECT_VERSION
 #define PROJECT_VERSION "1.0.0"
 #endif
@@ -241,6 +243,8 @@ void user_main(void)
     tuya_authorize_init();
     tuya_app_cli_init();
 #endif
+
+    app_at_modem_init();
 
     reset_netconfig_start();
 
