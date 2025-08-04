@@ -11,6 +11,8 @@
 #include "tuya_cloud_types.h"
 #include "at_line.h"
 
+#include "tdl_transport_manage.h"
+
 #include "tuya_slist.h"
 
 #ifdef __cplusplus

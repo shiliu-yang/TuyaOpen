@@ -8,8 +8,6 @@
 #include "at_client.h"
 #include "at_line.h"
 
-#include "tdl_transport_manage.h"
-
 #include "tal_api.h"
 
 /***********************************************************
@@ -64,6 +62,7 @@ typedef struct {
 ***********************************************************/
 static char *__at_client_line_parse_input(AT_LINE_HANDLE line_hdl, char *end_symbol, char *data, uint32_t len);
 static OPERATE_RET __at_client_urc_process(AT_LINE_HANDLE line_hdl);
+static uint8_t __is_urc_line(char *line, uint32_t len);
 
 /***********************************************************
 ***********************variable define**********************
@@ -122,13 +121,14 @@ static void __at_client_thread(void *arg)
             uint32_t free_space = sg_at_client.rx_buffer_size - sg_at_client.rx_buffer_used;
             if (available) {
                 // Read data from transport
+                PR_DEBUG("AT client waiting for response, available: %d bytes, free_space: %d", available, free_space);
                 tal_mutex_lock(sg_at_client.mutex);
                 uint32_t read_len = tdl_transport_read(sg_at_client.transport_hdl, p_rx, free_space);
                 if (read_len > 0) {
                     sg_at_client.rx_buffer_used += read_len;
                     waiting_cnt = 0; // Reset waiting count
-                    // PR_DEBUG("Read %d bytes from transport", read_len);
-                    // PR_DEBUG("Received data: %.*s", read_len, p_rx);
+                    // PR_DEBUG("--> Read %d bytes from transport", read_len);
+                    // PR_DEBUG("--> Received data: %.*s", read_len, p_rx);
                 }
                 tal_mutex_unlock(sg_at_client.mutex);
             }
@@ -136,9 +136,14 @@ static void __at_client_thread(void *arg)
             // check one of the response lines
             if (sg_at_client.rx_buffer_used > 3) {
                 tal_mutex_lock(sg_at_client.mutex);
+
+                uint8_t is_urc = __is_urc_line(sg_at_client.rx_buffer, sg_at_client.rx_buffer_used);
+                AT_LINE_HANDLE line_hdl = is_urc ? sg_at_client.urc_line_hdl : sg_at_client.line_hdl;
+                PR_DEBUG("AT client checking response lines, is_urc: %d", is_urc);
+
                 // Parse the input data and add to the line handle
-                char *next_pos = __at_client_line_parse_input(sg_at_client.line_hdl, sg_at_client.end_symbol,
-                                                              sg_at_client.rx_buffer, sg_at_client.rx_buffer_used);
+                char *next_pos = __at_client_line_parse_input(line_hdl, sg_at_client.end_symbol, sg_at_client.rx_buffer,
+                                                              sg_at_client.rx_buffer_used);
                 if (next_pos && next_pos > sg_at_client.rx_buffer) {
                     // Move remaining data to the start of the buffer
                     uint32_t remaining_len = sg_at_client.rx_buffer_used - (next_pos - sg_at_client.rx_buffer);
@@ -157,8 +162,8 @@ static void __at_client_thread(void *arg)
         } break;
         case AT_CLIENT_STATUS_PROCESSING: {
             // Processing response
-            PR_DEBUG("AT client is processing response");
-            // Here you would typically process the response received from the modem
+            __at_client_urc_process(sg_at_client.urc_line_hdl);
+            AT_CLIENT_STATUS_CHANGE(AT_CLIENT_STATUS_COMPLETED);
         } break;
         case AT_CLIENT_STATUS_COMPLETED: {
             // Command completed
@@ -306,7 +311,7 @@ AT_LINE_T *at_client_get_response(uint32_t timeout_ms)
 {
     AT_LINE_T *line = NULL;
 
-    TUYA_CHECK_NULL_RETURN(sg_at_client.thread_hdl, OPRT_INVALID_PARM);
+    TUYA_CHECK_NULL_RETURN(sg_at_client.thread_hdl, NULL);
     TUYA_CHECK_NULL_RETURN(sg_at_client.line_hdl, NULL);
 
     // Wait for response with timeout
@@ -375,16 +380,29 @@ static uint8_t __is_urc_line(char *line, uint32_t len)
 {
     TUYA_CHECK_NULL_RETURN(line, 0);
 
+    char *p_start = line;
+    // skip "CRLF" at the beginning
+    if (p_start[0] == '\r' && p_start[1] == '\n') {
+        p_start += 2;
+        len -= 2;
+    }
+
     SLIST_HEAD *pos = NULL;
     for (pos = sg_at_client.urc_head.next; pos != NULL; pos = pos->next) {
         AT_URC_T *urc_handler = (AT_URC_T *)pos;
-        // if (urc_handler->prefix && strncmp(line, urc_handler->prefix, strlen(urc_handler->prefix)) == 0) {
-        //     return 1; // URC match found
-        // }
-        // if (urc_handler->suffix && len >= strlen(urc_handler->suffix) &&
-        //     strncmp(line + len - strlen(urc_handler->suffix), urc_handler->suffix, strlen(urc_handler->suffix)) == 0)
-        //     { return 1; // URC match found
-        // }
+        PR_DEBUG("Checking line: %s", line);
+        PR_DEBUG("Checking URC handler: prefix: %s, suffix: %s", urc_handler->prefix, urc_handler->suffix);
+        if (urc_handler->prefix) {
+            if (strncmp(line, urc_handler->prefix, strlen(urc_handler->prefix)) == 0) {
+                return 1; // URC match found
+            }
+        }
+        if (urc_handler->suffix) {
+            if (len >= strlen(urc_handler->suffix) && strncmp(line + len - strlen(urc_handler->suffix),
+                                                              urc_handler->suffix, strlen(urc_handler->suffix)) == 0) {
+                return 1; // URC match found
+            }
+        }
     }
 
     return 0; // No URC match found
@@ -396,7 +414,39 @@ static OPERATE_RET __at_client_urc_process(AT_LINE_HANDLE line_hdl)
 
     TUYA_CHECK_NULL_RETURN(line_hdl, OPRT_INVALID_PARM);
 
-    // AT_LINE_T *line = at_line_get_by_key(line_hdl, "+MATREADY");
+    if (at_line_get_count(line_hdl) == 0) {
+        return OPRT_OK; // No URC lines to process
+    }
+
+    // Process each URC line
+    AT_LINE_T *line = NULL;
+    while (at_line_get_count(line_hdl)) {
+        line = at_line_get(line_hdl);
+        SLIST_HEAD *pos = NULL;
+        for (pos = sg_at_client.urc_head.next; pos != NULL; pos = pos->next) {
+            AT_URC_T *urc_handler = (AT_URC_T *)pos;
+            if (urc_handler->prefix) {
+                if (strncmp(line->line, urc_handler->prefix, strlen(urc_handler->prefix)) == 0) {
+                    if (urc_handler->urc_handler) {
+                        urc_handler->urc_handler(line->line, line->len);
+                    }
+                    break;
+                }
+            }
+            if (urc_handler->suffix) {
+                if (line->len >= strlen(urc_handler->suffix) &&
+                    strncmp(line->line + line->len - strlen(urc_handler->suffix), urc_handler->suffix,
+                            strlen(urc_handler->suffix)) == 0) {
+                    if (urc_handler->urc_handler) {
+                        urc_handler->urc_handler(line->line, line->len);
+                    }
+                    break;
+                }
+            }
+        }
+        at_line_free(line); // Free the URC line after processing
+        line = NULL;        // Reset line pointer to avoid dangling pointer
+    }
 
     return rt;
 }

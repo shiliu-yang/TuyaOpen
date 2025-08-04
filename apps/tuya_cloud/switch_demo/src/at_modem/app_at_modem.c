@@ -47,7 +47,6 @@ OPERATE_RET app_at_modem_init(void)
                                              .databits = TUYA_UART_DATA_LEN_8BIT,
                                              .parity = TUYA_UART_PARITY_TYPE_NONE,
                                              .stopbits = TUYA_UART_STOP_LEN_1BIT,
-                                             .flowctrl = TUYA_UART_FLOWCTRL_NONE,
                                          }};
     TUYA_CALL_ERR_RETURN(tdd_transport_uart_register(TRANSPORT_NAME, uart_cfg));
 

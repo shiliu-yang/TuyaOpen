@@ -22,18 +22,39 @@
 /***********************************************************
 ********************function declaration********************
 ***********************************************************/
+static void __urc_matready_cb(char *data, uint32_t len);
+static void __urc_cereg_cb(char *data, uint32_t len);
+static void __urc_cpin_cb(char *data, uint32_t len);
 
 /***********************************************************
 ***********************variable define**********************
 ***********************************************************/
 static AT_URC_T sg_ml307r_urc_handler[] = {
-    {{NULL}, AT_RSP_MATCH_PREFIX, "+MATREADY", NULL, NULL},
-    {{NULL}, AT_RSP_MATCH_PREFIX, "+CEREG: ", NULL, NULL},
-    {{NULL}, AT_RSP_MATCH_PREFIX, "+CPIN: ", NULL, NULL},
+    {{NULL}, "+MATREADY", NULL, __urc_matready_cb},
+    {{NULL}, "+CEREG: ", NULL, __urc_cereg_cb},
+    {{NULL}, "+CPIN: ", NULL, __urc_cpin_cb},
 };
 /***********************************************************
 ***********************function define**********************
 ***********************************************************/
+static void __urc_matready_cb(char *data, uint32_t len)
+{
+    PR_DEBUG("URC +MATREADY received: %.*s", len, data);
+    return;
+}
+
+static void __urc_cereg_cb(char *data, uint32_t len)
+{
+    PR_DEBUG("URC +CEREG received: %.*s", len, data);
+    return;
+}
+
+static void __urc_cpin_cb(char *data, uint32_t len)
+{
+    PR_DEBUG("URC +CPIN received: %.*s", len, data);
+    return;
+}
+
 static OPERATE_RET __ml307r_urc_register(void)
 {
     OPERATE_RET rt = OPRT_OK;

@@ -147,9 +147,9 @@ void uart_rx_chars_in_isr(TUYA_UART_NUM_E port_num)
 
         rx_bytes++;
 
-#if OPERATING_SYSTEM == SYSTEM_LINUX
-        break;
-#endif
+        // #if OPERATING_SYSTEM == SYSTEM_LINUX
+        //         break;
+        // #endif
     }
 
 #ifdef CONFIG_UART_FLOW_CONTRAL
@@ -343,6 +343,8 @@ int tal_uart_read(TUYA_UART_NUM_E port_num, uint8_t *data, uint32_t len)
     }
 #endif
 
+    // PR_HEXDUMP_DEBUG("tal_uart read data", data, read_count);
+
     tal_semaphore_post(uart_info->rx_ring_sem);
     return read_count;
 }
@@ -406,20 +408,22 @@ int tal_uart_write(TUYA_UART_NUM_E port_num, const uint8_t *data, uint32_t len)
 
     int tx_bytes = 0;
     int ret;
-    if ((uart_info->open_mode & O_ASYNC_WRITE) == 0) {
-        while (tx_bytes != len) {
-            ret = tkl_uart_write(port_num, (void *)&data[tx_bytes], 1);
-            if (ret != 1) {
-                break;
-            }
-            tx_bytes++;
-        }
-    }
-#ifdef CONFIG_UART_WRITE_ASYNC
-    else {
-        tx_bytes = uart_async_write(uart_info, data, len);
-    }
-#endif
+    //     if ((uart_info->open_mode & O_ASYNC_WRITE) == 0) {
+    //         while (tx_bytes != len) {
+    //             ret = tkl_uart_write(port_num, (void *)&data[tx_bytes], 1);
+    //             if (ret != 1) {
+    //                 break;
+    //             }
+    //             tx_bytes++;
+    //         }
+    //     }
+    // #ifdef CONFIG_UART_WRITE_ASYNC
+    //     else {
+    //         tx_bytes = uart_async_write(uart_info, data, len);
+    //     }
+    // #endif
+    PR_HEXDUMP_DEBUG("tal_uart write data", data, len);
+    tx_bytes = tkl_uart_write(port_num, data, len);
 
     return tx_bytes;
 }
@@ -479,5 +483,18 @@ int tal_uart_get_rx_data_size(TUYA_UART_NUM_E port_num)
     TUYA_RINGBUFF_T *rx_ring = uart_info->rx_ring;
     uint32_t buffer_size = tuya_ring_buff_used_size_get(rx_ring);
 
-    return buffer_size;
+    return (int)buffer_size;
+}
+
+OPERATE_RET tal_uart_rx_clear(TUYA_UART_NUM_E port_num)
+{
+    TAL_UART_DEV *uart_info = uart_list_get_one_node(port_num);
+    if (uart_info == NULL) {
+        return OPRT_INVALID_PARM;
+    }
+
+    TUYA_RINGBUFF_T *rx_ring = uart_info->rx_ring;
+    tuya_ring_buff_reset(rx_ring);
+
+    return OPRT_OK;
 }

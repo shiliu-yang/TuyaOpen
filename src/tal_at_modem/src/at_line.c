@@ -48,6 +48,8 @@ OPERATE_RET at_line_init(AT_LINE_HANDLE *line_hdl)
     tuya_init_slist_node(&line->line_head);
     line->line_count = 0;
 
+    *line_hdl = (AT_LINE_HANDLE)line;
+
     return rt;
 }
 
