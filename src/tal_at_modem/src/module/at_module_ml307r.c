@@ -14,7 +14,10 @@
 /***********************************************************
 ************************macro define************************
 ***********************************************************/
+#define AT "AT\r"
 
+// rsp
+#define OK "OK"
 /***********************************************************
 ***********************typedef define***********************
 ***********************************************************/
@@ -29,6 +32,8 @@ static void __urc_cpin_cb(char *data, uint32_t len);
 /***********************************************************
 ***********************variable define**********************
 ***********************************************************/
+static AT_MODEM_CB sg_urc_cb = NULL;
+
 static AT_URC_T sg_ml307r_urc_handler[] = {
     {{NULL}, "+MATREADY", NULL, __urc_matready_cb},
     {{NULL}, "+CEREG: ", NULL, __urc_cereg_cb},
@@ -39,19 +44,44 @@ static AT_URC_T sg_ml307r_urc_handler[] = {
 ***********************************************************/
 static void __urc_matready_cb(char *data, uint32_t len)
 {
-    PR_DEBUG("URC +MATREADY received: %.*s", len, data);
+    // PR_DEBUG("URC +MATREADY received: %.*s", len, data);
+
+    uint8_t at_ready = 0;
+
+    if (strncmp("+MATREADY", data, len) == 0) {
+        at_ready = 1;
+    }
+
+    if (sg_urc_cb) {
+        sg_urc_cb(TAL_AT_MODEM_CMD_READY, &at_ready);
+    }
+
     return;
 }
 
 static void __urc_cereg_cb(char *data, uint32_t len)
 {
     PR_DEBUG("URC +CEREG received: %.*s", len, data);
+    // +CEREG: 0
+    // +CEREG: 5,"58BC","0C03A143",7
     return;
 }
 
 static void __urc_cpin_cb(char *data, uint32_t len)
 {
-    PR_DEBUG("URC +CPIN received: %.*s", len, data);
+    // PR_DEBUG("URC +CPIN received: %.*s", len, data);
+
+    // +CPIN: READY
+    uint8_t cpin_ready = 0;
+
+    if (strncmp("+CPIN: READY", data, len) == 0) {
+        cpin_ready = 1;
+    }
+
+    if (sg_urc_cb) {
+        sg_urc_cb(TAL_AT_MODEM_CMD_SIM, &cpin_ready);
+    }
+
     return;
 }
 
@@ -70,16 +100,39 @@ static OPERATE_RET __ml307r_urc_register(void)
     return rt;
 }
 
-OPERATE_RET at_module_ml307r_init(void)
+static uint8_t __ml307r_at_check(void)
+{
+    // send AT
+    OPERATE_RET rt = OPRT_OK;
+    AT_LINE_T *rsp_line = NULL;
+
+    TUYA_CALL_ERR_LOG(at_client_send_with_rsp(AT, strlen(AT), &rsp_line, 1000));
+    if (OPRT_OK != rt) {
+        return 0;
+    }
+
+    PR_DEBUG("AT RSP: %.*s", rsp_line->len, rsp_line->line);
+
+    if (strcmp(OK, rsp_line->line) != 0) {
+        return 0;
+    }
+
+    return 1;
+}
+
+OPERATE_RET at_module_ml307r_init(AT_MODULE_OPS_T *ops, AT_MODEM_CB urc_cb)
 {
     OPERATE_RET rt = OPRT_OK;
 
+    TUYA_CHECK_NULL_RETURN(ops, OPRT_INVALID_PARM);
+    TUYA_CHECK_NULL_RETURN(urc_cb, OPRT_INVALID_PARM);
+
+    sg_urc_cb = urc_cb;
+
+    ops->at_check = __ml307r_at_check;
+
     // register urc handler
     TUYA_CALL_ERR_RETURN(__ml307r_urc_register());
-
-    // Send AT
-
-    // Get rsp OK
 
     PR_DEBUG("ML307R module initialized successfully");
 

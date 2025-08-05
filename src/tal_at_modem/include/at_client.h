@@ -27,17 +27,11 @@ extern "C" {
 #define LINE_END_SYMBOL_LF      "\n"
 #define LINE_END_SYMBOL_CR      "\r"
 
-// typedef uint8_t AT_RSP_MATCH_T;
-// #define AT_RSP_MATCH_EXACT  0
-// #define AT_RSP_MATCH_PREFIX 1
-// #define AT_RSP_MATCH_SUFFIX 2
-
 /***********************************************************
 ***********************typedef define***********************
 ***********************************************************/
 typedef struct {
-    SLIST_HEAD node; // Node for single linked list
-    // AT_RSP_MATCH_T match_type;                     // Type of match for the response
+    SLIST_HEAD node;                               // Node for single linked list
     char *prefix;                                  // Prefix of the response
     char *suffix;                                  // Suffix of the response
     void (*urc_handler)(char *data, uint32_t len); // URC handler function
@@ -54,6 +48,10 @@ OPERATE_RET at_client_deinit(void);
 OPERATE_RET at_client_send(const char *cmd, uint32_t len);
 
 AT_LINE_T *at_client_get_response(uint32_t timeout_ms);
+
+OPERATE_RET at_client_send_with_rsp(const char *cmd, uint32_t len, AT_LINE_T **rsp_line, uint32_t timeout_ms);
+
+void at_client_response_free(AT_LINE_T *line);
 
 OPERATE_RET at_client_urc_handler_register(AT_URC_T *urc_handler);
 

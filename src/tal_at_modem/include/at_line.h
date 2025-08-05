@@ -39,13 +39,15 @@ typedef struct {
 
 OPERATE_RET at_line_init(AT_LINE_HANDLE *line_hdl);
 
-OPERATE_RET at_line_add(AT_LINE_HANDLE line_hdl, const char *line, uint32_t len);
+OPERATE_RET at_line_add(AT_LINE_HANDLE line_hdl, AT_LINE_T *new_line);
 
 AT_LINE_T *at_line_get(AT_LINE_HANDLE line_hdl);
 
 AT_LINE_T *at_line_get_by_key(AT_LINE_HANDLE line_hdl, const char *key);
 
 uint32_t at_line_get_count(AT_LINE_HANDLE line_hdl);
+
+AT_LINE_T *at_line_create(const char *line, uint32_t len);
 
 OPERATE_RET at_line_free(AT_LINE_T *line);
 

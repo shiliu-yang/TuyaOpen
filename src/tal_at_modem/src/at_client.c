@@ -60,9 +60,9 @@ typedef struct {
 /***********************************************************
 ********************function declaration********************
 ***********************************************************/
-static char *__at_client_line_parse_input(AT_LINE_HANDLE line_hdl, char *end_symbol, char *data, uint32_t len);
+static char *__at_client_line_parse_input(AT_LINE_T **line, char *end_symbol, char *data, uint32_t len);
 static OPERATE_RET __at_client_urc_process(AT_LINE_HANDLE line_hdl);
-static uint8_t __is_urc_line(char *line, uint32_t len);
+static uint8_t __is_urc_line(AT_LINE_T *line);
 
 /***********************************************************
 ***********************variable define**********************
@@ -79,7 +79,7 @@ static AT_CLIENT_T sg_at_client = {
     .mutex = NULL,
     .status = AT_CLIENT_STATUS_IDLE,
     .transport_hdl = NULL,
-    .end_symbol = LINE_END_SYMBOL_CRLF,
+    .end_symbol = {LINE_END_SYMBOL_CRLF},
     .urc_head = {NULL}, // Initialize the URC handler list
     .urc_count = 0,
     .urc_line_hdl = NULL, // Initialize the URC line handle
@@ -136,15 +136,18 @@ static void __at_client_thread(void *arg)
             // check one of the response lines
             if (sg_at_client.rx_buffer_used > 3) {
                 tal_mutex_lock(sg_at_client.mutex);
-
-                uint8_t is_urc = __is_urc_line(sg_at_client.rx_buffer, sg_at_client.rx_buffer_used);
-                AT_LINE_HANDLE line_hdl = is_urc ? sg_at_client.urc_line_hdl : sg_at_client.line_hdl;
-                PR_DEBUG("AT client checking response lines, is_urc: %d", is_urc);
-
-                // Parse the input data and add to the line handle
-                char *next_pos = __at_client_line_parse_input(line_hdl, sg_at_client.end_symbol, sg_at_client.rx_buffer,
-                                                              sg_at_client.rx_buffer_used);
+                AT_LINE_T *new_line = NULL;
+                char *next_pos = __at_client_line_parse_input(&new_line, sg_at_client.end_symbol,
+                                                              sg_at_client.rx_buffer, sg_at_client.rx_buffer_used);
                 if (next_pos && next_pos > sg_at_client.rx_buffer) {
+                    // get new line
+                    // Check if it's URC
+                    PR_DEBUG("---> Parsed new line: [%.*s]", new_line->len, new_line->line);
+                    uint8_t is_urc = __is_urc_line(new_line);
+                    AT_LINE_HANDLE line_hdl = is_urc ? sg_at_client.urc_line_hdl : sg_at_client.line_hdl;
+                    PR_DEBUG("AT client checking response lines, is_urc: %d", is_urc);
+                    // add to line handle
+                    at_line_add(line_hdl, new_line);
                     // Move remaining data to the start of the buffer
                     uint32_t remaining_len = sg_at_client.rx_buffer_used - (next_pos - sg_at_client.rx_buffer);
                     memmove(sg_at_client.rx_buffer, next_pos, remaining_len);
@@ -156,14 +159,19 @@ static void __at_client_thread(void *arg)
                 tal_mutex_unlock(sg_at_client.mutex);
             }
 
-            if (at_line_get_count(sg_at_client.line_hdl) > 0) {
+            if (at_line_get_count(sg_at_client.urc_line_hdl) > 0) {
                 AT_CLIENT_STATUS_CHANGE(AT_CLIENT_STATUS_PROCESSING);
             }
         } break;
         case AT_CLIENT_STATUS_PROCESSING: {
             // Processing response
             __at_client_urc_process(sg_at_client.urc_line_hdl);
-            AT_CLIENT_STATUS_CHANGE(AT_CLIENT_STATUS_COMPLETED);
+
+            if (sg_at_client.rx_buffer_used > 3) {
+                AT_CLIENT_STATUS_CHANGE(AT_CLIENT_STATUS_WAITING);
+            } else {
+                AT_CLIENT_STATUS_CHANGE(AT_CLIENT_STATUS_COMPLETED);
+            }
         } break;
         case AT_CLIENT_STATUS_COMPLETED: {
             // Command completed
@@ -181,21 +189,25 @@ static void __at_client_thread(void *arg)
     }
 }
 
-static char *__at_client_line_parse_input(AT_LINE_HANDLE line_hdl, char *end_symbol, char *data, uint32_t len)
+static char *__at_client_line_parse_input(AT_LINE_T **line, char *end_symbol, char *data, uint32_t len)
 {
-    TUYA_CHECK_NULL_RETURN(line_hdl, NULL);
+    TUYA_CHECK_NULL_RETURN(line, NULL);
     TUYA_CHECK_NULL_RETURN(data, NULL);
 
     char *p_start = data;
     char *p_end = NULL;
     uint32_t offset = 0;
 
+    // PR_DEBUG("Parsing input data: %.*s", len, data);
+
     do {
         p_end = strstr(p_start, end_symbol);
         if (p_end && p_end > p_start) {
-            at_line_add(line_hdl, p_start, p_end - p_start);
+            // at_line_add(line_hdl, p_start, p_end - p_start);
+            *line = at_line_create(p_start, p_end - p_start);
             offset = p_end - data + strlen(end_symbol);
             p_start = data + offset;
+            break;
         } else if (p_end == p_start) {
             p_start += strlen(end_symbol);
             offset += strlen(end_symbol);
@@ -204,9 +216,7 @@ static char *__at_client_line_parse_input(AT_LINE_HANDLE line_hdl, char *end_sym
         }
     } while (1);
 
-    return p_start; // Return the next position after the last processed line
-
-    return NULL; // No complete line found
+    return p_start;
 }
 
 OPERATE_RET at_client_init(TDL_TRANSPORT_HANDLE transport_hdl)
@@ -376,29 +386,27 @@ OPERATE_RET at_client_urc_handler_register(AT_URC_T *urc_handler)
     return rt;
 }
 
-static uint8_t __is_urc_line(char *line, uint32_t len)
+static uint8_t __is_urc_line(AT_LINE_T *line)
 {
     TUYA_CHECK_NULL_RETURN(line, 0);
 
-    char *p_start = line;
-    // skip "CRLF" at the beginning
-    if (p_start[0] == '\r' && p_start[1] == '\n') {
-        p_start += 2;
-        len -= 2;
-    }
+    char *p_start = line->line;
+    uint32_t len = line->len;
+
+    // PR_DEBUG("Checking if line is URC: %.*s", len, p_start);
 
     SLIST_HEAD *pos = NULL;
     for (pos = sg_at_client.urc_head.next; pos != NULL; pos = pos->next) {
         AT_URC_T *urc_handler = (AT_URC_T *)pos;
-        PR_DEBUG("Checking line: %s", line);
-        PR_DEBUG("Checking URC handler: prefix: %s, suffix: %s", urc_handler->prefix, urc_handler->suffix);
+
+        // PR_DEBUG("Checking URC handler: prefix: %s, suffix: %s", urc_handler->prefix, urc_handler->suffix);
         if (urc_handler->prefix) {
-            if (strncmp(line, urc_handler->prefix, strlen(urc_handler->prefix)) == 0) {
+            if (strncmp(p_start, urc_handler->prefix, strlen(urc_handler->prefix)) == 0) {
                 return 1; // URC match found
             }
         }
         if (urc_handler->suffix) {
-            if (len >= strlen(urc_handler->suffix) && strncmp(line + len - strlen(urc_handler->suffix),
+            if (len >= strlen(urc_handler->suffix) && strncmp(p_start + len - strlen(urc_handler->suffix),
                                                               urc_handler->suffix, strlen(urc_handler->suffix)) == 0) {
                 return 1; // URC match found
             }
