@@ -8,16 +8,28 @@
 #include "at_module_ml307r.h"
 
 #include "at_client.h"
+#include "at_utils.h"
 
 #include "tal_api.h"
 
 /***********************************************************
 ************************macro define************************
 ***********************************************************/
-#define AT "AT\r"
+#define AT_SEND_TIMEOUT_MS (10 * 1000) // Timeout for interaction with 4G module
+
+// send
+#define AT         "AT\r"
+#define AT_MIPOPEN "AT+MIPOPEN"
+#define AT_MIPCFG  "AT+MIPCFG"
+#define AT_MDNSGIP "AT+MDNSGIP"
 
 // rsp
 #define OK "OK"
+
+// PROTOCOL_TCP = 0,
+// PROTOCOL_UDP = 1,
+#define GET_PROTOCOL_TYPE(type) ((type) == PROTOCOL_TCP ? "TCP" : "UDP")
+
 /***********************************************************
 ***********************typedef define***********************
 ***********************************************************/
@@ -25,23 +37,91 @@
 /***********************************************************
 ********************function declaration********************
 ***********************************************************/
+static int __parse_urc_tokens(char *data, const char *cmd_prefix, const char *delimiters, char **out_buffer,
+                              char **token_array, int max_tokens);
+
 static void __urc_matready_cb(char *data, uint32_t len);
 static void __urc_cereg_cb(char *data, uint32_t len);
 static void __urc_cpin_cb(char *data, uint32_t len);
+static void __urc_mipopen_cb(char *data, uint32_t len);
+static void __urc_mdnsgip_cb(char *data, uint32_t len);
 
 /***********************************************************
 ***********************variable define**********************
 ***********************************************************/
+static TUYA_IP_ADDR_T sg_dns_addr = 0;
+
 static AT_MODEM_CB sg_urc_cb = NULL;
 
 static AT_URC_T sg_ml307r_urc_handler[] = {
-    {{NULL}, "+MATREADY", NULL, __urc_matready_cb},
-    {{NULL}, "+CEREG: ", NULL, __urc_cereg_cb},
-    {{NULL}, "+CPIN: ", NULL, __urc_cpin_cb},
+    {{NULL}, "+MATREADY", NULL, __urc_matready_cb}, {{NULL}, "+CEREG: ", NULL, __urc_cereg_cb},
+    {{NULL}, "+CPIN: ", NULL, __urc_cpin_cb},       {{NULL}, "+MIPOPEN: ", NULL, __urc_mipopen_cb},
+    {{NULL}, "+MDNSGIP: ", NULL, __urc_mdnsgip_cb},
 };
 /***********************************************************
 ***********************function define**********************
 ***********************************************************/
+
+/**
+ * @brief Parse URC command tokens in format: "+CMD: token1,token2,..."
+ * @param data Source data string to parse (will be modified during parsing)
+ * @param cmd_prefix Expected command prefix (e.g., "+MIPOPEN")
+ * @param delimiters String containing delimiter characters (e.g., ": ," or ": ,\"")
+ * @param out_buffer Pointer to store allocated buffer (caller should free this)
+ * @param token_array Array to store pointers to parsed token strings
+ * @param max_tokens Maximum number of tokens to parse
+ * @return Number of tokens parsed successfully, -1 on error
+ *
+ * Note: The token_array will contain pointers to strings within out_buffer.
+ *       Caller should only free out_buffer, not individual token strings.
+ */
+static int __parse_urc_tokens(char *data, const char *cmd_prefix, const char *delimiters, char **out_buffer,
+                              char **token_array, int max_tokens)
+{
+    if (!data || !cmd_prefix || !delimiters || !out_buffer || !token_array || max_tokens <= 0) {
+        return -1;
+    }
+
+    // Allocate buffer for strtok processing
+    size_t len = strlen(data);
+    char *buffer = tal_malloc(len + 1);
+    if (!buffer) {
+        PR_ERR("malloc failed for URC parsing");
+        return -1;
+    }
+    memset(buffer, 0, len + 1);
+    strcpy(buffer, data);
+    *out_buffer = buffer;
+
+    // Parse command prefix
+    char *token = strtok(buffer, delimiters);
+    if (!token || strncmp(token, cmd_prefix, strlen(cmd_prefix)) != 0) {
+        PR_ERR("Invalid URC format, expected: %s", cmd_prefix);
+        tal_free(buffer);
+        *out_buffer = NULL;
+        return -1;
+    }
+
+    // Parse tokens and store pointers
+    int parsed_count = 0;
+    for (int i = 0; i < max_tokens; i++) {
+        token = strtok(NULL, delimiters);
+        if (!token) {
+            if (i == 0) {
+                PR_ERR("Invalid URC format, missing tokens after %s", cmd_prefix);
+                tal_free(buffer);
+                *out_buffer = NULL;
+                return -1;
+            }
+            break; // End of tokens
+        }
+        token_array[i] = token; // Store pointer to token string
+        parsed_count++;
+    }
+
+    return parsed_count;
+}
+
 static void __urc_matready_cb(char *data, uint32_t len)
 {
     // PR_DEBUG("URC +MATREADY received: %.*s", len, data);
@@ -85,6 +165,93 @@ static void __urc_cpin_cb(char *data, uint32_t len)
     return;
 }
 
+static void __urc_mipopen_cb(char *data, uint32_t len)
+{
+    PR_TRACE("%s received: %.*s", __func__, len, data);
+
+    // +MIPOPEN: <fd>,<result>
+    AT_CONNECT_STATUS_T connect_status = {0};
+
+    char *buffer = NULL;
+    char *tokens[2] = {NULL};
+    int parsed = __parse_urc_tokens(data, "+MIPOPEN", ": ,", &buffer, tokens, 2);
+    if (parsed != 2) {
+        if (buffer) {
+            tal_free(buffer);
+        }
+        return;
+    }
+
+    connect_status.fd = atoi(tokens[0]);
+    connect_status.result = atoi(tokens[1]);
+
+    PR_TRACE("URC +MIPOPEN parsed: fd=%d, result=%d", connect_status.fd, connect_status.result);
+
+    if (sg_urc_cb) {
+        sg_urc_cb(TAL_AT_MODEM_CMD_CONNECT_STATUS, &connect_status);
+    }
+
+    // Free the allocated buffer only, not the tokens
+    tal_free(buffer);
+
+    return;
+}
+
+static void __urc_mdnsgip_cb(char *data, uint32_t len)
+{
+    PR_TRACE("%s received: %.*s", __func__, len, data);
+
+    // +MDNSGIP: "<domainname>","<ip1>","<ip2>",...,"<ipn>"
+
+    // Count how many IP addresses are returned by searching for ','
+    int ip_count = 0;
+    char *token = strchr(data, ',');
+    while (token) {
+        ip_count++;
+        token = strchr(token + 1, ',');
+    }
+
+    PR_TRACE("MDNSGIP IP count: %d", ip_count);
+
+    if (ip_count == 0) {
+        PR_ERR("No IP addresses found in URC +MDNSGIP");
+        return;
+    }
+
+    char *buffer = NULL;
+    char *tokens[4] = {NULL};
+    int parsed = __parse_urc_tokens(data, "+MDNSGIP:", ",", &buffer, tokens, 4);
+    if (parsed < 2) {
+        PR_ERR("Failed to parse URC +MDNSGIP, parsed count: %d", parsed);
+        if (buffer) {
+            tal_free(buffer);
+        }
+        return;
+    }
+
+    char *domainname = tokens[0];
+    char *ip_str = NULL;
+
+    for (int i = 1; i < parsed; i++) {
+        ip_str = tokens[i];
+        if (at_utils_is_ipv4(ip_str)) {
+            // Convert IP string to address
+            TUYA_IP_ADDR_T ip_addr = at_utils_str2addr(ip_str);
+            if (ip_addr != -1) {
+                PR_DEBUG("Parsed IP address: %s -> 0x%08X", ip_str, ip_addr);
+                sg_dns_addr = ip_addr; // Store the last valid IP address
+                break;                 // Use the first valid IP address
+            } else {
+                PR_ERR("Invalid IP address format: %s", ip_str);
+            }
+        }
+    }
+
+    tal_free(buffer);
+
+    return;
+}
+
 static OPERATE_RET __ml307r_urc_register(void)
 {
     OPERATE_RET rt = OPRT_OK;
@@ -102,22 +269,193 @@ static OPERATE_RET __ml307r_urc_register(void)
 
 static uint8_t __ml307r_at_check(void)
 {
-    // send AT
+    uint8_t at_ready = 1;
     OPERATE_RET rt = OPRT_OK;
     AT_LINE_T *rsp_line = NULL;
 
-    TUYA_CALL_ERR_LOG(at_client_send_with_rsp(AT, strlen(AT), &rsp_line, 1000));
-    if (OPRT_OK != rt) {
+    TUYA_CALL_ERR_LOG(at_client_send_with_rsp(AT, strlen(AT), &rsp_line, AT_SEND_TIMEOUT_MS));
+    if (OPRT_OK != rt || NULL == rsp_line) {
         return 0;
     }
-
-    PR_DEBUG("AT RSP: %.*s", rsp_line->len, rsp_line->line);
 
     if (strcmp(OK, rsp_line->line) != 0) {
-        return 0;
+        at_ready = 0;
     }
 
-    return 1;
+    at_client_response_free(rsp_line);
+    rsp_line = NULL;
+
+    return at_ready;
+}
+
+static uint8_t __ml307r_at_get_socket_num_max(void)
+{
+    return 6;
+}
+
+static TUYA_ERRNO __ml307r_at_connect(int fd, TUYA_PROTOCOL_TYPE_E type, const char *ip, uint16_t port,
+                                      uint32_t timeout_ms)
+{
+    OPERATE_RET rt = OPRT_OK;
+    char tmp_buf[64] = {0};
+    AT_LINE_T *rsp_line = NULL;
+
+    // open socket
+    // "AT+MIPOPEN=fd,\"TCP\",\"<addr>\",<port>,timeout\r";
+    snprintf(tmp_buf, sizeof(tmp_buf), "AT+MIPOPEN=%d,\"%s\",\"%s\",%d,%d\r", fd, GET_PROTOCOL_TYPE(type), ip, port,
+             timeout_ms);
+    TUYA_CALL_ERR_LOG(at_client_send_with_rsp(tmp_buf, strlen(tmp_buf), &rsp_line, AT_SEND_TIMEOUT_MS));
+
+    if (OPRT_OK != rt || NULL == rsp_line) {
+        PR_ERR("AT+MIPOPEN failed, response: %s", rsp_line ? rsp_line->line : "NULL");
+        return UNW_FAIL;
+    }
+
+    if (strcmp(OK, rsp_line->line) != 0) {
+        PR_ERR("AT+MIPOPEN failed, response: %s", rsp_line->line);
+        at_client_response_free(rsp_line);
+        rsp_line = NULL;
+        return UNW_FAIL;
+    }
+
+    at_client_response_free(rsp_line);
+    rsp_line = NULL;
+
+    return UNW_SUCCESS;
+}
+
+static OPERATE_RET __ml307r_at_gethostbyname(const char *domain, TUYA_IP_ADDR_T *addr)
+{
+    OPERATE_RET rt = OPRT_OK;
+
+    // AT+MDNSGIP="www.tuya.com"
+    char *send_buf = NULL;
+    AT_LINE_T *rsp_line = NULL;
+    uint32_t send_len = strlen(domain) + 16;
+
+    send_buf = tal_malloc(send_len);
+    TUYA_CHECK_NULL_RETURN(send_buf, OPRT_MALLOC_FAILED);
+    memset(send_buf, 0, send_len);
+    snprintf(send_buf, send_len, "AT+MDNSGIP=\"%s\"\r", domain);
+
+    TUYA_CALL_ERR_LOG(at_client_send_with_rsp(send_buf, strlen(send_buf), &rsp_line, AT_SEND_TIMEOUT_MS));
+    tal_free(send_buf);
+    if (OPRT_OK != rt || NULL == rsp_line) {
+        PR_ERR("AT+MDNSGIP failed, response: %s", rsp_line ? rsp_line->line : "NULL");
+        at_client_response_free(rsp_line);
+        return OPRT_COM_ERROR;
+    }
+    if (strcmp(OK, rsp_line->line) != 0) {
+        PR_ERR("AT+MDNSGIP failed, response: %s", rsp_line->line);
+        at_client_response_free(rsp_line);
+        rsp_line = NULL;
+        return OPRT_COM_ERROR;
+    }
+
+    // wait for URC +MDNSGIP:
+    uint32_t cnt = 0;
+    do {
+        tal_system_sleep(100);
+        cnt++;
+
+        if (cnt * 100 > 5 * 1000) {
+            PR_ERR("Get DNS timeout");
+            rt = OPRT_COM_ERROR;
+            break;
+        }
+    } while (sg_dns_addr == 0);
+
+    if (OPRT_OK == rt && addr) {
+        *addr = sg_dns_addr;
+        sg_dns_addr = 0;
+    }
+
+    return rt;
+}
+
+static TUYA_ERRNO __ml307r_at_send(const int fd, const void *buf, const uint32_t nbytes)
+{
+    TUYA_ERRNO rt_errno = UNW_FAIL;
+    OPERATE_RET rt = OPRT_OK;
+    char *buffer = NULL;
+    AT_LINE_T *rsp_line = NULL;
+
+    // AT+MIPSEND=fd,len,"<data>"
+
+    uint32_t offset = 0;
+    uint32_t send_len = nbytes * 2 + 64;
+    char *send_cmd = tal_malloc(send_len);
+    if (send_cmd == NULL) {
+        PR_ERR("malloc for send command failed");
+        return UNW_FAIL;
+    }
+    memset(send_cmd, 0, send_len);
+
+    offset += snprintf(send_cmd + offset, send_len - offset, "AT+MIPSEND=%d,%d,\"", fd, nbytes);
+    for (uint32_t i = 0; i < nbytes; i++) {
+        offset += snprintf(send_cmd + offset, send_len - offset, "%02X", ((uint8_t *)buf)[i]);
+    }
+    offset += snprintf(send_cmd + offset, send_len - offset, "\"\r");
+    // rt = at_client_send_with_rsp(send_cmd, offset, NULL, AT_SEND_TIMEOUT_MS);
+
+    rt = at_client_send(send_cmd, offset);
+    if (OPRT_OK != rt) {
+        PR_ERR("AT+MIPSEND failed, response: %s", send_cmd);
+        rt_errno = UNW_FAIL;
+        goto __EXIT;
+    }
+
+    // +MIPSEND: fd,len
+    rsp_line = at_client_get_response(AT_SEND_TIMEOUT_MS);
+    if (rsp_line == NULL) {
+        PR_ERR("AT+MIPSEND response timeout");
+        rt_errno = UNW_FAIL;
+        goto __EXIT;
+    }
+
+    char *tokens[3] = {NULL};
+    int parsed = __parse_urc_tokens(rsp_line->line, "+MIPSEND", ": ,", &buffer, tokens, 3);
+    if (fd != atoi(tokens[1]) || 3 != parsed) {
+        PR_ERR("parsed %d, fd: %d, expected: %d", parsed, fd, atoi(tokens[1]));
+        rt_errno = UNW_FAIL;
+        goto __EXIT;
+    }
+    at_client_response_free(rsp_line);
+    rsp_line = NULL;
+
+    rt_errno = atoi(tokens[2]);
+    PR_DEBUG("response len: %d", rt_errno);
+
+    tal_free(buffer);
+    buffer = NULL;
+
+    // OK
+    rsp_line = at_client_get_response(AT_SEND_TIMEOUT_MS);
+    if (rsp_line == NULL) {
+        PR_ERR("AT+MIPSEND response timeout");
+        rt_errno = UNW_FAIL;
+        goto __EXIT;
+    }
+    if (strcmp(OK, rsp_line->line) != 0) {
+        rt_errno = UNW_FAIL;
+    }
+    at_client_response_free(rsp_line);
+    rsp_line = NULL;
+
+__EXIT:
+    if (NULL != send_cmd) {
+        tal_free(send_cmd);
+    }
+
+    if (NULL != rsp_line) {
+        at_client_response_free(rsp_line);
+    }
+
+    if (NULL != buffer) {
+        tal_free(buffer);
+    }
+
+    return rt_errno;
 }
 
 OPERATE_RET at_module_ml307r_init(AT_MODULE_OPS_T *ops, AT_MODEM_CB urc_cb)
@@ -130,6 +468,10 @@ OPERATE_RET at_module_ml307r_init(AT_MODULE_OPS_T *ops, AT_MODEM_CB urc_cb)
     sg_urc_cb = urc_cb;
 
     ops->at_check = __ml307r_at_check;
+    ops->at_get_socket_num_max = __ml307r_at_get_socket_num_max;
+    ops->at_connect = __ml307r_at_connect;
+    ops->at_gethostbyname = __ml307r_at_gethostbyname;
+    ops->at_send = __ml307r_at_send;
 
     // register urc handler
     TUYA_CALL_ERR_RETURN(__ml307r_urc_register());
@@ -138,3 +480,71 @@ OPERATE_RET at_module_ml307r_init(AT_MODULE_OPS_T *ops, AT_MODEM_CB urc_cb)
 
     return rt;
 }
+
+/*
+ * 使用新的 __parse_urc_tokens 函数重写 __urc_mipopen_cb 的示例：
+ *
+ * static void __urc_mipopen_cb_optimized(char *data, uint32_t len)
+ * {
+ *     char *buffer = NULL;
+ *     char *tokens[2] = {NULL}; // 存储指向token字符串的指针
+ *
+ *     // 使用标准分隔符: 冒号、空格、逗号
+ *     int parsed = __parse_urc_tokens(data, "+MIPOPEN", ": ,", &buffer, tokens, 2);
+ *     if (parsed != 2) {
+ *         if (buffer) {
+ *             tal_free(buffer);
+ *         }
+ *         return;
+ *     }
+ *
+ *     AT_CONNECT_STATUS_T connect_status = {0};
+ *     connect_status.fd = atoi(tokens[0]);        // 您可以自己决定如何处理
+ *     connect_status.result = atoi(tokens[1]);    // 可以是atoi、strcmp等
+ *
+ *     if (sg_urc_cb) {
+ *         sg_urc_cb(TAL_AT_MODEM_CMD_NETWORK, &connect_status);
+ *     }
+ *
+ *     tal_free(buffer);  // 只需要释放这一个buffer
+ * }
+ *
+ * 对于 +CEREG: 5,"58BC","0C03A143",7 这样包含引号的复杂格式：
+ *
+ * static void __urc_cereg_cb_optimized(char *data, uint32_t len)
+ * {
+ *     char *buffer = NULL;
+ *     char *tokens[4] = {NULL};
+ *
+ *     // 包含引号作为分隔符: 冒号、空格、逗号、引号
+ *     int parsed = __parse_urc_tokens(data, "+CEREG", ": ,\"", &buffer, tokens, 4);
+ *     if (parsed >= 1) {
+ *         int status = atoi(tokens[0]);  // 网络注册状态
+ *
+ *         if (parsed >= 4) {
+ *             // tokens[1] = "58BC" (LAC) - 引号已被分隔符处理
+ *             // tokens[2] = "0C03A143" (Cell ID)
+ *             // tokens[3] = "7" (Access Technology)
+ *             // 您可以选择性地处理这些字符串或数字
+ *         }
+ *     }
+ *
+ *     if (buffer) {
+ *         tal_free(buffer);
+ *     }
+ * }
+ *
+ * 其他分隔符使用场景：
+ * - 标准格式: ": ,"
+ * - 包含引号: ": ,\""
+ * - 包含括号: ": ,()"
+ * - 自定义: "|;:"
+ *
+ * 函数特点：
+ * 1. 灵活的分隔符配置，适应不同URC格式
+ * 2. 返回分割好的字符串指针数组，您可以灵活处理
+ * 3. 支持字符串和数字混合的token
+ * 4. 统一的内存管理（只需释放一个buffer）
+ * 5. 可以处理可变数量的参数
+ * 6. 保留了原始字符串格式，方便您自定义处理逻辑
+ */

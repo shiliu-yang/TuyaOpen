@@ -130,7 +130,10 @@ AT_LINE_T *at_line_get_by_key(AT_LINE_HANDLE line_hdl, const char *key)
 
 uint32_t at_line_get_count(AT_LINE_HANDLE line_hdl)
 {
-    TUYA_CHECK_NULL_RETURN(line_hdl, 0);
+    if (line_hdl == NULL) {
+        return 0;
+    }
+
     AT_LINE_HANDLE_T *at_line = (AT_LINE_HANDLE_T *)line_hdl;
     if (at_line->magic != AT_LINE_MAGIC) {
         PR_ERR("Invalid AT line handle");

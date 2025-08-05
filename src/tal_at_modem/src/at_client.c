@@ -232,6 +232,9 @@ OPERATE_RET at_client_init(TDL_TRANSPORT_HANDLE transport_hdl)
 
     sg_at_client.transport_hdl = transport_hdl;
 
+    // Initialize mutex for thread safety
+    TUYA_CALL_ERR_GOTO(tal_mutex_create_init(&sg_at_client.mutex), __ERR);
+
     // Initialize the line handle
     TUYA_CALL_ERR_GOTO(at_line_init(&sg_at_client.line_hdl), __ERR);
     TUYA_CALL_ERR_GOTO(at_line_init(&sg_at_client.urc_line_hdl), __ERR);
@@ -245,9 +248,6 @@ OPERATE_RET at_client_init(TDL_TRANSPORT_HANDLE transport_hdl)
     }
     memset(sg_at_client.rx_buffer, 0, sg_at_client.rx_buffer_size);
     sg_at_client.rx_buffer_used = 0;
-
-    // Initialize mutex for thread safety
-    TUYA_CALL_ERR_GOTO(tal_mutex_create_init(&sg_at_client.mutex), __ERR);
 
     // Initialize the AT client status
     sg_at_client.status = AT_CLIENT_STATUS_IDLE;
@@ -270,6 +270,11 @@ __ERR:
 
 OPERATE_RET at_client_deinit(void)
 {
+    if (NULL == sg_at_client.mutex) {
+        PR_WARN(" AT client mutex is NULL, maybe not init");
+        return OPRT_OK;
+    }
+
     tal_mutex_lock(sg_at_client.mutex);
     if (NULL != sg_at_client.thread_hdl) {
         tal_thread_delete(sg_at_client.thread_hdl);
@@ -295,10 +300,8 @@ OPERATE_RET at_client_deinit(void)
 
     tal_mutex_unlock(sg_at_client.mutex);
 
-    if (NULL != sg_at_client.mutex) {
-        tal_mutex_release(sg_at_client.mutex);
-        sg_at_client.mutex = NULL;
-    }
+    tal_mutex_release(sg_at_client.mutex);
+    sg_at_client.mutex = NULL;
 
     return OPRT_OK;
 }
