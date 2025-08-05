@@ -45,6 +45,7 @@ static void __urc_cereg_cb(char *data, uint32_t len);
 static void __urc_cpin_cb(char *data, uint32_t len);
 static void __urc_mipopen_cb(char *data, uint32_t len);
 static void __urc_mdnsgip_cb(char *data, uint32_t len);
+static void __urc_mipurc_cb(char *data, uint32_t len);
 
 /***********************************************************
 ***********************variable define**********************
@@ -56,7 +57,7 @@ static AT_MODEM_CB sg_urc_cb = NULL;
 static AT_URC_T sg_ml307r_urc_handler[] = {
     {{NULL}, "+MATREADY", NULL, __urc_matready_cb}, {{NULL}, "+CEREG: ", NULL, __urc_cereg_cb},
     {{NULL}, "+CPIN: ", NULL, __urc_cpin_cb},       {{NULL}, "+MIPOPEN: ", NULL, __urc_mipopen_cb},
-    {{NULL}, "+MDNSGIP: ", NULL, __urc_mdnsgip_cb},
+    {{NULL}, "+MDNSGIP: ", NULL, __urc_mdnsgip_cb}, {{NULL}, "+MIPURC: ", NULL, __urc_mipurc_cb},
 };
 /***********************************************************
 ***********************function define**********************
@@ -252,6 +253,74 @@ static void __urc_mdnsgip_cb(char *data, uint32_t len)
     return;
 }
 
+static void __urc_mipurc_cb(char *data, uint32_t len)
+{
+    PR_DEBUG("%s received: %.*s", __func__, len, data);
+
+    // +MIPURC: "disconn",<fd>,<connect_state>
+    // +MIPURC: "rtcp",<fd>,<recv_len>,<recv_data>
+
+    char *buffer = NULL;
+    char *tokens[4] = {NULL};
+    int parsed = __parse_urc_tokens(data, "+MIPURC", ": ,\"", &buffer, tokens, 4);
+    if (parsed < 2) {
+        if (buffer) {
+            tal_free(buffer);
+        }
+        PR_ERR("Failed to parse MIPURC command, parsed count: %d", parsed);
+        return;
+    }
+
+    char *type = tokens[0];
+    int fd = -1;
+
+    if (!type) {
+        PR_ERR("MIPURC type is NULL");
+        if (buffer) {
+            tal_free(buffer);
+        }
+        return;
+    }
+
+    if (strcmp(type, "disconn") == 0) {
+        int connect_state = -1;
+        if (parsed >= 2 && tokens[1]) {
+            fd = atoi(tokens[1]);
+        }
+        if (parsed >= 3 && tokens[2]) {
+            connect_state = atoi(tokens[2]);
+        }
+        PR_DEBUG("URC +MIPURC disconn: fd=%d, connect_state=%d", fd, connect_state);
+    } else if (strcmp(type, "rtcp") == 0) {
+        int recv_len = 0;
+        char *recv_data = NULL;
+        if (parsed >= 2 && tokens[1]) {
+            fd = atoi(tokens[1]);
+        }
+        if (parsed >= 3 && tokens[2]) {
+            recv_len = atoi(tokens[2]);
+        }
+        if (parsed >= 4 && tokens[3]) {
+            recv_data = tokens[3];
+            // For large data, only log the length to avoid log overflow
+            if (recv_len > 100) {
+                PR_DEBUG("URC +MIPURC rtcp: fd=%d, recv_len=%d, recv_data=[%d bytes]", fd, recv_len, recv_len);
+            } else {
+                PR_DEBUG("URC +MIPURC rtcp: fd=%d, recv_len=%d, recv_data=%s", fd, recv_len,
+                         recv_data ? recv_data : "NULL");
+            }
+        }
+    } else {
+        PR_ERR("Unknown URC type: %s", type);
+    }
+
+    if (buffer) {
+        tal_free(buffer);
+    }
+
+    return;
+}
+
 static OPERATE_RET __ml307r_urc_register(void)
 {
     OPERATE_RET rt = OPRT_OK;
@@ -317,7 +386,44 @@ static TUYA_ERRNO __ml307r_at_connect(int fd, TUYA_PROTOCOL_TYPE_E type, const c
         rsp_line = NULL;
         return UNW_FAIL;
     }
+    at_client_response_free(rsp_line);
+    rsp_line = NULL;
 
+    // AT+MIPCFG="autofree",<connect_id>,<free_mode>
+    // free_mode: 0: Automatically release after disconnection; 1: Do not release after disconnection, manual release
+    // required
+    memset(tmp_buf, 0, sizeof(tmp_buf));
+    snprintf(tmp_buf, sizeof(tmp_buf), "AT+MIPCFG=\"autofree\",%d,0\r", fd);
+    TUYA_CALL_ERR_LOG(at_client_send_with_rsp(tmp_buf, strlen(tmp_buf), &rsp_line, 50 * 1000));
+    if (OPRT_OK != rt || NULL == rsp_line) {
+        PR_ERR("AT+MIPCFG failed, response: %s", rsp_line ? rsp_line->line : "NULL");
+        return UNW_FAIL;
+    }
+    if (strcmp(OK, rsp_line->line) != 0) {
+        PR_ERR("AT+MIPCFG failed, response: %s", rsp_line->line);
+        at_client_response_free(rsp_line);
+        rsp_line = NULL;
+        return UNW_FAIL;
+    }
+    at_client_response_free(rsp_line);
+    rsp_line = NULL;
+
+    // encode hex
+    // AT+MIPCFG="encoding",<connect_id>,<send_format>,<recv_format>
+    // send_format: 0: ASCII, 1: HEX, 2: Escaped string
+    memset(tmp_buf, 0, sizeof(tmp_buf));
+    snprintf(tmp_buf, sizeof(tmp_buf), "AT+MIPCFG=\"encoding\",%d,1,1\r", fd);
+    TUYA_CALL_ERR_LOG(at_client_send_with_rsp(tmp_buf, strlen(tmp_buf), &rsp_line, AT_SEND_TIMEOUT_MS));
+    if (OPRT_OK != rt || NULL == rsp_line) {
+        PR_ERR("AT+MIPCFG encoding failed, response: %s", rsp_line ? rsp_line->line : "NULL");
+        return UNW_FAIL;
+    }
+    if (strcmp(OK, rsp_line->line) != 0) {
+        PR_ERR("AT+MIPCFG encoding failed, response: %s", rsp_line ? rsp_line->line : "NULL");
+        at_client_response_free(rsp_line);
+        rsp_line = NULL;
+        return UNW_FAIL;
+    }
     at_client_response_free(rsp_line);
     rsp_line = NULL;
 
@@ -413,17 +519,17 @@ static TUYA_ERRNO __ml307r_at_send(const int fd, const void *buf, const uint32_t
         goto __EXIT;
     }
 
-    char *tokens[3] = {NULL};
-    int parsed = __parse_urc_tokens(rsp_line->line, "+MIPSEND", ": ,", &buffer, tokens, 3);
-    if (fd != atoi(tokens[1]) || 3 != parsed) {
-        PR_ERR("parsed %d, fd: %d, expected: %d", parsed, fd, atoi(tokens[1]));
+    char *tokens[2] = {NULL};
+    int parsed = __parse_urc_tokens(rsp_line->line, "+MIPSEND", ": ,", &buffer, tokens, 2);
+    if (fd != atoi(tokens[0]) || 2 != parsed) {
+        PR_ERR("parsed %d, fd: %d, expected: %d", parsed, fd, atoi(tokens[0]));
         rt_errno = UNW_FAIL;
         goto __EXIT;
     }
     at_client_response_free(rsp_line);
     rsp_line = NULL;
 
-    rt_errno = atoi(tokens[2]);
+    rt_errno = atoi(tokens[1]);
     PR_DEBUG("response len: %d", rt_errno);
 
     tal_free(buffer);

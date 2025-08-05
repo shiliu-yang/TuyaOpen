@@ -139,7 +139,7 @@ static void __at_client_thread(void *arg)
                 AT_LINE_T *new_line = NULL;
                 char *next_pos = __at_client_line_parse_input(&new_line, sg_at_client.end_symbol,
                                                               sg_at_client.rx_buffer, sg_at_client.rx_buffer_used);
-                if (next_pos && next_pos > sg_at_client.rx_buffer) {
+                if (next_pos && next_pos > sg_at_client.rx_buffer && new_line) {
                     // get new line
                     // Check if it's URC
                     PR_DEBUG("---> Parsed new line: [%.*s]", new_line->len, new_line->line);
@@ -149,6 +149,16 @@ static void __at_client_thread(void *arg)
                     // add to line handle
                     at_line_add(line_hdl, new_line);
                     // Move remaining data to the start of the buffer
+                    uint32_t remaining_len = sg_at_client.rx_buffer_used - (next_pos - sg_at_client.rx_buffer);
+                    memmove(sg_at_client.rx_buffer, next_pos, remaining_len);
+                    sg_at_client.rx_buffer_used = remaining_len;
+                    // Set 0 at the end of the used buffer
+                    memset(sg_at_client.rx_buffer + sg_at_client.rx_buffer_used, 0,
+                           sg_at_client.rx_buffer_size - sg_at_client.rx_buffer_used);
+                } else if (next_pos && next_pos > sg_at_client.rx_buffer) {
+                    // next_pos is valid but new_line is NULL (e.g., empty line or just end symbols)
+                    // Still need to move the buffer to avoid data accumulation
+                    PR_DEBUG("---> Skipping empty line or just end symbols");
                     uint32_t remaining_len = sg_at_client.rx_buffer_used - (next_pos - sg_at_client.rx_buffer);
                     memmove(sg_at_client.rx_buffer, next_pos, remaining_len);
                     sg_at_client.rx_buffer_used = remaining_len;

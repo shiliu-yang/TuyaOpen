@@ -110,7 +110,7 @@ static void __at_socket_status_cb(AT_CONNECT_STATUS_T *status)
         return;
     }
 
-    tal_mutex_lock(socket->mutex);
+    // tal_mutex_lock(socket->mutex);
     if (status->result == 0) {
         // Connection successful
         socket->is_connected = 1;
@@ -119,9 +119,8 @@ static void __at_socket_status_cb(AT_CONNECT_STATUS_T *status)
         // Connection failed
         socket->is_connected = 0;
         PR_ERR("Socket fd %d connection failed, result: %d", status->fd, status->result);
-        // TODO: send close?
     }
-    tal_mutex_unlock(socket->mutex);
+    // tal_mutex_unlock(socket->mutex);
 
     return;
 }
