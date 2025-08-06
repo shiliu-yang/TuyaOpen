@@ -53,6 +53,7 @@ OPERATE_RET app_at_modem_init(void)
     // Create ML307R Client
     tal_at_modem_init(TRANSPORT_NAME, TAL_AT_MODEM_TYPE_ML307R);
 
+#if 0
 #if 1
     int fd = tal_at_net_socket_create(PROTOCOL_TCP);
     if (fd < 0) {
@@ -97,5 +98,9 @@ OPERATE_RET app_at_modem_init(void)
                    0x02, 0x01, 0x00, 0x00, 0x01, 0x00, 0x01, 0x02, 0x00, 0x16, 0x00, 0x00, 0x00, 0x17, 0x00, 0x00};
     tal_at_net_send(fd, data, sizeof(data));
 
+    char recv_data[5 * 1024] = {0};
+    int recv_len = tal_at_net_recv(fd, recv_data, sizeof(recv_data));
+    PR_DEBUG("--> Received data length: %d <--", recv_len);
+#endif
     return rt;
 }

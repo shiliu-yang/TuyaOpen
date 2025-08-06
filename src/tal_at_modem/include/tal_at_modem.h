@@ -26,6 +26,7 @@ typedef uint8_t TAL_AT_MODEM_CMD_T;
 #define TAL_AT_MODEM_CMD_SIM            (0x01)
 #define TAL_AT_MODEM_CMD_NETWORK        (0x02)
 #define TAL_AT_MODEM_CMD_CONNECT_STATUS (0x03)
+#define TAL_AT_MODEM_CMD_SOCKET_RECV    (0x04)
 
 typedef void (*AT_MODEM_CB)(TAL_AT_MODEM_CMD_T cmd, void *args);
 
@@ -34,8 +35,14 @@ typedef void (*AT_MODEM_CB)(TAL_AT_MODEM_CMD_T cmd, void *args);
 ***********************************************************/
 typedef struct {
     int fd;
-    int result;
+    int result; // 0: success, other: fail reason
 } AT_CONNECT_STATUS_T;
+
+typedef struct {
+    int fd;
+    uint32_t len;
+    char *data;
+} AT_SOCKET_RECV_T;
 
 typedef struct {
     uint8_t (*at_check)(void);
@@ -43,6 +50,7 @@ typedef struct {
     TUYA_ERRNO (*at_connect)(int fd, TUYA_PROTOCOL_TYPE_E type, const char *ip, uint16_t port, uint32_t timeout_ms);
     OPERATE_RET (*at_gethostbyname)(const char *domain, TUYA_IP_ADDR_T *addr);
     TUYA_ERRNO (*at_send)(const int fd, const void *buf, const uint32_t nbytes);
+    TUYA_ERRNO (*at_close)(const int fd);
 } AT_MODULE_OPS_T;
 
 /***********************************************************

@@ -29,7 +29,8 @@
 typedef struct {
     int is_used; // Indicates if the socket is in use
 
-    MUTEX_HANDLE mutex; // Mutex for thread safety
+    MUTEX_HANDLE mutex;      // Mutex for thread safety
+    MUTEX_HANDLE send_mutex; // Mutex for thread safety
 
     char ip_str[16];   // IP address of the socket
     TUYA_IP_ADDR_T ip; // IP address structure for the socket
@@ -110,7 +111,6 @@ static void __at_socket_status_cb(AT_CONNECT_STATUS_T *status)
         return;
     }
 
-    // tal_mutex_lock(socket->mutex);
     if (status->result == 0) {
         // Connection successful
         socket->is_connected = 1;
@@ -120,8 +120,77 @@ static void __at_socket_status_cb(AT_CONNECT_STATUS_T *status)
         socket->is_connected = 0;
         PR_ERR("Socket fd %d connection failed, result: %d", status->fd, status->result);
     }
-    // tal_mutex_unlock(socket->mutex);
 
+    return;
+}
+
+static void __at_socket_recv_cb(AT_SOCKET_RECV_T *recv_data)
+{
+    if (!recv_data) {
+        return;
+    }
+
+    // PR_DEBUG("Socket recv: fd=%d, len=%d, data=%.*s", recv_data->fd, recv_data->len, recv_data->len,
+    // recv_data->data);
+    // PR_HEXDUMP_DEBUG("Socket recv data", recv_data->data, recv_data->len);
+
+    if (recv_data->fd < 0 || recv_data->fd >= sg_at_modem.socket_num_max) {
+        PR_ERR("Invalid socket fd: %d", recv_data->fd);
+        return;
+    }
+
+    if (NULL == recv_data->data || recv_data->len == 0) {
+        PR_ERR("Invalid socket recv data for fd: %d", recv_data->fd);
+        return;
+    }
+
+    AT_SOCKET_T *socket = &sg_at_modem.socket[recv_data->fd];
+
+    if (NULL == socket->mutex) {
+        PR_ERR("Socket mutex is NULL for fd: %d", recv_data->fd);
+        return;
+    }
+
+    if (socket->is_connected == 0 || socket->is_used == 0) {
+        PR_ERR("Socket fd %d is not connected or not in use", recv_data->fd);
+        return;
+    }
+
+    tal_mutex_lock(socket->mutex);
+#if 1
+    char *p_start = NULL;
+    if (socket->recv == NULL) {
+        socket->recv = (char *)tal_malloc(recv_data->len);
+        if (NULL == socket->recv) {
+            PR_ERR("Failed to allocate memory for socket recv buffer");
+            tal_mutex_unlock(socket->mutex);
+            return;
+        }
+        memset(socket->recv, 0, recv_data->len);
+        socket->recv_size = recv_data->len;
+        p_start = socket->recv;
+    } else if (socket->recv_used + recv_data->len > socket->recv_size) {
+        // Resize the buffer if needed
+        char *new_recv = (char *)tal_malloc(socket->recv_used + recv_data->len);
+        if (NULL == new_recv) {
+            PR_ERR("Failed to allocate memory for resized socket recv buffer");
+            tal_mutex_unlock(socket->mutex);
+            return;
+        }
+        memcpy(new_recv, socket->recv, socket->recv_used);
+        tal_free(socket->recv);
+        socket->recv = new_recv;
+        socket->recv_size = socket->recv_used + recv_data->len;
+        p_start = new_recv + socket->recv_used;
+    } else {
+        p_start = socket->recv + socket->recv_used;
+    }
+
+    memcpy(p_start, recv_data->data, recv_data->len);
+    socket->recv_used += recv_data->len;
+#else
+#endif
+    tal_mutex_unlock(socket->mutex);
     return;
 }
 
@@ -157,6 +226,9 @@ static void __at_modem_urc_cb(TAL_AT_MODEM_CMD_T cmd, void *args)
     } break;
     case (TAL_AT_MODEM_CMD_CONNECT_STATUS): {
         __at_socket_status_cb((AT_CONNECT_STATUS_T *)args);
+    } break;
+    case (TAL_AT_MODEM_CMD_SOCKET_RECV): {
+        __at_socket_recv_cb((AT_SOCKET_RECV_T *)args);
     } break;
     default: {
         PR_ERR("Unknown URC cmd: %d", cmd);
@@ -253,6 +325,7 @@ OPERATE_RET tal_at_modem_deinit(void)
     }
 
     tal_mutex_lock(sg_at_modem.mutex);
+    PR_DEBUG("-> lock sg_at_modem.mutex");
 
     at_client_deinit();
 
@@ -261,6 +334,7 @@ OPERATE_RET tal_at_modem_deinit(void)
     sg_at_modem.socket_num_max = 0;
 
     tal_mutex_unlock(sg_at_modem.mutex);
+    PR_DEBUG("<- unlock sg_at_modem.mutex");
 
     tal_mutex_release(sg_at_modem.mutex);
     sg_at_modem.mutex = NULL;
@@ -275,14 +349,17 @@ static int __find_free_socket(void)
     }
 
     tal_mutex_lock(sg_at_modem.mutex);
+    PR_DEBUG("-> lock sg_at_modem.mutex");
 
     for (int i = 0; i < sg_at_modem.socket_num_max; i++) {
         if (sg_at_modem.socket[i].is_used == 0) {
             tal_mutex_unlock(sg_at_modem.mutex);
+            PR_DEBUG("<- unlock sg_at_modem.mutex");
             return i;
         }
     }
     tal_mutex_unlock(sg_at_modem.mutex);
+    PR_ERR("<- unlock sg_at_modem.mutex");
 
     return -1; // No free socket found
 }
@@ -294,8 +371,13 @@ TUYA_ERRNO tal_at_net_get_errno(void)
 
 OPERATE_RET tal_at_net_fd_set(int fd, TUYA_FD_SET_T *fds)
 {
-    PR_ERR("[%s] not supported", __func__);
-    return OPRT_NOT_SUPPORTED;
+    if (fd < 0 || fd >= sg_at_modem.socket_num_max || fds == NULL) {
+        return OPRT_INVALID_PARM;
+    }
+
+    fds->placeholder[fd / 8] |= (1 << (fd % 8)); // Set the bit for the fd
+
+    return OPRT_OK;
 }
 
 OPERATE_RET tal_at_net_fd_clear(int fd, TUYA_FD_SET_T *fds)
@@ -306,21 +388,36 @@ OPERATE_RET tal_at_net_fd_clear(int fd, TUYA_FD_SET_T *fds)
 
 OPERATE_RET tal_at_net_fd_isset(int fd, TUYA_FD_SET_T *fds)
 {
-    PR_ERR("[%s] not supported", __func__);
-    return OPRT_NOT_SUPPORTED;
+    // PR_ERR("[%s] not supported", __func__);
+
+    if (fd < 0 || fd >= sg_at_modem.socket_num_max || fds == NULL) {
+        return OPRT_INVALID_PARM;
+    }
+
+    if (fds->placeholder[fd / 8] & (1 << (fd % 8))) {
+        return OPRT_OK; // fd is set
+    } else {
+        return OPRT_COM_ERROR; // fd is not set
+    }
+    return OPRT_OK;
 }
 
 OPERATE_RET tal_at_net_fd_zero(TUYA_FD_SET_T *fds)
 {
-    PR_ERR("[%s] not supported", __func__);
-    return OPRT_NOT_SUPPORTED;
+    // PR_ERR("[%s] not supported", __func__);
+    if (fds == NULL) {
+        return OPRT_INVALID_PARM;
+    }
+
+    memset(fds->placeholder, 0, sizeof(fds->placeholder));
+    return OPRT_OK;
 }
 
 int tal_at_net_select(const int maxfd, TUYA_FD_SET_T *readfds, TUYA_FD_SET_T *writefds, TUYA_FD_SET_T *errorfds,
                       const uint32_t ms_timeout)
 {
-    PR_ERR("[%s] not supported", __func__);
-    return OPRT_NOT_SUPPORTED;
+    // TODO: Implement select for AT modem
+    return 1;
 }
 
 int tal_at_net_get_nonblock(const int fd)
@@ -357,12 +454,69 @@ OPERATE_RET tal_at_net_set_block(const int fd, const BOOL_T block)
 
 TUYA_ERRNO tal_at_net_close(const int fd)
 {
-    PR_ERR("[%s] not supported", __func__);
-    return OPRT_NOT_SUPPORTED;
+    if (fd < 0 || fd >= sg_at_modem.socket_num_max) {
+        return UNW_FAIL;
+    }
+
+    AT_SOCKET_T *socket = &sg_at_modem.socket[fd];
+    if (socket->is_used == 0) {
+        PR_ERR("Socket %d not used", fd);
+        return UNW_FAIL;
+    }
+
+    if (socket->mutex == NULL) {
+        PR_ERR("Socket mutex is NULL for fd: %d", fd);
+        return UNW_FAIL;
+    }
+
+    PR_DEBUG("tal_at_net_close: fd=%d, recv: %d", fd, socket->recv_used);
+
+    uint32_t wait_cnt = 0;
+    do {
+        // Wait for the socket to be ready to close
+        if (socket->recv_used > 0) {
+            // PR_DEBUG("Waiting for socket %d to finish receiving data", fd);
+            tal_system_sleep(50); // Wait for a short time before checking again
+            wait_cnt++;
+            if (wait_cnt * 50 > 50 * 1000) {
+                PR_ERR("Socket %d close timeout, recv_used: %d", fd, socket->recv_used);
+                break;
+            }
+            continue;
+        }
+
+        break; // Exit the loop if the socket is ready to close
+    } while (1);
+
+    tal_mutex_lock(socket->send_mutex);
+    // Reset socket state
+    memset(socket->ip_str, 0, sizeof(socket->ip_str));
+    socket->ip = 0;
+    socket->port = 0;
+
+    if (socket->recv) {
+        PR_DEBUG("--> lock socket mutex for fd: %d", fd);
+        tal_free(socket->recv);
+        socket->recv = NULL;
+        socket->recv_size = 0;
+        socket->recv_used = 0;
+    }
+
+    if (sg_at_modem.ops.at_close && socket->is_connected) {
+        sg_at_modem.ops.at_close(fd);
+    }
+
+    socket->is_used = 0;
+    socket->is_connected = 0;
+    tal_mutex_unlock(socket->send_mutex);
+
+    return UNW_SUCCESS;
 }
 
 int tal_at_net_socket_create(const TUYA_PROTOCOL_TYPE_E type)
 {
+    PR_DEBUG("tal_at_net_socket_create: type=%d", type);
+
     OPERATE_RET rt = OPRT_OK;
     int fd = -1;
 
@@ -382,7 +536,16 @@ int tal_at_net_socket_create(const TUYA_PROTOCOL_TYPE_E type)
         }
     }
 
+    if (NULL == socket->send_mutex) {
+        rt = tal_mutex_create_init(&socket->send_mutex);
+        if (OPRT_OK != rt) {
+            PR_ERR("Socket[%d] create send mutex fail, %d", fd, rt);
+            return -1;
+        }
+    }
+
     tal_mutex_lock(socket->mutex);
+    PR_DEBUG("--> lock socket mutex for fd: %d", fd);
     socket->is_used = 1;
     socket->type = type;
     socket->is_block = 1;
@@ -391,12 +554,15 @@ int tal_at_net_socket_create(const TUYA_PROTOCOL_TYPE_E type)
     socket->send_timeout = 60 * 1000;
     socket->recv_timeout = 60 * 1000;
     tal_mutex_unlock(socket->mutex);
+    PR_DEBUG("<-- unlock socket mutex for fd: %d", fd);
 
     return fd;
 }
 
 TUYA_ERRNO tal_at_net_connect(const int fd, const TUYA_IP_ADDR_T addr, const uint16_t port)
 {
+    PR_DEBUG("tal_at_net_connect: fd=%d, addr=%u, port=%d", fd, addr, port);
+
     TUYA_ERRNO rt_errno = UNW_FAIL;
 
     char ip_str[16] = {0};
@@ -414,19 +580,17 @@ TUYA_ERRNO tal_at_net_connect(const int fd, const TUYA_IP_ADDR_T addr, const uin
     }
 
     // Convert IP address to string
-    tal_mutex_lock(sg_at_modem.mutex);
     char *p = tal_at_net_addr2str(addr);
     if (p == NULL) {
         PR_ERR("Invalid IP address");
-        tal_mutex_unlock(sg_at_modem.mutex);
         return UNW_FAIL;
     }
     memset(ip_str, 0, sizeof(ip_str));
     memcpy(ip_str, p, sizeof(ip_str) - 1);
-    tal_mutex_unlock(sg_at_modem.mutex);
 
     // Set socket parameters
-    tal_mutex_lock(socket->mutex);
+    tal_mutex_lock(socket->send_mutex);
+    PR_DEBUG("--> lock socket mutex for fd: %d", fd);
     socket->ip = addr;
     socket->port = port;
     memset(socket->ip_str, 0, sizeof(socket->ip_str));
@@ -439,7 +603,8 @@ TUYA_ERRNO tal_at_net_connect(const int fd, const TUYA_IP_ADDR_T addr, const uin
         rt_errno = UNW_FAIL;
     }
 
-    tal_mutex_unlock(socket->mutex);
+    tal_mutex_unlock(socket->send_mutex);
+    PR_DEBUG("<-- unlock socket mutex for fd: %d", fd);
 
     // wait connect
     uint32_t wait_cnt = 0;
@@ -469,7 +634,8 @@ TUYA_ERRNO tal_at_net_connect_raw(const int fd, void *p_socket, const int len)
 TUYA_ERRNO tal_at_net_bind(const int fd, const TUYA_IP_ADDR_T addr, const uint16_t port)
 {
     PR_ERR("[%s] not supported", __func__);
-    return OPRT_NOT_SUPPORTED;
+    PR_ERR("tal_at_net_bind: fd=%d, addr=%u, port=%d", fd, addr, port);
+    return OPRT_OK;
 }
 
 TUYA_ERRNO tal_at_net_listen(const int fd, const int backlog)
@@ -480,6 +646,8 @@ TUYA_ERRNO tal_at_net_listen(const int fd, const int backlog)
 
 TUYA_ERRNO tal_at_net_send(const int fd, const void *buf, const uint32_t nbytes)
 {
+    PR_DEBUG("tal_at_net_send: fd=%d, nbytes=%d", fd, nbytes);
+
     TUYA_CHECK_NULL_RETURN(buf, UNW_FAIL);
 
     if (fd < 0 || fd >= sg_at_modem.socket_num_max) {
@@ -493,12 +661,18 @@ TUYA_ERRNO tal_at_net_send(const int fd, const void *buf, const uint32_t nbytes)
         return UNW_FAIL;
     }
 
-    if (sg_at_modem.ops.at_send) {
-        return sg_at_modem.ops.at_send(fd, buf, nbytes);
-    } else {
-        PR_ERR("AT send function not implemented");
+    if (NULL == socket->send_mutex) {
+        PR_ERR("Socket mutex is NULL for fd: %d", fd);
         return UNW_FAIL;
     }
+
+    tal_mutex_lock(socket->send_mutex);
+    if (sg_at_modem.ops.at_send) {
+        int send_len = sg_at_modem.ops.at_send(fd, buf, nbytes);
+        tal_mutex_unlock(socket->send_mutex);
+        return send_len;
+    }
+    tal_mutex_unlock(socket->send_mutex);
 
     return UNW_SUCCESS;
 }
@@ -518,8 +692,55 @@ int tal_at_net_accept(const int fd, TUYA_IP_ADDR_T *addr, uint16_t *port)
 
 TUYA_ERRNO tal_at_net_recv(const int fd, void *buf, const uint32_t nbytes)
 {
-    PR_ERR("[%s] not supported", __func__);
-    return OPRT_NOT_SUPPORTED;
+    PR_DEBUG("tal_at_net_recv: fd=%d, nbytes=%d", fd, nbytes);
+
+    if (buf == NULL || nbytes == 0) {
+        PR_ERR("Invalid parameters: buf is NULL or nbytes is 0");
+        return UNW_FAIL;
+    }
+
+    if (fd < 0 || fd >= sg_at_modem.socket_num_max) {
+        PR_ERR("Invalid socket fd: %d", fd);
+        return UNW_FAIL;
+    }
+
+    AT_SOCKET_T *socket = &sg_at_modem.socket[fd];
+    if (socket->is_used == 0 || socket->is_connected == 0) {
+        PR_ERR("Socket %d not used or not connected", fd);
+        return UNW_FAIL;
+    }
+
+    uint32_t wait_cnt = 0;
+    do {
+        if (nbytes <= socket->recv_used) {
+            break; // Enough data available
+        }
+        tal_system_sleep(50); // Wait for more data
+        wait_cnt++;
+    } while (wait_cnt * 50 < 5 * 1000);
+
+    uint32_t available_data = (socket->recv_used < nbytes) ? socket->recv_used : nbytes;
+
+    tal_mutex_lock(socket->mutex);
+    PR_DEBUG("--> lock socket mutex for fd: %d", fd);
+
+    memcpy(buf, socket->recv, available_data);
+    socket->recv_used -= available_data;
+
+    if (socket->recv_used == 0) {
+        // If no data left, free the buffer
+        tal_free(socket->recv);
+        socket->recv = NULL;
+        socket->recv_size = 0;
+    } else {
+        // Move remaining data to the start of the buffer
+        memmove(socket->recv, socket->recv + available_data, socket->recv_used);
+    }
+
+    tal_mutex_unlock(socket->mutex);
+    PR_DEBUG("<-- unlock socket mutex for fd: %d", fd);
+
+    return available_data; // Return the number of bytes received
 }
 
 int tal_at_net_recv_nd_size(const int fd, void *buf, const uint32_t buf_size, const uint32_t nd_size)
@@ -536,8 +757,40 @@ TUYA_ERRNO tal_at_net_recvfrom(const int fd, void *buf, const uint32_t nbytes, T
 
 OPERATE_RET tal_at_net_set_timeout(const int fd, const int ms_timeout, const TUYA_TRANS_TYPE_E type)
 {
-    PR_ERR("[%s] not supported", __func__);
-    return OPRT_NOT_SUPPORTED;
+    // PR_ERR("[%s] not supported", __func__);
+    if (fd < 0 || fd >= sg_at_modem.socket_num_max) {
+        PR_ERR("Invalid socket fd: %d", fd);
+        return OPRT_INVALID_PARM;
+    }
+
+    AT_SOCKET_T *socket = &sg_at_modem.socket[fd];
+    if (socket->is_used == 0) {
+        PR_ERR("Socket %d not used", fd);
+        return OPRT_INVALID_PARM;
+    }
+
+    if (NULL == socket->mutex) {
+        PR_ERR("Socket mutex is NULL for fd: %d", fd);
+        return OPRT_INVALID_PARM;
+    }
+
+    tal_mutex_lock(socket->mutex);
+    PR_DEBUG("--> lock socket mutex for fd: %d", fd);
+    if (type == TRANS_RECV) {
+        if (ms_timeout > 0) {
+            socket->recv_timeout = ms_timeout;
+        }
+        // PR_DEBUG("Set recv timeout for socket %d: %d ms", fd, socket->recv_timeout);
+    } else if (type == TRANS_SEND) {
+        if (ms_timeout > 0) {
+            socket->send_timeout = ms_timeout;
+        }
+        // PR_DEBUG("Set send timeout for socket %d: %d ms", fd, socket->send_timeout);
+    }
+    tal_mutex_unlock(socket->mutex);
+    PR_DEBUG("<-- unlock socket mutex for fd: %d", fd);
+
+    return OPRT_OK;
 }
 
 OPERATE_RET tal_at_net_set_bufsize(const int fd, const int buf_size, const TUYA_TRANS_TYPE_E type)
@@ -577,10 +830,12 @@ OPERATE_RET tal_at_net_gethostbyname(const char *domain, TUYA_IP_ADDR_T *addr)
     }
 
     tal_mutex_lock(sg_at_modem.mutex);
+    PR_DEBUG("-> lock sg_at_modem.mutex");
     if (sg_at_modem.ops.at_gethostbyname) {
         rt = sg_at_modem.ops.at_gethostbyname(domain, addr);
     }
     tal_mutex_unlock(sg_at_modem.mutex);
+    PR_DEBUG("<- unlock sg_at_modem.mutex");
 
     return rt;
 }

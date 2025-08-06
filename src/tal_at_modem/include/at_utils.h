@@ -34,6 +34,8 @@ uint8_t at_utils_is_ipv4(const char *ip_str);
 
 uint8_t at_utils_is_ipv6(const char *ip_str);
 
+int at_utils_hex_char_to_byte(const char *hex, size_t hex_len, uint8_t *out_buf, size_t max_len);
+
 #ifdef __cplusplus
 }
 #endif

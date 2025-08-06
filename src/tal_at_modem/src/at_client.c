@@ -62,7 +62,7 @@ typedef struct {
 ***********************************************************/
 static char *__at_client_line_parse_input(AT_LINE_T **line, char *end_symbol, char *data, uint32_t len);
 static OPERATE_RET __at_client_urc_process(AT_LINE_HANDLE line_hdl);
-static uint8_t __is_urc_line(AT_LINE_T *line);
+static AT_URC_T *__get_urc_handler(AT_LINE_T *line);
 
 /***********************************************************
 ***********************variable define**********************
@@ -143,7 +143,8 @@ static void __at_client_thread(void *arg)
                     // get new line
                     // Check if it's URC
                     PR_DEBUG("---> Parsed new line: [%.*s]", new_line->len, new_line->line);
-                    uint8_t is_urc = __is_urc_line(new_line);
+                    AT_URC_T *urc_handler = __get_urc_handler(new_line);
+                    uint8_t is_urc = (urc_handler != NULL) ? 1 : 0;
                     AT_LINE_HANDLE line_hdl = is_urc ? sg_at_client.urc_line_hdl : sg_at_client.line_hdl;
                     PR_DEBUG("AT client checking response lines, is_urc: %d", is_urc);
                     // add to line handle
@@ -399,7 +400,7 @@ OPERATE_RET at_client_urc_handler_register(AT_URC_T *urc_handler)
     return rt;
 }
 
-static uint8_t __is_urc_line(AT_LINE_T *line)
+static AT_URC_T *__get_urc_handler(AT_LINE_T *line)
 {
     TUYA_CHECK_NULL_RETURN(line, 0);
 
@@ -415,13 +416,13 @@ static uint8_t __is_urc_line(AT_LINE_T *line)
         // PR_DEBUG("Checking URC handler: prefix: %s, suffix: %s", urc_handler->prefix, urc_handler->suffix);
         if (urc_handler->prefix) {
             if (strncmp(p_start, urc_handler->prefix, strlen(urc_handler->prefix)) == 0) {
-                return 1; // URC match found
+                return urc_handler;
             }
         }
         if (urc_handler->suffix) {
             if (len >= strlen(urc_handler->suffix) && strncmp(p_start + len - strlen(urc_handler->suffix),
                                                               urc_handler->suffix, strlen(urc_handler->suffix)) == 0) {
-                return 1; // URC match found
+                return urc_handler;
             }
         }
     }
@@ -431,11 +432,14 @@ static uint8_t __is_urc_line(AT_LINE_T *line)
 
 static OPERATE_RET __at_client_urc_process(AT_LINE_HANDLE line_hdl)
 {
+    PR_DEBUG("Processing URC lines");
+
     OPERATE_RET rt = OPRT_OK;
 
     TUYA_CHECK_NULL_RETURN(line_hdl, OPRT_INVALID_PARM);
 
     if (at_line_get_count(line_hdl) == 0) {
+        PR_DEBUG("No URC lines to process");
         return OPRT_OK; // No URC lines to process
     }
 
@@ -443,6 +447,12 @@ static OPERATE_RET __at_client_urc_process(AT_LINE_HANDLE line_hdl)
     AT_LINE_T *line = NULL;
     while (at_line_get_count(line_hdl)) {
         line = at_line_get(line_hdl);
+        if (NULL == line) {
+            PR_DEBUG("No URC line to process");
+            break;
+        }
+        // PR_DEBUG("Processing URC line: %d [%.*s]", line->len, line->len, line->line);
+#if 0
         SLIST_HEAD *pos = NULL;
         for (pos = sg_at_client.urc_head.next; pos != NULL; pos = pos->next) {
             AT_URC_T *urc_handler = (AT_URC_T *)pos;
@@ -465,6 +475,16 @@ static OPERATE_RET __at_client_urc_process(AT_LINE_HANDLE line_hdl)
                 }
             }
         }
+#else
+        AT_URC_T *urc_handler = __get_urc_handler(line);
+        PR_DEBUG("URC handler found: %s", urc_handler->prefix ? urc_handler->prefix : "NULL");
+        if (urc_handler && urc_handler->urc_handler) {
+            // PR_DEBUG("Invoking URC handler for line: %.*s", line->len, line->line);
+            urc_handler->urc_handler(line->line, line->len);
+        } else {
+            PR_DEBUG("No URC handler found for line: %.*s", line->len, line->line);
+        }
+#endif
         at_line_free(line); // Free the URC line after processing
         line = NULL;        // Reset line pointer to avoid dangling pointer
     }

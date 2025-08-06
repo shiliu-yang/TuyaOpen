@@ -170,3 +170,20 @@ uint8_t at_utils_is_ipv6(const char *ip_str)
     // Valid IPv6 should have at least one colon
     return (colon_count > 0) ? 1 : 0;
 }
+
+int at_utils_hex_char_to_byte(const char *hex, size_t hex_len, uint8_t *out_buf, size_t max_len)
+{
+    if (hex_len % 2 != 0)
+        return -1;
+
+    size_t byte_len = hex_len / 2;
+    if (byte_len > max_len)
+        return -2;
+
+    for (size_t i = 0; i < byte_len; i++) {
+        char byte_str[3] = {hex[i * 2], hex[i * 2 + 1], '\0'};
+        out_buf[i] = (uint8_t)strtoul(byte_str, NULL, 16);
+    }
+
+    return (int)byte_len;
+}

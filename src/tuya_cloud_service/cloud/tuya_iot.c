@@ -503,6 +503,7 @@ static int run_state_reset(tuya_iot_client_t *client)
     /* Stop MQTT service */
     if (client->is_activated && tuya_mqtt_connected(&client->mqctx)) {
         tuya_mqtt_stop(&client->mqctx);
+        PR_DEBUG("1111Tuya MQTT stopped.");
     }
 
     tuya_mqtt_destory(&client->mqctx);
@@ -952,9 +953,11 @@ int tuya_iot_yield(tuya_iot_client_t *client)
         if (client->config.network_check && client->config.network_check()) {
             client->status = TUYA_STATUS_WIFI_CONNECTED;
             client->nextstate = STATE_MQTT_CONNECT_START;
+            PR_DEBUG("Tuya MQTT reconnect, goto STATE_MQTT_CONNECT_START.");
         } else {
             client->status = TUYA_STATUS_UNCONNECT_ROUTER;
             client->nextstate = STATE_NETWORK_RECONNECT;
+            PR_DEBUG("Tuya MQTT reconnect, goto STATE_NETWORK_RECONNECT.");
         }
         break;
 
@@ -981,6 +984,7 @@ int tuya_iot_yield(tuya_iot_client_t *client)
         tuya_mqtt_stop(&client->mqctx);
         tuya_mqtt_destory(&client->mqctx);
         client->nextstate = STATE_IDLE;
+        PR_DEBUG("Tuya IoT client stopped, goto STATE_IDLE.");
         break;
 
     default:
