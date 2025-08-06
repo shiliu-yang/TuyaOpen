@@ -53,6 +53,8 @@ typedef struct {
 } AT_SOCKET_T;
 
 typedef struct {
+    NW_IP_S ip; // IP address structure for the modem
+    AT_MODEM_EVENT_CB event_cb;
     MUTEX_HANDLE mutex;
 
     TUYA_ERRNO errno;
@@ -78,6 +80,9 @@ typedef struct {
 ***********************variable define**********************
 ***********************************************************/
 static TAL_AT_MODEM_CFG_T sg_at_modem = {
+    .ip = {0},
+    .event_cb = NULL,
+    .mutex = NULL,
     .errno = UNW_SUCCESS,
     .type = TAL_AT_MODEM_TYPE_ML307R, // Default modem type
     .transport_hdl = NULL,
@@ -222,6 +227,15 @@ static void __at_modem_urc_cb(TAL_AT_MODEM_CMD_T cmd, void *args)
 
         sg_at_modem.network_ready = (*(uint8_t *)(args)) == 1 ? 1 : 0;
 
+        if (0 == sg_at_modem.network_ready) {
+            // Reset IP address if network is not ready
+            memset(&sg_at_modem.ip, 0, sizeof(NW_IP_S));
+        }
+
+        if (sg_at_modem.event_cb) {
+            sg_at_modem.event_cb(sg_at_modem.network_ready ? AT_CONNECTED : AT_DISCONNECTED, NULL);
+        }
+
         PR_DEBUG("network read: %d", sg_at_modem.network_ready);
     } break;
     case (TAL_AT_MODEM_CMD_CONNECT_STATUS): {
@@ -289,10 +303,54 @@ OPERATE_RET tal_at_modem_init(const char *transport_name, TAL_AT_MODEM_TYPE_T ty
         goto __ERR;
     }
 
+    // get IP address
+    NW_IP_S at_module_ip = {0};
+    tal_at_modem_get_ip(&at_module_ip);
+
     return OPRT_OK;
 
 __ERR:
     tal_at_modem_deinit();
+
+    return rt;
+}
+
+OPERATE_RET tal_at_modem_set_event_cb(AT_MODEM_EVENT_CB cb)
+{
+    if (NULL == cb) {
+        PR_ERR("AT modem event callback is NULL");
+        return OPRT_INVALID_PARM;
+    }
+
+    sg_at_modem.event_cb = cb;
+
+    return OPRT_OK;
+}
+
+OPERATE_RET tal_at_modem_get_ip(NW_IP_S *ip)
+{
+    OPERATE_RET rt = OPRT_OK;
+
+    if (NULL == ip) {
+        PR_ERR("IP parameter is NULL");
+        return OPRT_INVALID_PARM;
+    }
+
+    if (NULL == sg_at_modem.mutex) {
+        PR_ERR("AT modem mutex is NULL");
+        return OPRT_COM_ERROR;
+    }
+
+    if (strlen(sg_at_modem.ip.ip) != 0) {
+        memcpy(ip, &sg_at_modem.ip, sizeof(NW_IP_S));
+        return OPRT_OK;
+    }
+
+    if (sg_at_modem.ops.get_at_modem_ip) {
+        tal_mutex_lock(sg_at_modem.mutex);
+        rt = sg_at_modem.ops.get_at_modem_ip(ip);
+        tal_mutex_unlock(sg_at_modem.mutex);
+    }
 
     return rt;
 }
@@ -692,7 +750,7 @@ int tal_at_net_accept(const int fd, TUYA_IP_ADDR_T *addr, uint16_t *port)
 
 TUYA_ERRNO tal_at_net_recv(const int fd, void *buf, const uint32_t nbytes)
 {
-    PR_DEBUG("tal_at_net_recv: fd=%d, nbytes=%d", fd, nbytes);
+    // PR_DEBUG("tal_at_net_recv: fd=%d, nbytes=%d", fd, nbytes);
 
     if (buf == NULL || nbytes == 0) {
         PR_ERR("Invalid parameters: buf is NULL or nbytes is 0");
@@ -722,7 +780,7 @@ TUYA_ERRNO tal_at_net_recv(const int fd, void *buf, const uint32_t nbytes)
     uint32_t available_data = (socket->recv_used < nbytes) ? socket->recv_used : nbytes;
 
     tal_mutex_lock(socket->mutex);
-    PR_DEBUG("--> lock socket mutex for fd: %d", fd);
+    // PR_DEBUG("--> lock socket mutex for fd: %d", fd);
 
     memcpy(buf, socket->recv, available_data);
     socket->recv_used -= available_data;
@@ -738,7 +796,7 @@ TUYA_ERRNO tal_at_net_recv(const int fd, void *buf, const uint32_t nbytes)
     }
 
     tal_mutex_unlock(socket->mutex);
-    PR_DEBUG("<-- unlock socket mutex for fd: %d", fd);
+    // PR_DEBUG("<-- unlock socket mutex for fd: %d", fd);
 
     return available_data; // Return the number of bytes received
 }

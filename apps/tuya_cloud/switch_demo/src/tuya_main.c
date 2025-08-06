@@ -244,7 +244,7 @@ void user_main(void)
     tuya_app_cli_init();
 #endif
 
-    app_at_modem_init();
+    // app_at_modem_init();
 
     reset_netconfig_start();
 
@@ -281,6 +281,9 @@ void user_main(void)
 #if defined(ENABLE_CELLULAR) && (ENABLE_CELLULAR == 1)
     type |= NETCONN_CELLULAR;
 #endif
+
+    type |= NETCONN_AT_MODEM;
+
     netmgr_init(type);
 
 #if defined(ENABLE_WIFI) && (ENABLE_WIFI == 1)

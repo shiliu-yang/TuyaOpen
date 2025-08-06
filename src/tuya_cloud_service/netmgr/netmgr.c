@@ -50,6 +50,9 @@ extern netmgr_conn_wired_t s_netmgr_wired;
 extern netmgr_conn_cellular_t s_netmgr_cellular;
 #endif
 
+#include "netconn_at_modem.h"
+extern netmgr_conn_at_modem_t s_netmgr_at_modem;
+
 #ifdef ENABLE_BLUETOOTH
 #include "ble_mgr.h"
 #endif
@@ -304,6 +307,12 @@ OPERATE_RET netmgr_init(netmgr_type_e type)
         __netmgr_conn_register(NETCONN_CELLULAR, (netmgr_conn_base_t *)&s_netmgr_cellular);
     }
 #endif
+
+    // #ifdef ENABLE_AT_MODEM
+    if (type & NETCONN_AT_MODEM) {
+        __netmgr_conn_register(NETCONN_AT_MODEM, (netmgr_conn_base_t *)&s_netmgr_at_modem);
+    }
+    // #endif
 
 #ifdef ENABLE_WIFI
     if (type & NETCONN_WIFI) {

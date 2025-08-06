@@ -28,11 +28,18 @@ typedef uint8_t TAL_AT_MODEM_CMD_T;
 #define TAL_AT_MODEM_CMD_CONNECT_STATUS (0x03)
 #define TAL_AT_MODEM_CMD_SOCKET_RECV    (0x04)
 
-typedef void (*AT_MODEM_CB)(TAL_AT_MODEM_CMD_T cmd, void *args);
-
 /***********************************************************
 ***********************typedef define***********************
 ***********************************************************/
+typedef void (*AT_MODEM_CB)(TAL_AT_MODEM_CMD_T cmd, void *args);
+
+typedef enum {
+    AT_CONNECTED,
+    AT_CONNECT_FAILED,
+    AT_DISCONNECTED,
+} AT_MODEM_EVENT_E;
+typedef void (*AT_MODEM_EVENT_CB)(AT_MODEM_EVENT_E event, void *arg);
+
 typedef struct {
     int fd;
     int result; // 0: success, other: fail reason
@@ -45,6 +52,7 @@ typedef struct {
 } AT_SOCKET_RECV_T;
 
 typedef struct {
+    OPERATE_RET (*get_at_modem_ip)(NW_IP_S *ip);
     uint8_t (*at_check)(void);
     uint8_t (*at_get_socket_num_max)(void);
     TUYA_ERRNO (*at_connect)(int fd, TUYA_PROTOCOL_TYPE_E type, const char *ip, uint16_t port, uint32_t timeout_ms);
@@ -58,6 +66,10 @@ typedef struct {
 ***********************************************************/
 
 OPERATE_RET tal_at_modem_init(const char *transport_name, TAL_AT_MODEM_TYPE_T type);
+
+OPERATE_RET tal_at_modem_set_event_cb(AT_MODEM_EVENT_CB cb);
+
+OPERATE_RET tal_at_modem_get_ip(NW_IP_S *ip);
 
 OPERATE_RET tal_at_modem_deinit(void);
 

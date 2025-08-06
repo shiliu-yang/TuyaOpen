@@ -636,6 +636,135 @@ TUYA_ERRNO __ml307r_at_close(const int fd)
     return UNW_SUCCESS;
 }
 
+OPERATE_RET at_module_ml307r_get_at_modem_ip(NW_IP_S *ip)
+{
+    char *buffer = NULL;
+
+    if (NULL == ip) {
+        PR_ERR("Invalid parameter: ip is NULL");
+        return OPRT_INVALID_PARM;
+    }
+
+    // AT+CGDCONT?
+    char *send_buf = "AT+CGDCONT?\r";
+    AT_LINE_T *rsp_line = NULL;
+    OPERATE_RET rt = at_client_send_with_rsp(send_buf, strlen(send_buf), &rsp_line, AT_SEND_TIMEOUT_MS);
+    if (OPRT_OK != rt || NULL == rsp_line) {
+        PR_ERR("AT+CGDCONT? failed, response: %s", rsp_line ? rsp_line->line : "NULL");
+        if (rsp_line) {
+            at_client_response_free(rsp_line);
+            rsp_line = NULL;
+        }
+        return OPRT_COM_ERROR;
+    }
+    // +CME ERROR: <err>
+    if (strncmp(rsp_line->line, "+CME ERROR:", 11) == 0) {
+        PR_ERR("AT+CGDCONT? failed, response: %s", rsp_line->line);
+        at_client_response_free(rsp_line);
+        rsp_line = NULL;
+        return OPRT_COM_ERROR;
+    }
+
+    // +CGDCONT: 1,"IPV4V6","CMIOT",,0,0,,,,
+    char *tokens[5] = {NULL};
+    int parsed = __parse_urc_tokens(rsp_line->line, "+CGDCONT", ": ,", &buffer, tokens, 5);
+    if (parsed < 2 || tokens[1] == NULL || tokens[2] == NULL) {
+        PR_ERR("AT+CGDCONT? response format error, response: %.*s", rsp_line->len, rsp_line->line);
+        at_client_response_free(rsp_line);
+        rsp_line = NULL;
+        if (buffer) {
+            tal_free(buffer);
+            buffer = NULL;
+        }
+        return OPRT_COM_ERROR;
+    }
+    int cid = atoi(tokens[0]); // CID
+    at_client_response_free(rsp_line);
+    rsp_line = NULL;
+    tal_free(buffer);
+    buffer = NULL;
+
+    // OK
+    rsp_line = at_client_get_response(AT_SEND_TIMEOUT_MS);
+    if (rsp_line == NULL) {
+        PR_ERR("AT+CGDCONT? response timeout");
+        return OPRT_COM_ERROR;
+    }
+    if (strcmp(OK, rsp_line->line) != 0) {
+        PR_ERR("AT+CGDCONT? failed, response: %s", rsp_line->line);
+        at_client_response_free(rsp_line);
+        rsp_line = NULL;
+        return OPRT_COM_ERROR;
+    }
+    at_client_response_free(rsp_line);
+    rsp_line = NULL;
+
+    // Get IP address
+    // AT+CGPADDR=<cid>
+    uint8_t tmp_buf[32] = {0};
+    snprintf(tmp_buf, sizeof(tmp_buf), "AT+CGPADDR=%d\r", cid);
+    rt = at_client_send_with_rsp(tmp_buf, strlen(tmp_buf), &rsp_line, AT_SEND_TIMEOUT_MS);
+    if (OPRT_OK != rt || NULL == rsp_line) {
+        PR_ERR("AT+CGPADDR failed, response: %s", rsp_line ? rsp_line->line : "NULL");
+        return OPRT_COM_ERROR;
+    }
+
+    // +CME ERROR: <err>
+    if (strncmp(rsp_line->line, "+CME ERROR:", 11) == 0) {
+        PR_ERR("AT+CGPADDR failed, response: %s", rsp_line->line);
+        at_client_response_free(rsp_line);
+        rsp_line = NULL;
+        return OPRT_COM_ERROR;
+    }
+
+    // +CGPADDR: 1,"10.112.152.218","2409:8D28:248:B226:1859:274B:5503:CFE"
+    char *ip_str = NULL;
+    tokens[0] = NULL;
+    parsed = __parse_urc_tokens(rsp_line->line, "+CGPADDR", ",", &buffer, tokens, 5);
+    if (parsed < 2 || tokens[1] == NULL) {
+        PR_ERR("AT+CGPADDR response format error, response: %.*s", rsp_line->len, rsp_line->line);
+        at_client_response_free(rsp_line);
+        rsp_line = NULL;
+        if (buffer) {
+            tal_free(buffer);
+            buffer = NULL;
+        }
+        return OPRT_COM_ERROR;
+    }
+
+    PR_DEBUG("parsed: %d", parsed);
+    for (int i = 0; i < parsed; i++) {
+        PR_DEBUG("Token %d: %s", i, tokens[i]);
+    }
+
+    for (int i = 0; i < parsed; i++) {
+        if (at_utils_is_ipv4(tokens[i])) {
+            ip_str = tokens[i];
+            break; // Use the first valid IPv4 address
+        }
+    }
+    strncpy(ip->ip, ip_str, sizeof(ip->ip) - 1);
+
+    at_client_response_free(rsp_line);
+    rsp_line = NULL;
+    tal_free(buffer);
+    buffer = NULL;
+
+    // OK
+    rsp_line = at_client_get_response(AT_SEND_TIMEOUT_MS);
+    if (rsp_line == NULL) {
+        PR_ERR("AT+CGPADDR response timeout");
+        return OPRT_COM_ERROR;
+    }
+    if (strcmp(OK, rsp_line->line) != 0) {
+        PR_ERR("AT+CGPADDR failed, response: %s", rsp_line->line);
+        at_client_response_free(rsp_line);
+        rsp_line = NULL;
+    }
+
+    return OPRT_OK;
+}
+
 OPERATE_RET at_module_ml307r_init(AT_MODULE_OPS_T *ops, AT_MODEM_CB urc_cb)
 {
     OPERATE_RET rt = OPRT_OK;
@@ -651,6 +780,7 @@ OPERATE_RET at_module_ml307r_init(AT_MODULE_OPS_T *ops, AT_MODEM_CB urc_cb)
     ops->at_gethostbyname = __ml307r_at_gethostbyname;
     ops->at_send = __ml307r_at_send;
     ops->at_close = __ml307r_at_close;
+    ops->get_at_modem_ip = at_module_ml307r_get_at_modem_ip;
 
     // register urc handler
     TUYA_CALL_ERR_RETURN(__ml307r_urc_register());

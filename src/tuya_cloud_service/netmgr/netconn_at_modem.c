@@ -1,0 +1,167 @@
+/**
+ * @file netconn_at_modem.c
+ * @brief netconn_at_modem module is used to
+ * @version 0.1
+ * @copyright Copyright (c) 2021-2025 Tuya Inc. All Rights Reserved.
+ */
+
+#include "netconn_at_modem.h"
+
+#include "tdd_transport_uart.h"
+#include "tdl_transport_manage.h"
+
+#include "tal_at_modem.h"
+
+#include "tal_api.h"
+
+/***********************************************************
+************************macro define************************
+***********************************************************/
+#define TRANSPORT_NAME "AT_UART"
+
+/***********************************************************
+***********************typedef define***********************
+***********************************************************/
+
+/***********************************************************
+********************function declaration********************
+***********************************************************/
+
+/***********************************************************
+***********************variable define**********************
+***********************************************************/
+netmgr_conn_at_modem_t s_netmgr_at_modem = {
+    .base =
+        {
+            .pri = 3,
+            .type = NETCONN_AT_MODEM,
+            .status = NETMGR_LINK_DOWN,
+            .open = netconn_at_modem_open,
+            .close = netconn_at_modem_close,
+            .get = netconn_at_modem_get,
+            .set = netconn_at_modem_set,
+        },
+};
+
+/***********************************************************
+***********************function define**********************
+***********************************************************/
+
+static void __netconn_at_modem_event(AT_MODEM_EVENT_E event, void *arg)
+{
+    netmgr_conn_at_modem_t *netmgr_at_modem = &s_netmgr_at_modem;
+
+    PR_NOTICE("AT Modem status changed to %d, old stat: %d", event, netmgr_at_modem->base.status);
+    netmgr_at_modem->base.status = (event == AT_CONNECTED) ? NETMGR_LINK_UP : NETMGR_LINK_DOWN;
+
+    // notify netmgr
+    if (netmgr_at_modem->base.event_cb) {
+        netmgr_at_modem->base.event_cb(NETCONN_AT_MODEM, netmgr_at_modem->base.status);
+    }
+}
+
+/**
+ * @brief open a at_modem connection
+ *
+ * @param config: at_modem connection configuration
+ * @return OPERATE_RET: return OPERATE_OK on success, otherwise return error code
+ */
+OPERATE_RET netconn_at_modem_open(void *config)
+{
+    OPERATE_RET rt = OPRT_OK;
+
+    // Initialize the AT modem connection here
+    TDD_TRANSPORT_UART_CFG_T uart_cfg = {
+        .port_id = TUYA_UART_NUM_2,
+        .cfg.rx_buffer_size = 10 * 1024,
+        .cfg.open_mode = O_BLOCK,
+        .cfg.base_cfg =
+            {
+                .baudrate = 921600,
+                .databits = TUYA_UART_DATA_LEN_8BIT,
+                .parity = TUYA_UART_PARITY_TYPE_NONE,
+                .stopbits = TUYA_UART_STOP_LEN_1BIT,
+            },
+    };
+    TUYA_CALL_ERR_RETURN(tdd_transport_uart_register(TRANSPORT_NAME, uart_cfg));
+
+    // Create ML307R Client
+    TUYA_CALL_ERR_RETURN(tal_at_modem_init(TRANSPORT_NAME, TAL_AT_MODEM_TYPE_ML307R));
+
+    TUYA_CALL_ERR_RETURN(tal_at_modem_set_event_cb(__netconn_at_modem_event));
+
+    return rt;
+}
+
+/**
+ * @brief update at_modem connection
+ *
+ * @param none
+ * @return OPERATE_RET: return OPERATE_OK on success, otherwise return error code
+ */
+OPERATE_RET netconn_at_modem_close(void)
+{
+    // tal_at_modem_deinit
+
+    return OPRT_OK;
+}
+
+/**
+ * @brief update at_modem connection configuration
+ *
+ * @param cmd: command to update configuration
+ * @param param: parameter for the command
+ * @return OPERATE_RET: return OPERATE_OK on success, otherwise return error code
+ */
+OPERATE_RET netconn_at_modem_set(netmgr_conn_config_type_e cmd, void *param)
+{
+    OPERATE_RET rt = OPRT_OK;
+
+    netmgr_conn_at_modem_t *netmgr_cellular = &s_netmgr_at_modem;
+
+    switch (cmd) {
+    case NETCONN_CMD_PRI: {
+        netmgr_cellular->base.pri = *(int *)param;
+        netmgr_cellular->base.event_cb(NETCONN_CELLULAR, netmgr_cellular->base.status);
+    } break;
+    default: {
+        rt = OPRT_NOT_SUPPORTED;
+    } break;
+    }
+
+    return rt;
+}
+
+/**
+ * @brief get at_modem connection attribute
+ *
+ * @param cmd: command to get attribute
+ * @param param: parameter for the command
+ * @return OPERATE_RET: return OPERATE_OK on success, otherwise return error code
+ */
+OPERATE_RET netconn_at_modem_get(netmgr_conn_config_type_e cmd, void *param)
+{
+    OPERATE_RET rt = OPRT_OK;
+
+    netmgr_conn_at_modem_t *netmgr_cellular = &s_netmgr_at_modem;
+
+    switch (cmd) {
+    case NETCONN_CMD_PRI: {
+        *(int *)param = netmgr_cellular->base.pri;
+    } break;
+    case NETCONN_CMD_STATUS: {
+        *(netmgr_status_e *)param = netmgr_cellular->base.status;
+    } break;
+    case NETCONN_CMD_IP: {
+        TUYA_CALL_ERR_RETURN(tal_at_modem_get_ip((NW_IP_S *)param));
+    } break;
+    case NETCONN_CMD_MAC: {
+        rt = OPRT_NOT_SUPPORTED;
+    } break;
+    default: {
+        rt = OPRT_NOT_SUPPORTED;
+    } break;
+    }
+
+    return rt;
+}
