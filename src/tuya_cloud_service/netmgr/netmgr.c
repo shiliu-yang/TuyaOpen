@@ -33,6 +33,8 @@
 #include "tuya_error_code.h"
 #include "tuya_lan.h"
 
+#include "tal_network_register.h"
+
 #ifdef ENABLE_WIFI
 #include "netconn_wifi.h"
 extern netmgr_conn_wifi_t s_netmgr_wifi;
@@ -284,6 +286,8 @@ __EXIT:
 OPERATE_RET netmgr_init(netmgr_type_e type)
 {
     OPERATE_RET rt = OPRT_OK;
+
+    TUYA_CALL_ERR_RETURN(tal_network_card_init());
 
     TUYA_CALL_ERR_RETURN(tal_mutex_create_init(&s_netmgr.lock));
     s_netmgr.status = NETMGR_LINK_DOWN;
