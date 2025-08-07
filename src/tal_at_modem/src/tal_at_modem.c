@@ -22,6 +22,7 @@
 /***********************************************************
 ************************macro define************************
 ***********************************************************/
+#define MODULE_HEARTBEAT_INTERVAL_MS (30 * 1000) // Heartbeat interval for AT modem
 
 /***********************************************************
 ***********************typedef define***********************
@@ -56,6 +57,7 @@ typedef struct {
     NW_IP_S ip; // IP address structure for the modem
     AT_MODEM_EVENT_CB event_cb;
     MUTEX_HANDLE mutex;
+    TIMER_ID heartbeat_timer; // Timer for heartbeat
 
     TUYA_ERRNO errno;
     TAL_AT_MODEM_TYPE_T type;
@@ -83,6 +85,7 @@ static TAL_AT_MODEM_CFG_T sg_at_modem = {
     .ip = {0},
     .event_cb = NULL,
     .mutex = NULL,
+    .heartbeat_timer = NULL, // Heartbeat timer initialized to NULL
     .errno = UNW_SUCCESS,
     .type = TAL_AT_MODEM_TYPE_ML307R, // Default modem type
     .transport_hdl = NULL,
@@ -252,6 +255,48 @@ static void __at_modem_urc_cb(TAL_AT_MODEM_CMD_T cmd, void *args)
     return;
 }
 
+static void __at_modem_heartbeat_cb(TIMER_ID timer_id, void *arg)
+{
+    static uint32_t heartbeat_err_cnt = 0;
+
+    if (NULL == arg) {
+        return;
+    }
+
+    TAL_AT_MODEM_CFG_T *modem = (TAL_AT_MODEM_CFG_T *)arg;
+
+    uint8_t at_ready = 0;
+
+    if (NULL == modem->mutex) {
+        return;
+    }
+
+    tal_mutex_lock(modem->mutex);
+    at_ready = modem->ops.at_check();
+    if (at_ready == 0) {
+        heartbeat_err_cnt++;
+
+        if (heartbeat_err_cnt * MODULE_HEARTBEAT_INTERVAL_MS >= 60 * 1000) {
+            heartbeat_err_cnt = 0;
+            modem->at_ready = 0;
+            modem->sim_ready = 0;
+            modem->network_ready = 0;
+
+            memset(&modem->ip, 0, sizeof(NW_IP_S));
+            if (modem->event_cb) {
+                modem->event_cb(AT_DISCONNECTED, NULL);
+            }
+        }
+    } else if (at_ready && modem->at_ready == 0) {
+        // AT is ready now
+        modem->at_ready = 1;
+        heartbeat_err_cnt = 0;
+    }
+    tal_mutex_unlock(modem->mutex);
+
+    return;
+}
+
 OPERATE_RET tal_at_modem_init(const char *transport_name, TAL_AT_MODEM_TYPE_T type)
 {
     OPERATE_RET rt = OPRT_OK;
@@ -261,6 +306,11 @@ OPERATE_RET tal_at_modem_init(const char *transport_name, TAL_AT_MODEM_TYPE_T ty
     // Create mutex
     if (NULL == sg_at_modem.mutex) {
         TUYA_CALL_ERR_RETURN(tal_mutex_create_init(&sg_at_modem.mutex));
+    }
+
+    // Create heartbeat timer
+    if (NULL == sg_at_modem.heartbeat_timer) {
+        tal_sw_timer_create(__at_modem_heartbeat_cb, &sg_at_modem, &sg_at_modem.heartbeat_timer);
     }
 
     TUYA_CALL_ERR_GOTO(tdl_transport_find(transport_name, &sg_at_modem.transport_hdl), __ERR);
@@ -302,6 +352,12 @@ OPERATE_RET tal_at_modem_init(const char *transport_name, TAL_AT_MODEM_TYPE_T ty
         rt = OPRT_COM_ERROR;
         goto __ERR;
     }
+    tal_sw_timer_start(sg_at_modem.heartbeat_timer, MODULE_HEARTBEAT_INTERVAL_MS, TAL_TIMER_CYCLE);
+
+    // cereg
+    if (sg_at_modem.ops.at_get_cereg_status) {
+        TUYA_CALL_ERR_LOG(sg_at_modem.ops.at_get_cereg_status());
+    }
 
     // get IP address
     NW_IP_S at_module_ip = {0};
@@ -310,7 +366,7 @@ OPERATE_RET tal_at_modem_init(const char *transport_name, TAL_AT_MODEM_TYPE_T ty
     return OPRT_OK;
 
 __ERR:
-    tal_at_modem_deinit();
+    // tal_at_modem_deinit();
 
     return rt;
 }

@@ -36,6 +36,7 @@ netmgr_conn_at_modem_t s_netmgr_at_modem = {
             .pri = 3,
             .type = NETCONN_AT_MODEM,
             .status = NETMGR_LINK_DOWN,
+            .card_type = TAL_NET_TYPE_AT_MODEM,
             .open = netconn_at_modem_open,
             .close = netconn_at_modem_close,
             .get = netconn_at_modem_get,
@@ -49,14 +50,14 @@ netmgr_conn_at_modem_t s_netmgr_at_modem = {
 
 static void __netconn_at_modem_event(AT_MODEM_EVENT_E event, void *arg)
 {
-    netmgr_conn_at_modem_t *netmgr_at_modem = &s_netmgr_at_modem;
+    netmgr_conn_at_modem_t *netmgr_at = &s_netmgr_at_modem;
 
-    PR_NOTICE("AT Modem status changed to %d, old stat: %d", event, netmgr_at_modem->base.status);
-    netmgr_at_modem->base.status = (event == AT_CONNECTED) ? NETMGR_LINK_UP : NETMGR_LINK_DOWN;
+    PR_NOTICE("AT Modem status changed to %d, old stat: %d", event, netmgr_at->base.status);
+    netmgr_at->base.status = (event == AT_CONNECTED) ? NETMGR_LINK_UP : NETMGR_LINK_DOWN;
 
     // notify netmgr
-    if (netmgr_at_modem->base.event_cb) {
-        netmgr_at_modem->base.event_cb(NETCONN_AT_MODEM, netmgr_at_modem->base.status);
+    if (netmgr_at->base.event_cb) {
+        netmgr_at->base.event_cb(NETCONN_AT_MODEM, netmgr_at->base.status);
     }
 }
 
@@ -69,6 +70,8 @@ static void __netconn_at_modem_event(AT_MODEM_EVENT_E event, void *arg)
 OPERATE_RET netconn_at_modem_open(void *config)
 {
     OPERATE_RET rt = OPRT_OK;
+
+    PR_DEBUG("open at_modem connection");
 
     // Initialize the AT modem connection here
     TDD_TRANSPORT_UART_CFG_T uart_cfg = {
@@ -86,9 +89,8 @@ OPERATE_RET netconn_at_modem_open(void *config)
     TUYA_CALL_ERR_RETURN(tdd_transport_uart_register(TRANSPORT_NAME, uart_cfg));
 
     // Create ML307R Client
-    TUYA_CALL_ERR_RETURN(tal_at_modem_init(TRANSPORT_NAME, TAL_AT_MODEM_TYPE_ML307R));
-
     TUYA_CALL_ERR_RETURN(tal_at_modem_set_event_cb(__netconn_at_modem_event));
+    TUYA_CALL_ERR_RETURN(tal_at_modem_init(TRANSPORT_NAME, TAL_AT_MODEM_TYPE_ML307R));
 
     return rt;
 }
@@ -117,12 +119,12 @@ OPERATE_RET netconn_at_modem_set(netmgr_conn_config_type_e cmd, void *param)
 {
     OPERATE_RET rt = OPRT_OK;
 
-    netmgr_conn_at_modem_t *netmgr_cellular = &s_netmgr_at_modem;
+    netmgr_conn_at_modem_t *netmgr_at = &s_netmgr_at_modem;
 
     switch (cmd) {
     case NETCONN_CMD_PRI: {
-        netmgr_cellular->base.pri = *(int *)param;
-        netmgr_cellular->base.event_cb(NETCONN_CELLULAR, netmgr_cellular->base.status);
+        netmgr_at->base.pri = *(int *)param;
+        netmgr_at->base.event_cb(NETCONN_AT_MODEM, netmgr_at->base.status);
     } break;
     default: {
         rt = OPRT_NOT_SUPPORTED;
@@ -143,14 +145,14 @@ OPERATE_RET netconn_at_modem_get(netmgr_conn_config_type_e cmd, void *param)
 {
     OPERATE_RET rt = OPRT_OK;
 
-    netmgr_conn_at_modem_t *netmgr_cellular = &s_netmgr_at_modem;
+    netmgr_conn_at_modem_t *netmgr_at = &s_netmgr_at_modem;
 
     switch (cmd) {
     case NETCONN_CMD_PRI: {
-        *(int *)param = netmgr_cellular->base.pri;
+        *(int *)param = netmgr_at->base.pri;
     } break;
     case NETCONN_CMD_STATUS: {
-        *(netmgr_status_e *)param = netmgr_cellular->base.status;
+        *(netmgr_status_e *)param = netmgr_at->base.status;
     } break;
     case NETCONN_CMD_IP: {
         TUYA_CALL_ERR_RETURN(tal_at_modem_get_ip((NW_IP_S *)param));

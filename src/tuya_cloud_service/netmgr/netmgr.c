@@ -186,6 +186,8 @@ static void __netmgr_event_cb(netmgr_type_e type, netmgr_status_e status)
                      active_status);
             s_netmgr.status = active_status;
             s_netmgr.active = active_conn;
+            netmgr_conn_base_t *p_conn = __get_conn_by_type(active_conn);
+            tal_network_card_set_active(p_conn->card_type);
             tal_event_publish(EVENT_LINK_TYPE_CHG, (void *)s_netmgr.active);
             tal_event_publish(EVENT_LINK_STATUS_CHG, (void *)s_netmgr.status);
         } else if (active_status != s_netmgr.status) {
@@ -199,6 +201,8 @@ static void __netmgr_event_cb(netmgr_type_e type, netmgr_status_e status)
             PR_DEBUG("netmgr conn type changed [%s] --> [%s]", NETMGR_TYPE_TO_STR(s_netmgr.active),
                      NETMGR_TYPE_TO_STR(active_conn));
             s_netmgr.active = active_conn;
+            netmgr_conn_base_t *p_conn = __get_conn_by_type(active_conn);
+            tal_network_card_set_active(p_conn->card_type);
             tal_event_publish(EVENT_LINK_TYPE_CHG, (void *)s_netmgr.active);
         }
     }

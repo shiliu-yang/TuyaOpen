@@ -133,6 +133,7 @@ static int __parse_urc_tokens(char *data, const char *cmd_prefix, const char *de
 static void __urc_matready_cb(char *data, uint32_t len)
 {
     // PR_DEBUG("URC +MATREADY received: %.*s", len, data);
+    // Maybe ML307R module is rebooting
 
     uint8_t at_ready = 0;
 
@@ -149,9 +150,49 @@ static void __urc_matready_cb(char *data, uint32_t len)
 
 static void __urc_cereg_cb(char *data, uint32_t len)
 {
+    uint8_t net_ready = 0;
+
+    char *buffer = NULL;
+    char *tokens[7] = {NULL};
+
     PR_DEBUG("URC +CEREG received: %.*s", len, data);
     // +CEREG: 0
     // +CEREG: 5,"58BC","0C03A143",7
+    // +CEREG: <n>,<stat>[,<lac>,<ci>]
+
+    int parsed = __parse_urc_tokens(data, "+CEREG", ": ,", &buffer, tokens, 7);
+    if (parsed == 0) {
+        if (buffer) {
+            tal_free(buffer);
+        }
+        return;
+    }
+
+    PR_DEBUG("Parsed %d tokens from +CEREG", parsed);
+    for (int i = 0; i < parsed; i++) {
+        PR_DEBUG("Token %d: %s", i, tokens[i]);
+    }
+
+    int n = atoi(tokens[0]);
+    // if (n == 0 && parsed)
+    if (n >= 0 && n <= 3 && parsed > 1) {
+        int stat = atoi(tokens[1]);
+        PR_DEBUG("CEREG stat: %d", stat);
+        if (stat <= 5 && stat != 2) {
+            net_ready = 1;
+        } else {
+            net_ready = 0;
+        }
+    } else if (n == 4 || n == 5) {
+        net_ready = 1;
+    } else {
+        net_ready = 0;
+    }
+
+    if (sg_ml307r_ctx.urc_cb) {
+        sg_ml307r_ctx.urc_cb(TAL_AT_MODEM_CMD_NETWORK, &net_ready);
+    }
+
     return;
 }
 
@@ -186,6 +227,7 @@ static void __urc_mipopen_cb(char *data, uint32_t len)
     if (parsed != 2) {
         if (buffer) {
             tal_free(buffer);
+            buffer = NULL;
         }
         return;
     }
@@ -201,6 +243,7 @@ static void __urc_mipopen_cb(char *data, uint32_t len)
 
     // Free the allocated buffer only, not the tokens
     tal_free(buffer);
+    buffer = NULL;
 
     return;
 }
@@ -382,16 +425,68 @@ static uint8_t __ml307r_at_check(void)
         goto __EXIT;
     }
 
-    if (strcmp(OK, rsp_line->line) != 0) {
+    if (strncmp(rsp_line->line, OK, strlen(OK)) != 0) {
+        PR_ERR("AT check failed, response: %s", rsp_line->line);
         at_ready = 0;
+        goto __EXIT;
     }
 
-    at_client_response_free(rsp_line);
-    rsp_line = NULL;
 __EXIT:
     tal_mutex_unlock(sg_ml307r_ctx.mutex);
 
+    if (rsp_line) {
+        at_client_response_free(rsp_line);
+        rsp_line = NULL;
+    }
+
     return at_ready;
+}
+
+static OPERATE_RET __ml307r_get_cereg_status(void)
+{
+    OPERATE_RET rt = OPRT_OK;
+
+    // AT+CEREG?
+    char *send_buf = "AT+CEREG?\r";
+    AT_LINE_T *rsp_line = NULL;
+
+    if (NULL == sg_ml307r_ctx.mutex) {
+        PR_ERR("ML307R context mutex is NULL");
+        return OPRT_COM_ERROR;
+    }
+    tal_mutex_lock(sg_ml307r_ctx.mutex);
+
+    TUYA_CALL_ERR_LOG(at_client_send_with_rsp(send_buf, strlen(send_buf), &rsp_line, AT_SEND_TIMEOUT_MS));
+    if (OPRT_OK != rt || NULL == rsp_line) {
+        PR_ERR("AT+CEREG? failed, response: %s", rsp_line ? rsp_line->line : "NULL");
+        rt = OPRT_COM_ERROR;
+        goto __EXIT;
+    }
+
+    // +CME ERROR: <error_code>
+    if (strncmp(rsp_line->line, "+CME ERROR:", 11) == 0) {
+        PR_ERR("AT+CEREG? failed, response: %s", rsp_line->line);
+        rt = OPRT_COM_ERROR;
+        goto __EXIT;
+    }
+
+    // OK
+    if (strcmp(OK, rsp_line->line) != 0) {
+        PR_ERR("AT+CEREG? failed, response: %s", rsp_line->line);
+        rt = OPRT_COM_ERROR;
+        goto __EXIT;
+    }
+
+__EXIT:
+
+    tal_mutex_unlock(sg_ml307r_ctx.mutex);
+
+    if (rsp_line) {
+        at_client_response_free(rsp_line);
+        rsp_line = NULL;
+    }
+
+    return rt;
 }
 
 static uint8_t __ml307r_at_get_socket_num_max(void)
@@ -868,6 +963,7 @@ OPERATE_RET at_module_ml307r_init(AT_MODULE_OPS_T *ops, AT_MODEM_CB urc_cb)
     sg_ml307r_ctx.urc_cb = urc_cb;
 
     ops->at_check = __ml307r_at_check;
+    ops->at_get_cereg_status = __ml307r_get_cereg_status;
     ops->at_get_socket_num_max = __ml307r_at_get_socket_num_max;
     ops->at_connect = __ml307r_at_connect;
     ops->at_gethostbyname = __ml307r_at_gethostbyname;

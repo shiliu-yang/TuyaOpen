@@ -54,6 +54,7 @@ typedef struct {
 typedef struct {
     OPERATE_RET (*get_at_modem_ip)(NW_IP_S *ip);
     uint8_t (*at_check)(void);
+    OPERATE_RET (*at_get_cereg_status)(void);
     uint8_t (*at_get_socket_num_max)(void);
     TUYA_ERRNO (*at_connect)(int fd, TUYA_PROTOCOL_TYPE_E type, const char *ip, uint16_t port, uint32_t timeout_ms);
     OPERATE_RET (*at_gethostbyname)(const char *domain, TUYA_IP_ADDR_T *addr);
