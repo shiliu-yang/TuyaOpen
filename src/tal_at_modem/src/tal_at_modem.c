@@ -619,7 +619,7 @@ int tal_at_net_socket_create(const TUYA_PROTOCOL_TYPE_E type)
 
 TUYA_ERRNO tal_at_net_connect(const int fd, const TUYA_IP_ADDR_T addr, const uint16_t port)
 {
-    PR_DEBUG("tal_at_net_connect: fd=%d, addr=%u, port=%d", fd, addr, port);
+    PR_TRACE("tal_at_net_connect: fd=%d, addr=0x%08X, port=%d", fd, addr, port);
 
     TUYA_ERRNO rt_errno = UNW_FAIL;
 
