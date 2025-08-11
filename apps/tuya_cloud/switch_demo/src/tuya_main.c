@@ -236,7 +236,7 @@ void user_main(void)
     tal_sw_timer_init();
     tal_workq_init();
 
-#if (!defined(PLATFORM_UBUNTU) || (PLATFORM_UBUNTU == 0)) && (!(defined(ENABLE_AT_MODEM) && (ENABLE_AT_MODEM == 1)))
+#if !defined(PLATFORM_UBUNTU) || (PLATFORM_UBUNTU == 0)
     tal_cli_init();
     tuya_authorize_init();
     tuya_app_cli_init();
@@ -282,7 +282,7 @@ void user_main(void)
 // Initialize the AT modem connection here
 #include "tdd_transport_uart.h"
     TDD_TRANSPORT_UART_CFG_T uart_cfg = {
-        .port_id = TUYA_UART_NUM_0,
+        .port_id = TUYA_UART_NUM_2,
         .cfg.rx_buffer_size = 10 * 1024,
         .cfg.open_mode = O_BLOCK,
         .cfg.base_cfg =

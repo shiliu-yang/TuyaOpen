@@ -343,6 +343,8 @@ int tal_uart_read(TUYA_UART_NUM_E port_num, uint8_t *data, uint32_t len)
     }
 #endif
 
+    // PR_HEXDUMP_DEBUG("read", data, read_count);
+
     tal_semaphore_post(uart_info->rx_ring_sem);
     return read_count;
 }

@@ -15,7 +15,9 @@
 /***********************************************************
 ************************macro define************************
 ***********************************************************/
-#define AT_SEND_TIMEOUT_MS (10 * 1000) // Timeout for interaction with 4G module
+#define AT_SEND_AT_TIMEOUT_MS   (500)
+#define AT_SEND_DATA_TIMEOUT_MS (50 * 1000)
+#define AT_SEND_TIMEOUT_MS      (20 * 1000) // Timeout for interaction with 4G module
 
 // send
 #define AT         "AT\r"
@@ -155,7 +157,7 @@ static void __urc_cereg_cb(char *data, uint32_t len)
     char *buffer = NULL;
     char *tokens[7] = {NULL};
 
-    PR_DEBUG("URC +CEREG received: %.*s", len, data);
+    PR_TRACE("URC +CEREG received: %.*s", len, data);
     // +CEREG: 0
     // +CEREG: 5,"58BC","0C03A143",7
     // +CEREG: <n>,<stat>[,<lac>,<ci>]
@@ -168,16 +170,16 @@ static void __urc_cereg_cb(char *data, uint32_t len)
         return;
     }
 
-    PR_DEBUG("Parsed %d tokens from +CEREG", parsed);
-    for (int i = 0; i < parsed; i++) {
-        PR_DEBUG("Token %d: %s", i, tokens[i]);
-    }
+    // PR_DEBUG("Parsed %d tokens from +CEREG", parsed);
+    // for (int i = 0; i < parsed; i++) {
+    //     PR_DEBUG("Token %d: %s", i, tokens[i]);
+    // }
 
     int n = atoi(tokens[0]);
     // if (n == 0 && parsed)
     if (n >= 0 && n <= 3 && parsed > 1) {
         int stat = atoi(tokens[1]);
-        PR_DEBUG("CEREG stat: %d", stat);
+        PR_TRACE("CEREG stat: %d", stat);
         if (stat <= 5 && stat != 2) {
             net_ready = 1;
         } else {
@@ -326,6 +328,7 @@ static void __urc_mipurc_cb(char *data, uint32_t len)
     if (parsed < 2) {
         if (buffer) {
             tal_free(buffer);
+            buffer = NULL;
         }
         PR_ERR("Failed to parse MIPURC command, parsed count: %d", parsed);
         return;
@@ -338,6 +341,7 @@ static void __urc_mipurc_cb(char *data, uint32_t len)
         PR_ERR("MIPURC type is NULL");
         if (buffer) {
             tal_free(buffer);
+            buffer = NULL;
         }
         return;
     }
@@ -349,15 +353,13 @@ static void __urc_mipurc_cb(char *data, uint32_t len)
         if (parsed >= 2 && tokens[1]) {
             socket_conn.fd = atoi(tokens[1]);
         }
-        // if (parsed >= 3 && tokens[2]) {
-        //     // Disconnect reason
-        // }
         socket_conn.result = 1;
         if (sg_ml307r_ctx.urc_cb) {
             sg_ml307r_ctx.urc_cb(TAL_AT_MODEM_CMD_CONNECT_STATUS, &socket_conn);
         }
-        PR_DEBUG("URC +MIPURC disconn: fd=%d, connect_state=%d", socket_conn.fd, socket_conn.result);
+        PR_TRACE("URC +MIPURC disconn: fd=%d, connect_state=%d", socket_conn.fd, socket_conn.result);
     } else if (strcmp(type, "rtcp") == 0) {
+#if 0
         AT_SOCKET_RECV_T socket_recv = {0};
         if (parsed >= 2 && tokens[1]) {
             socket_recv.fd = (uint32_t)(atoi(tokens[1]));
@@ -370,6 +372,7 @@ static void __urc_mipurc_cb(char *data, uint32_t len)
             if (!byte_data) {
                 PR_ERR("Failed to allocate memory for socket recv data");
                 tal_free(buffer);
+                buffer = NULL;
                 return;
             }
             memset(byte_data, 0, socket_recv.len);
@@ -380,13 +383,33 @@ static void __urc_mipurc_cb(char *data, uint32_t len)
                 sg_ml307r_ctx.urc_cb(TAL_AT_MODEM_CMD_SOCKET_RECV, &socket_recv);
             }
             tal_free(byte_data);
+            byte_data = NULL;
         }
+#else
+        // tcp mode access mode 2
+        AT_SOCKET_RECV_T socket_recv = {0};
+        if (parsed >= 2 && tokens[1]) {
+            socket_recv.fd = (uint32_t)(atoi(tokens[1]));
+        }
+        if (parsed >= 3 && tokens[2]) {
+            socket_recv.len = atoi(tokens[2]);
+        }
+        if (parsed >= 4 && tokens[3]) {
+            socket_recv.unread_len = atoi(tokens[3]);
+        }
+        socket_recv.data = NULL;
+
+        if (sg_ml307r_ctx.urc_cb) {
+            sg_ml307r_ctx.urc_cb(TAL_AT_MODEM_CMD_SOCKET_RECV, &socket_recv);
+        }
+#endif
     } else {
         PR_ERR("Unknown URC type: %s", type);
     }
 
     if (buffer) {
         tal_free(buffer);
+        buffer = NULL;
     }
 
     return;
@@ -419,7 +442,7 @@ static uint8_t __ml307r_at_check(void)
     }
     tal_mutex_lock(sg_ml307r_ctx.mutex);
 
-    TUYA_CALL_ERR_LOG(at_client_send_with_rsp(AT, strlen(AT), &rsp_line, AT_SEND_TIMEOUT_MS));
+    TUYA_CALL_ERR_LOG(at_client_send_with_rsp(AT, strlen(AT), &rsp_line, AT_SEND_AT_TIMEOUT_MS));
     if (OPRT_OK != rt || NULL == rsp_line) {
         at_ready = 0;
         goto __EXIT;
@@ -574,6 +597,27 @@ static TUYA_ERRNO __ml307r_at_connect(int fd, TUYA_PROTOCOL_TYPE_E type, const c
     rsp_line = NULL;
     PR_DEBUG("AT+MIPCFG encoding set successfully");
 
+    // Set tcp recv mode
+    // AT+MIPMODE=<fd>,<mode>
+    if (PROTOCOL_TCP == type) {
+        memset(tmp_buf, 0, sizeof(tmp_buf));
+        snprintf(tmp_buf, sizeof(tmp_buf), "AT+MIPMODE=%d,2\r", fd);
+        TUYA_CALL_ERR_LOG(at_client_send_with_rsp(tmp_buf, strlen(tmp_buf), &rsp_line, AT_SEND_TIMEOUT_MS));
+        if (OPRT_OK != rt || NULL == rsp_line) {
+            PR_ERR("AT+MIPMODE failed, response: %s", rsp_line ? rsp_line->line : "NULL");
+            rt_erron = UNW_FAIL;
+            goto __EXIT;
+        }
+        if (strcmp(OK, rsp_line->line) != 0) {
+            PR_ERR("AT+MIPMODE failed, response: %s", rsp_line->line);
+            rt_erron = UNW_FAIL;
+            goto __EXIT;
+        }
+        tal_free(rsp_line);
+        rsp_line = NULL;
+        PR_DEBUG("AT+MIPMODE set successfully");
+    }
+
 __EXIT:
     tal_mutex_unlock(sg_ml307r_ctx.mutex);
 
@@ -668,41 +712,139 @@ static TUYA_ERRNO __ml307r_at_send(const int fd, const void *buf, const uint32_t
     char *buffer = NULL;
     AT_LINE_T *rsp_line = NULL;
 
+    uint32_t offset = 0;
+    uint32_t send_len = 0;
+    char *send_buf = NULL;
+
     if (NULL == sg_ml307r_ctx.mutex) {
         PR_ERR("ML307R context mutex is NULL");
         return 0;
     }
 
     tal_mutex_lock(sg_ml307r_ctx.mutex);
+    // PR_DEBUG("--lock--> send");
 
+#if 1
     // AT+MIPSEND=fd,len,"<data>"
 
-    uint32_t offset = 0;
-    uint32_t send_len = nbytes * 2 + 64;
-    char *send_cmd = tal_malloc(send_len);
-    if (send_cmd == NULL) {
+    offset = 0;
+    send_len = nbytes * 2 + 64;
+    send_buf = tal_malloc(send_len);
+    if (send_buf == NULL) {
         PR_ERR("malloc for send command failed");
-        return UNW_FAIL;
+        goto __EXIT;
     }
-    memset(send_cmd, 0, send_len);
+    memset(send_buf, 0, send_len);
 
-    offset += snprintf(send_cmd + offset, send_len - offset, "AT+MIPSEND=%d,%d,\"", fd, nbytes);
+    offset += snprintf(send_buf + offset, send_len - offset, "AT+MIPSEND=%d,%d,\"", fd, nbytes);
     for (uint32_t i = 0; i < nbytes; i++) {
-        offset += snprintf(send_cmd + offset, send_len - offset, "%02X", ((uint8_t *)buf)[i]);
+        offset += snprintf(send_buf + offset, send_len - offset, "%02X", ((uint8_t *)buf)[i]);
     }
-    offset += snprintf(send_cmd + offset, send_len - offset, "\"\r");
+    offset += snprintf(send_buf + offset, send_len - offset, "\"\r");
 
-    rt = at_client_send(send_cmd, offset);
+    rt = at_client_send(send_buf, offset);
     if (OPRT_OK != rt) {
-        PR_ERR("AT+MIPSEND failed, response: %s", send_cmd);
+        PR_ERR("AT+MIPSEND failed, response: %s", send_buf);
         rt_errno = UNW_FAIL;
         goto __EXIT;
     }
-    tal_free(send_cmd);
-    send_cmd = NULL;
+    tal_free(send_buf);
+    send_buf = NULL;
+#elif 0
+    // send data buffer
+    send_len = 512;
+    uint32_t send_len_hex = send_len * 2; // Must be greater than 64 bytes
+    send_buf = tal_malloc(send_len_hex);
+    if (send_buf == NULL) {
+        PR_ERR("malloc for send data failed");
+        rt_errno = UNW_FAIL;
+        goto __EXIT;
+    }
+
+    memset(send_buf, 0, send_len_hex);
+    snprintf(send_buf, send_len_hex, "AT+MIPSEND=%d,%d\r", fd, nbytes);
+    // send: AT+MIPSEND=fd,len
+    rt = at_client_send_with_rsp(send_buf, strlen(send_buf), &rsp_line, AT_SEND_TIMEOUT_MS);
+    if (OPRT_OK != rt || NULL == rsp_line) {
+        PR_ERR("AT+MIPSEND failed, response: %s", rsp_line ? rsp_line->line : "NULL");
+        rt_errno = UNW_FAIL;
+        goto __EXIT;
+    }
+    // wait: >
+    if (strncmp(rsp_line->line, ">", 1) != 0) {
+        PR_ERR("AT+MIPSEND failed, response: %s", rsp_line->line);
+        rt_errno = UNW_FAIL;
+        goto __EXIT;
+    }
+
+    PR_HEXDUMP_DEBUG("ml307_send", (uint8_t *)buf, nbytes);
+
+    offset = 0;
+    while (offset < nbytes) {
+        memset(send_buf, 0, send_len_hex);
+        uint32_t chunk_size = (nbytes - offset > send_len) ? send_len : (nbytes - offset);
+#if 0
+        snprintf(send_buf, send_len_hex, "%.*s", chunk_size * 2, (uint8_t *)buf + offset);
+        PR_DEBUG("<-- Sending chunk: [%.*s]", chunk_size * 2, send_buf);
+#else
+        for (uint32_t i = 0; i < chunk_size; i++) {
+            snprintf(send_buf + i * 2, send_len_hex - i * 2, "%02X", ((uint8_t *)buf)[offset + i]);
+        }
+        PR_DEBUG("--> Sending chunk: [%s]", send_buf);
+#endif
+        at_client_send(send_buf, chunk_size * 2);
+        offset += chunk_size;
+    }
+    // at_client_send("\r", 1);
+
+    if (NULL != send_buf) {
+        tal_free(send_buf);
+        send_buf = NULL;
+    }
+#else
+    offset = 0;
+    uint32_t send_len_hex = 512; // Must be greater than 64 bytes
+    send_len = send_len_hex / 2;
+    send_buf = tal_malloc(send_len_hex);
+    if (send_buf == NULL) {
+        PR_ERR("malloc for send command failed");
+        return UNW_FAIL;
+    }
+    memset(send_buf, 0, send_len_hex);
+
+    // offset += snprintf(send_buf + offset, send_len - offset, "AT+MIPSEND=%d,%d,\"", fd, nbytes);
+    // for (uint32_t i = 0; i < nbytes; i++) {
+    //     offset += snprintf(send_buf + offset, send_len - offset, "%02X", ((uint8_t *)buf)[i]);
+    // }
+    // offset += snprintf(send_buf + offset, send_len - offset, "\"\r");
+
+    // rt = at_client_send(send_buf, offset);
+    // if (OPRT_OK != rt) {
+    //     PR_ERR("AT+MIPSEND failed, response: %s", send_buf);
+    //     rt_errno = UNW_FAIL;
+    //     goto __EXIT;
+    // }
+
+    uint32_t send_offset = 0;
+    do {
+        send_offset += snprintf(send_buf + send_offset, send_len_hex - send_offset, "AT+MIPSEND=%d,%d,\"", fd, nbytes);
+        uint32_t chunk_size = (send_len_hex - send_offset - 2) / 2; // -2 for "\r\""
+        chunk_size = (chunk_size < nbytes - send_offset) ? chunk_size : nbytes - send_offset;
+        for (uint32_t i = 0; i < chunk_size; i++) {
+            snprintf(send_buf + send_offset + i * 2, send_len_hex - send_offset - i * 2, "%02X",
+                     ((uint8_t *)buf)[offset + i]);
+        }
+        offset += chunk_size;
+
+    } while (1);
+
+    tal_free(send_buf);
+    send_buf = NULL;
+#endif
 
     // +MIPSEND: fd,len
-    rsp_line = at_client_get_response(AT_SEND_TIMEOUT_MS);
+    // send big data need longer timeout
+    rsp_line = at_client_get_response(AT_SEND_DATA_TIMEOUT_MS);
     if (rsp_line == NULL) {
         PR_ERR("AT+MIPSEND response timeout");
         rt_errno = UNW_FAIL;
@@ -716,6 +858,7 @@ static TUYA_ERRNO __ml307r_at_send(const int fd, const void *buf, const uint32_t
         goto __EXIT;
     }
 
+    // Rsp
     // +MIPSEND: <fd>,<send_length>
     char *tokens[2] = {NULL};
     int parsed = __parse_urc_tokens(rsp_line->line, "+MIPSEND", ": ,", &buffer, tokens, 2);
@@ -732,7 +875,7 @@ static TUYA_ERRNO __ml307r_at_send(const int fd, const void *buf, const uint32_t
     rsp_line = NULL;
 
     rt_errno = atoi(tokens[1]);
-    PR_DEBUG("response len: %d", rt_errno);
+    // PR_DEBUG("response len: %d", rt_errno);
 
     tal_free(buffer);
     buffer = NULL;
@@ -752,11 +895,103 @@ static TUYA_ERRNO __ml307r_at_send(const int fd, const void *buf, const uint32_t
 
 __EXIT:
     tal_mutex_unlock(sg_ml307r_ctx.mutex);
+    // PR_DEBUG("<--unlock-- send");
 
-    if (NULL != send_cmd) {
-        tal_free(send_cmd);
-        send_cmd = NULL;
+    if (NULL != send_buf) {
+        tal_free(send_buf);
+        send_buf = NULL;
     }
+
+    if (NULL != rsp_line) {
+        at_client_response_free(rsp_line);
+        rsp_line = NULL;
+    }
+
+    if (NULL != buffer) {
+        tal_free(buffer);
+        buffer = NULL;
+    }
+
+    return rt_errno;
+}
+
+TUYA_ERRNO __ml307r_at_recv(const int fd, void *buf, const uint32_t nbytes)
+{
+    TUYA_ERRNO rt_errno = UNW_SUCCESS;
+    AT_LINE_T *rsp_line = NULL;
+    char *buffer = NULL;
+
+    if (NULL == sg_ml307r_ctx.mutex) {
+        PR_ERR("ML307R context mutex is NULL");
+        return UNW_FAIL;
+    }
+
+    tal_mutex_lock(sg_ml307r_ctx.mutex);
+    // PR_DEBUG("--lock--> recv");
+
+    // AT+MIPRD=<fd>,<read_len>
+    char tmp_buf[32] = {0};
+    snprintf(tmp_buf, sizeof(tmp_buf), "AT+MIPRD=%d,%d\r", fd, nbytes);
+
+    rt_errno = at_client_send_with_rsp(tmp_buf, strlen(tmp_buf), &rsp_line, AT_SEND_TIMEOUT_MS);
+    if (OPRT_OK != rt_errno || NULL == rsp_line) {
+        PR_ERR("AT+MIPRD failed, response: %s", rsp_line ? rsp_line->line : "NULL");
+        rt_errno = UNW_FAIL;
+        goto __EXIT;
+    }
+
+    // +CME ERROR: <error_code>
+    if (strncmp(rsp_line->line, "+CME ERROR:", 11) == 0) {
+        PR_ERR("AT+MIPRD failed, response: %s", rsp_line->line);
+        rt_errno = UNW_FAIL;
+        goto __EXIT;
+    }
+
+    // +MIPRD: <fd>,<unread_len>,<data_len>,<data>
+    char *tokens[4] = {NULL};
+    int parsed = __parse_urc_tokens(rsp_line->line, "+MIPRD", ": ,", &buffer, tokens, 4);
+    if (parsed < 4 || tokens[0] == NULL || tokens[1] == NULL || tokens[2] == NULL || tokens[3] == NULL) {
+        PR_ERR("AT+MIPRD response error, expected: MIPRD: <fd>,<unread_len>,<data_len>,<data>, response: %.*s",
+               rsp_line->len, rsp_line->line);
+        rt_errno = UNW_FAIL;
+        goto __EXIT;
+    }
+    at_client_response_free(rsp_line);
+    rsp_line = NULL;
+
+    // for (int i = 0; i < 4; i++) {
+    //     PR_DEBUG("Token %d: %s", i, tokens[i]);
+    // }
+
+    // int fd = atoi(tokens[0]);
+    // int unread_len = atoi(tokens[1]);
+    rt_errno = atoi(tokens[2]);
+    char *data = tokens[3];
+
+    at_utils_hex_char_to_byte(data, nbytes * 2, buf, nbytes);
+
+    if (NULL != buffer) {
+        tal_free(buffer);
+        buffer = NULL;
+    }
+
+    // PR_HEXDUMP_DEBUG("AT+MIPRD response data", buf, nbytes);
+
+    // OK
+    rsp_line = at_client_get_response(AT_SEND_TIMEOUT_MS);
+    if (rsp_line == NULL) {
+        PR_ERR("AT+MIPRD response timeout");
+        rt_errno = UNW_FAIL;
+        goto __EXIT;
+    }
+    if (strcmp(OK, rsp_line->line) != 0) {
+        PR_ERR("AT+MIPRD failed, response: %s", rsp_line->line);
+        rt_errno = UNW_FAIL;
+    }
+
+__EXIT:
+    tal_mutex_unlock(sg_ml307r_ctx.mutex);
+    // PR_DEBUG("<--unlock-- recv");
 
     if (NULL != rsp_line) {
         at_client_response_free(rsp_line);
@@ -968,6 +1203,7 @@ OPERATE_RET at_module_ml307r_init(AT_MODULE_OPS_T *ops, AT_MODEM_CB urc_cb)
     ops->at_connect = __ml307r_at_connect;
     ops->at_gethostbyname = __ml307r_at_gethostbyname;
     ops->at_send = __ml307r_at_send;
+    ops->at_recv = __ml307r_at_recv;
     ops->at_close = __ml307r_at_close;
     ops->get_at_modem_ip = at_module_ml307r_get_at_modem_ip;
 

@@ -16,7 +16,7 @@
 #define AT_CLIENT_RX_BUFFER_SIZE (5 * 1024) // Default size of the receive buffer
 
 #define IDLE_SLEEP_MS    (100)
-#define WAITING_SLEEP_MS (20)
+#define WAITING_SLEEP_MS (50)
 
 typedef uint8_t AT_CLIENT_STATUS_T;
 #define AT_CLIENT_STATUS_IDLE       0x00 // Client is idle, not processing any command
@@ -26,7 +26,7 @@ typedef uint8_t AT_CLIENT_STATUS_T;
 
 #define AT_CLIENT_STATUS_CHANGE(new_status)                                                                            \
     do {                                                                                                               \
-        PR_DEBUG("AT client status changed: [%s] --> [%s]", AT_CLIENT_STATUS_STR[sg_at_client.status],                 \
+        PR_TRACE("AT client status changed: [%s] --> [%s]", AT_CLIENT_STATUS_STR[sg_at_client.status],                 \
                  AT_CLIENT_STATUS_STR[new_status]);                                                                    \
         sg_at_client.status = new_status;                                                                              \
     } while (0)
@@ -94,7 +94,7 @@ static AT_CLIENT_T sg_at_client = {
 
 static void __at_client_thread(void *arg)
 {
-    uint32_t delay_ms = 100;
+    uint32_t delay_ms = IDLE_SLEEP_MS;
 
     for (;;) {
         switch (sg_at_client.status) {
@@ -118,15 +118,14 @@ static void __at_client_thread(void *arg)
             uint32_t free_space = sg_at_client.rx_buffer_size - sg_at_client.rx_buffer_used;
             if (available) {
                 // Read data from transport
-                PR_DEBUG("AT client waiting for response, available: %d bytes, free_space: %d", available, free_space);
-                tal_mutex_lock(sg_at_client.mutex);
+                // PR_DEBUG("AT client waiting for response, available: %d bytes, free_space: %d", available,
+                // free_space);
                 uint32_t read_len = tdl_transport_read(sg_at_client.transport_hdl, p_rx, free_space);
                 if (read_len > 0) {
+                    tal_mutex_lock(sg_at_client.mutex);
                     sg_at_client.rx_buffer_used += read_len;
-                    // PR_DEBUG("--> Read %d bytes from transport", read_len);
-                    // PR_DEBUG("--> Received data: %.*s", read_len, p_rx);
+                    tal_mutex_unlock(sg_at_client.mutex);
                 }
-                tal_mutex_unlock(sg_at_client.mutex);
             }
 
             // check one of the response lines
@@ -138,11 +137,13 @@ static void __at_client_thread(void *arg)
                 if (next_pos && next_pos > sg_at_client.rx_buffer && new_line) {
                     // get new line
                     // Check if it's URC
-                    PR_DEBUG("---> Parsed new line: [%.*s]", new_line->len, new_line->line);
+                    // PR_TRACE("Parsed new line: [%.*s]", new_line->len, new_line->line);
+                    // PR_DEBUG("<-- Parsed new line: [%.*s]...", new_line->len > 30 ? 30 : new_line->len,
+                    // new_line->line);
                     AT_URC_T *urc_handler = __get_urc_handler(new_line);
                     uint8_t is_urc = (urc_handler != NULL) ? 1 : 0;
                     AT_LINE_HANDLE line_hdl = is_urc ? sg_at_client.urc_line_hdl : sg_at_client.line_hdl;
-                    PR_DEBUG("AT client checking response lines, is_urc: %d", is_urc);
+                    // PR_DEBUG("New lin is urc [%d]", is_urc);
                     // add to line handle
                     at_line_add(line_hdl, new_line);
                     // Move remaining data to the start of the buffer
@@ -155,7 +156,7 @@ static void __at_client_thread(void *arg)
                 } else if (next_pos && next_pos > sg_at_client.rx_buffer) {
                     // next_pos is valid but new_line is NULL (e.g., empty line or just end symbols)
                     // Still need to move the buffer to avoid data accumulation
-                    PR_DEBUG("---> Skipping empty line or just end symbols");
+                    PR_TRACE("Skipping empty line or just end symbols");
                     uint32_t remaining_len = sg_at_client.rx_buffer_used - (next_pos - sg_at_client.rx_buffer);
                     memmove(sg_at_client.rx_buffer, next_pos, remaining_len);
                     sg_at_client.rx_buffer_used = remaining_len;
@@ -182,7 +183,6 @@ static void __at_client_thread(void *arg)
         } break;
         case AT_CLIENT_STATUS_COMPLETED: {
             // Command completed
-            PR_DEBUG("AT client command completed");
             // Reset status to idle after processing
             AT_CLIENT_STATUS_CHANGE(AT_CLIENT_STATUS_IDLE);
         } break;
@@ -260,7 +260,7 @@ OPERATE_RET at_client_init(TDL_TRANSPORT_HANDLE transport_hdl)
     sg_at_client.status = AT_CLIENT_STATUS_IDLE;
 
     // Initialize thread handle
-    THREAD_CFG_T thrd_param = {4 * 1024, THREAD_PRIO_1, "at_client"};
+    THREAD_CFG_T thrd_param = {4 * 1024, THREAD_PRIO_2, "at_client"};
     TUYA_CALL_ERR_GOTO(
         tal_thread_create_and_start(&sg_at_client.thread_hdl, NULL, NULL, __at_client_thread, NULL, &thrd_param),
         __ERR);
@@ -335,18 +335,19 @@ AT_LINE_T *at_client_get_response(uint32_t timeout_ms)
     TUYA_CHECK_NULL_RETURN(sg_at_client.line_hdl, NULL);
 
     // Wait for response with timeout
-    uint32_t delay_cnt = 0;
-    do {
-        if (at_line_get_count(sg_at_client.line_hdl) > 0) {
-            break;
+    if (at_line_get_count(sg_at_client.line_hdl) == 0) {
+        uint32_t delay_cnt = 0;
+        while (delay_cnt * 10 < timeout_ms) {
+            tal_system_sleep(10);
+            delay_cnt++;
+            if (at_line_get_count(sg_at_client.line_hdl) > 0) {
+                break;
+            }
         }
-        tal_system_sleep(10);
-        delay_cnt++;
-    } while (delay_cnt * 10 < timeout_ms);
-
-    if (delay_cnt * 10 >= timeout_ms) {
-        PR_WARN("No response received within timeout: %d ms", timeout_ms);
-        return NULL;
+        if (delay_cnt * 10 >= timeout_ms) {
+            PR_WARN("No response received within timeout: %d ms", timeout_ms);
+            return NULL;
+        }
     }
 
     // Get the response line
@@ -428,7 +429,7 @@ static AT_URC_T *__get_urc_handler(AT_LINE_T *line)
 
 static OPERATE_RET __at_client_urc_process(AT_LINE_HANDLE line_hdl)
 {
-    PR_DEBUG("Processing URC lines");
+    PR_TRACE("Processing URC lines");
 
     OPERATE_RET rt = OPRT_OK;
 
@@ -442,7 +443,9 @@ static OPERATE_RET __at_client_urc_process(AT_LINE_HANDLE line_hdl)
     // Process each URC line
     AT_LINE_T *line = NULL;
     while (at_line_get_count(line_hdl)) {
+        tal_mutex_lock(sg_at_client.mutex);
         line = at_line_get(line_hdl);
+        tal_mutex_unlock(sg_at_client.mutex);
         if (NULL == line) {
             PR_DEBUG("No URC line to process");
             break;
@@ -473,12 +476,12 @@ static OPERATE_RET __at_client_urc_process(AT_LINE_HANDLE line_hdl)
         }
 #else
         AT_URC_T *urc_handler = __get_urc_handler(line);
-        PR_DEBUG("URC handler found: %s", urc_handler->prefix ? urc_handler->prefix : "NULL");
+        PR_TRACE("URC handler found: %s", urc_handler->prefix ? urc_handler->prefix : "NULL");
         if (urc_handler && urc_handler->urc_handler) {
-            // PR_DEBUG("Invoking URC handler for line: %.*s", line->len, line->line);
+            PR_TRACE("Invoking URC handler for line: %.*s", line->len, line->line);
             urc_handler->urc_handler(line->line, line->len);
         } else {
-            PR_DEBUG("No URC handler found for line: %.*s", line->len, line->line);
+            PR_WARN("No URC handler found for line: %.*s", line->len, line->line);
         }
 #endif
         at_line_free(line); // Free the URC line after processing

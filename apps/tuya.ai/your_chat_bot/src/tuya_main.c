@@ -32,6 +32,9 @@
 #if defined(ENABLE_WIRED) && (ENABLE_WIRED == 1)
 #include "netconn_wired.h"
 #endif
+#if defined(ENABLE_AT_MODEM) && (ENABLE_AT_MODEM == 1)
+#include "netconn_at_modem.h"
+#endif
 #if defined(ENABLE_LIBLWIP) && (ENABLE_LIBLWIP == 1)
 #include "lwip_init.h"
 #endif
@@ -253,7 +256,7 @@ bool user_network_check(void)
 
 void user_main(void)
 {
-    int ret = OPRT_OK;
+    int rt = OPRT_OK;
 
     //! open iot development kit runtim init
     cJSON_InitHooks(&(cJSON_Hooks){.malloc_fn = tal_malloc, .free_fn = tal_free});
@@ -290,16 +293,16 @@ void user_main(void)
     }
 
     /* Initialize Tuya device configuration */
-    ret = tuya_iot_init(&ai_client, &(const tuya_iot_config_t){
-                                        .software_ver = PROJECT_VERSION,
-                                        .productkey = TUYA_PRODUCT_ID,
-                                        .uuid = license.uuid,
-                                        .authkey = license.authkey,
-                                        // .firmware_key      = TUYA_DEVICE_FIRMWAREKEY,
-                                        .event_handler = user_event_handler_on,
-                                        .network_check = user_network_check,
-                                    });
-    assert(ret == OPRT_OK);
+    rt = tuya_iot_init(&ai_client, &(const tuya_iot_config_t){
+                                       .software_ver = PROJECT_VERSION,
+                                       .productkey = TUYA_PRODUCT_ID,
+                                       .uuid = license.uuid,
+                                       .authkey = license.authkey,
+                                       // .firmware_key      = TUYA_DEVICE_FIRMWAREKEY,
+                                       .event_handler = user_event_handler_on,
+                                       .network_check = user_network_check,
+                                   });
+    assert(rt == OPRT_OK);
 
 #if defined(ENABLE_LIBLWIP) && (ENABLE_LIBLWIP == 1)
     TUYA_LwIP_Init();
@@ -313,6 +316,23 @@ void user_main(void)
 #if defined(ENABLE_WIRED) && (ENABLE_WIRED == 1)
     type |= NETCONN_WIRED;
 #endif
+#if defined(ENABLE_AT_MODEM) && (ENABLE_AT_MODEM == 1)
+    type |= NETCONN_AT_MODEM;
+    // Initialize the AT modem connection here
+    TDD_TRANSPORT_UART_CFG_T uart_cfg = {
+        .port_id = TUYA_UART_NUM_2,
+        .cfg.rx_buffer_size = 10 * 1024,
+        .cfg.open_mode = O_BLOCK,
+        .cfg.base_cfg =
+            {
+                .baudrate = 921600,
+                .databits = TUYA_UART_DATA_LEN_8BIT,
+                .parity = TUYA_UART_PARITY_TYPE_NONE,
+                .stopbits = TUYA_UART_STOP_LEN_1BIT,
+            },
+    };
+    TUYA_CALL_ERR_LOG(tdd_transport_uart_register(AT_TRANSPORT_NAME, uart_cfg));
+#endif
     netmgr_init(type);
 #if defined(ENABLE_WIFI) && (ENABLE_WIFI == 1)
     netmgr_conn_set(NETCONN_WIFI, NETCONN_CMD_NETCFG, &(netcfg_args_t){.type = NETCFG_TUYA_BLE});
@@ -320,15 +340,9 @@ void user_main(void)
 
     PR_DEBUG("tuya_iot_init success");
 
-    ret = board_register_hardware();
-    if (ret != OPRT_OK) {
-        PR_ERR("board_register_hardware failed");
-    }
+    TUYA_CALL_ERR_LOG(board_register_hardware());
 
-    ret = app_chat_bot_init();
-    if (ret != OPRT_OK) {
-        PR_ERR("tuya_audio_recorde_init failed");
-    }
+    TUYA_CALL_ERR_LOG(app_chat_bot_init());
 
     app_system_info();
 

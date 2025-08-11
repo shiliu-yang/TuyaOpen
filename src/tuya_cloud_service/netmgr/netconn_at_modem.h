@@ -9,8 +9,8 @@
 #define __NETCONN_AT_MODEM_H__
 
 #include "tuya_cloud_types.h"
-
 #include "netmgr.h"
+#include "tdd_transport_uart.h"
 
 #ifdef __cplusplus
 extern "C" {

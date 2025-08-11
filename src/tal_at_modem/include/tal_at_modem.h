@@ -48,6 +48,7 @@ typedef struct {
 typedef struct {
     int fd;
     uint32_t len;
+    uint32_t unread_len;
     char *data;
 } AT_SOCKET_RECV_T;
 
@@ -59,6 +60,7 @@ typedef struct {
     TUYA_ERRNO (*at_connect)(int fd, TUYA_PROTOCOL_TYPE_E type, const char *ip, uint16_t port, uint32_t timeout_ms);
     OPERATE_RET (*at_gethostbyname)(const char *domain, TUYA_IP_ADDR_T *addr);
     TUYA_ERRNO (*at_send)(const int fd, const void *buf, const uint32_t nbytes);
+    TUYA_ERRNO (*at_recv)(const int fd, void *buf, const uint32_t nbytes);
     TUYA_ERRNO (*at_close)(const int fd);
 } AT_MODULE_OPS_T;
 
