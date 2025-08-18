@@ -9,7 +9,9 @@
 #include "tal_api.h"
 
 #include "tdd_transport_uart.h"
-#include "tdl_transport_manage.h"
+// #include "tdl_transport_manage.h"
+
+#include "tal_at_modem.h"
 
 /***********************************************************
 ************************macro define************************
@@ -29,11 +31,17 @@
 /***********************************************************
 ***********************variable define**********************
 ***********************************************************/
-static TDL_TRANSPORT_HANDLE sg_ts_hdl = NULL;
+// static TDL_TRANSPORT_HANDLE sg_ts_hdl = NULL;
 
 /***********************************************************
 ***********************function define**********************
 ***********************************************************/
+
+static void at_modem_event_cb(AT_MODEM_EVENT_E event, void *arg)
+{
+    PR_DEBUG("AT modem event: %d", event);
+    return;
+}
 
 void app_at_modem_init(void)
 {
@@ -52,11 +60,10 @@ void app_at_modem_init(void)
     };
     TUYA_CALL_ERR_LOG(tdd_transport_uart_register(AT_TRANSPORT_NAME, uart_cfg));
 
-    TUYA_CALL_ERR_LOG(tdl_transport_find(AT_TRANSPORT_NAME, &sg_ts_hdl));
-
-    TUYA_CALL_ERR_LOG(tdl_transport_open(sg_ts_hdl));
+    tal_at_modem_init(AT_TRANSPORT_NAME, TAL_AT_MODEM_TYPE_ML307R, at_modem_event_cb);
 
     for (;;) {
+#if 0
         rt = tdl_transport_send(sg_ts_hdl, (uint8_t *)"AT\r", 4);
 
         PR_DEBUG("ts write: AT, %d", rt);
@@ -65,7 +72,7 @@ void app_at_modem_init(void)
         uint32_t recv_len = tdl_transport_read(sg_ts_hdl, recv_data, sizeof(recv_data) - 1);
 
         // PR_HEXDUMP_DEBUG("ts read", recv_data, recv_len);
-
+#endif
         tal_system_sleep(3 * 1000);
     }
 }
