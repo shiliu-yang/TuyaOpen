@@ -80,3 +80,15 @@ OPERATE_RET at_module_ml307r_init(AT_MODULE_OPS_T *ops, AT_MODULE_CB cb)
 
     return rt;
 }
+
+OPERATE_RET at_module_ml307r_deinit(void)
+{
+    OPERATE_RET rt = OPRT_OK;
+
+    if (NULL != sg_ml307r_ctx.mutex) {
+        TUYA_CALL_ERR_RETURN(tal_mutex_release(sg_ml307r_ctx.mutex));
+        sg_ml307r_ctx.mutex = NULL;
+    }
+
+    return rt;
+}

@@ -29,6 +29,8 @@ extern "C" {
 
 OPERATE_RET at_module_ml307r_init(AT_MODULE_OPS_T *ops, AT_MODULE_CB cb);
 
+OPERATE_RET at_module_ml307r_deinit(void);
+
 #ifdef __cplusplus
 }
 #endif

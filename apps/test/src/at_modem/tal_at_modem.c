@@ -24,21 +24,28 @@
 ***********************typedef define***********************
 ***********************************************************/
 typedef struct {
-    // NW_IP_S ip; // IP address structure for the modem
-    AT_MODEM_EVENT_CB event_cb;
-    // MUTEX_HANDLE mutex;
-    // TIMER_ID heartbeat_timer; // Timer for heartbeat
+    int is_used; // Indicates if the socket is in use
 
-    // TUYA_ERRNO errno;
+    // Socket information
+    uint16_t port;             // Port number of the socket
+    TUYA_PROTOCOL_TYPE_E type; // Protocol type (TCP/UDP)
+    BOOL_T is_block;           // Indicates if the socket is blocking
+    BOOL_T is_connected;       // Indicates if the socket is connected
+
+    // Recv information
+
+    // Peer information
+    uint16_t peer_port;     // Port number of the peer
+    char peer_ip_str[16];   // IP address of the socket
+    TUYA_IP_ADDR_T peer_ip; // IP address structure for the peer
+
+} AT_SOCKET_T;
+
+typedef struct {
+    AT_MODEM_EVENT_CB event_cb;
     TAL_AT_MODEM_TYPE_T type;
 
     TDL_TRANSPORT_HANDLE transport_hdl;
-
-    // uint8_t socket_num_max;
-
-    // uint8_t at_ready;
-    // uint8_t sim_ready;
-    // uint8_t network_ready;
 
     AT_MODULE_OPS_T ops;
 } TAL_AT_MODEM_CFG_T;
@@ -55,6 +62,7 @@ static TAL_AT_MODEM_CFG_T sg_at_modem = {0};
 /***********************************************************
 ***********************function define**********************
 ***********************************************************/
+/* at modem start */
 static void __at_module_urc_cb(TAL_AT_MODULE_CMD_T cmd, void *args)
 {
     return;
@@ -68,25 +76,43 @@ OPERATE_RET tal_at_modem_init(const char *transport_name, TAL_AT_MODEM_TYPE_T ty
 
     sg_at_modem.event_cb = event_cb;
 
-    TUYA_CALL_ERR_GOTO(tdl_transport_find(transport_name, &sg_at_modem.transport_hdl), __ERR);
-    TUYA_CALL_ERR_GOTO(tdl_transport_open(sg_at_modem.transport_hdl), __ERR);
+    TUYA_CALL_ERR_GOTO(tdl_transport_find(transport_name, &sg_at_modem.transport_hdl), __EXIT);
+    TUYA_CALL_ERR_GOTO(tdl_transport_open(sg_at_modem.transport_hdl), __EXIT);
 
-    TUYA_CALL_ERR_GOTO(at_client_init(sg_at_modem.transport_hdl), __ERR);
+    TUYA_CALL_ERR_GOTO(at_client_init(sg_at_modem.transport_hdl), __EXIT);
 
     // init 4G module
     if (type == TAL_AT_MODEM_TYPE_ML307R) {
         // Initialize ML307R specific settings
-        TUYA_CALL_ERR_GOTO(at_module_ml307r_init(&sg_at_modem.ops, __at_module_urc_cb), __ERR);
+        TUYA_CALL_ERR_GOTO(at_module_ml307r_init(&sg_at_modem.ops, __at_module_urc_cb), __EXIT);
     }
 
-__ERR:
+__EXIT:
     return rt;
 }
+
+OPERATE_RET tal_at_modem_deinit(void)
+{
+    OPERATE_RET rt = OPRT_OK;
+
+    TUYA_CALL_ERR_LOG(tdl_transport_close(sg_at_modem.transport_hdl));
+    TUYA_CALL_ERR_LOG(at_client_deinit());
+    TUYA_CALL_ERR_LOG(at_module_ml307r_deinit());
+
+    return rt;
+}
+/* at modem end */
 
 /* at modem tal network start */
 TUYA_ERRNO tal_at_net_get_errno(void)
 {
-    return 0;
+    AT_MODULE_OPS_T *ops = &sg_at_modem.ops;
+
+    if (ops->at_get_errno) {
+        return ops->at_get_errno();
+    }
+
+    return UNW_FAIL;
 }
 
 OPERATE_RET tal_at_net_fd_set(int fd, TUYA_FD_SET_T *fds)
