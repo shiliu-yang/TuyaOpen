@@ -10,9 +10,9 @@ platforms:
   commit: 065639a0a76c5f7c564509b8fd8b64f7949da4f5
 
 - name: Ubuntu
-  repo: https://github.com/tuya/TuyaOpen-ubuntu
-  branch: platform_ubuntu
-  commit: 5ec7f1b9687ccf0fd104fcc8372fac74c9676788
+  repo: git@github.com:shiliu-yang/TuyaOpen-ubuntu.git
+  branch: yj/feat-support-serial
+  commit: 8babaf13a1a6ab7e4df2a7ec157f5338c97d83a3
 
 - name: T5AI
   repo: https://github.com/tuya/TuyaOpen-T5AI
