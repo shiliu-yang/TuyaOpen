@@ -67,14 +67,12 @@ extern const lv_font_t *font_emoji_64_init(void);
 /***********************************************************
 ***********************variable define**********************
 ***********************************************************/
-#if defined(BOARD_CHOICE_BREAD_COMPACT_WIFI) || defined(BOARD_CHOICE_XINGZHI_CUBE_0_96_OLED_WIFI)
-static UI_EMOJI_LIST_T sg_awesome_emo_list[] = {
+static __attribute__((unused)) UI_EMOJI_LIST_T sg_awesome_emo_list[EMO_ICON_MAX_NUM] = {
     {"NEUTRAL", FONT_AWESOME_EMOJI_NEUTRAL},   {"SAD", FONT_AWESOME_EMOJI_SAD},
     {"ANGRY", FONT_AWESOME_EMOJI_ANGRY},       {"SURPRISE", FONT_AWESOME_EMOJI_SURPRISED},
     {"CONFUSED", FONT_AWESOME_EMOJI_CONFUSED}, {"THINKING", FONT_AWESOME_EMOJI_THINKING},
     {"HAPPY", FONT_AWESOME_EMOJI_HAPPY},
 };
-#endif
 
 static __attribute__((unused)) UI_EMOJI_LIST_T sg_emo_list[EMO_ICON_MAX_NUM] = {
     {"NEUTRAL", "😶"},  {"SAD", "😔"},      {"ANGRY", "😠"}, {"SURPRISE", "😯"},
@@ -95,51 +93,81 @@ static OPERATE_RET __get_ui_font(UI_FONT_T *ui_font)
         return OPRT_INVALID_PARM;
     }
 
-#if (defined(BOARD_CHOICE_TUYA_T5AI_BOARD) || defined(BOARD_CHOICE_TUYA_T5AI_EVB) ||                                   \
-     defined(BOARD_CHOICE_T5AI_MOJI_1_28) || defined(BOARD_CHOICE_T5AI_MINI) || defined(BOARD_CHOICE_DNESP32S3_BOX) || \
-     defined(BOARD_CHOICE_DNESP32S3_BOX2_WIFI))
-#if defined(ENABLE_GUI_WECHAT)
+    // ------------------------------
+    // text font start
+    //-------------------------------
+#if (defined(FONT_TEXT_PUHUI_14_1) && (FONT_TEXT_PUHUI_14_1 == 1))
+    ui_font->text = (lv_font_t *)&font_puhui_14_1;
+#elif (defined(FONT_TEXT_PUHUI_16_2) && (FONT_TEXT_PUHUI_16_2 == 1))
+    ui_font->text = (lv_font_t *)&font_puhui_16_2;
+#elif (defined(FONT_TEXT_PUHUI_16_4) && (FONT_TEXT_PUHUI_16_4 == 1))
+    ui_font->text = (lv_font_t *)&font_puhui_16_4;
+#elif (defined(FONT_TEXT_PUHUI_18_2) && (FONT_TEXT_PUHUI_18_2 == 1))
     ui_font->text = (lv_font_t *)&font_puhui_18_2;
+#elif (defined(FONT_TEXT_PUHUI_20_2) && (FONT_TEXT_PUHUI_20_2 == 1))
+    ui_font->text = (lv_font_t *)&font_puhui_20_2;
+#elif (defined(FONT_TEXT_PUHUI_20_4) && (FONT_TEXT_PUHUI_20_4 == 1))
+    ui_font->text = (lv_font_t *)&font_puhui_20_4;
+#elif (defined(FONT_TEXT_PUHUI_30_4) && (FONT_TEXT_PUHUI_30_4 == 1))
+    ui_font->text = (lv_font_t *)&font_puhui_30_4;
+#else
+    ui_font->text = (lv_font_t *)&font_puhui_14_1;
+#endif
+    // ------------------------------
+    // text font end
+    //-------------------------------
+
+    // ------------------------------
+    // icon font start
+    //-------------------------------
+#if (defined(FONT_ICON_AWESOME_14_1) && (FONT_ICON_AWESOME_14_1 == 1))
+    ui_font->icon = (lv_font_t *)&font_awesome_14_1;
+#elif (defined(FONT_ICON_AWESOME_16_4) && (FONT_ICON_AWESOME_16_4 == 1))
     ui_font->icon = (lv_font_t *)&font_awesome_16_4;
+#elif (defined(FONT_ICON_AWESOME_20_4) && (FONT_ICON_AWESOME_20_4 == 1))
+    ui_font->icon = (lv_font_t *)&font_awesome_20_4;
+#elif (defined(FONT_ICON_AWESOME_30_1) && (FONT_ICON_AWESOME_30_1 == 1))
+    ui_font->icon = (lv_font_t *)&font_awesome_30_1;
+#elif (defined(FONT_ICON_AWESOME_30_4) && (FONT_ICON_AWESOME_30_4 == 1))
+    ui_font->icon = (lv_font_t *)&font_awesome_30_4;
+#else
+    ui_font->icon = (lv_font_t *)&font_awesome_14_1;
+#endif
+    // ------------------------------
+    // icon font end
+    //-------------------------------
+
+    // ------------------------------
+    // emoji font start
+    //-------------------------------
+#if (defined(FONT_EMOJI_AWESOME_14_1) && (FONT_EMOJI_AWESOME_14_1 == 1))
+    ui_font->emoji = (lv_font_t *)&font_awesome_14_1;
+    ui_font->emoji_list = sg_awesome_emo_list;
+#elif (defined(FONT_EMOJI_AWESOME_16_4) && (FONT_EMOJI_AWESOME_16_4 == 1))
+    ui_font->emoji = (lv_font_t *)&font_awesome_16_4;
+    ui_font->emoji_list = sg_awesome_emo_list;
+#elif (defined(FONT_EMOJI_AWESOME_20_4) && (FONT_EMOJI_AWESOME_20_4 == 1))
+    ui_font->emoji = (lv_font_t *)&font_awesome_20_4;
+    ui_font->emoji_list = sg_awesome_emo_list;
+#elif (defined(FONT_EMOJI_AWESOME_30_1) && (FONT_EMOJI_AWESOME_30_1 == 1))
+    ui_font->emoji = (lv_font_t *)&font_awesome_30_1;
+    ui_font->emoji_list = sg_awesome_emo_list;
+#elif (defined(FONT_EMOJI_AWESOME_30_4) && (FONT_EMOJI_AWESOME_30_4 == 1))
+    ui_font->emoji = (lv_font_t *)&font_awesome_30_4;
+    ui_font->emoji_list = sg_awesome_emo_list;
+#elif (defined(FONT_EMOJI_IMAGE_32) && (FONT_EMOJI_IMAGE_32 == 1))
     ui_font->emoji = (lv_font_t *)font_emoji_32_init();
     ui_font->emoji_list = sg_emo_list;
-#elif defined(ENABLE_GUI_CHATBOT)
-    ui_font->text = (lv_font_t *)&font_puhui_18_2;
-    ui_font->icon = (lv_font_t *)&font_awesome_16_4;
+#elif (defined(FONT_EMOJI_IMAGE_64) && (FONT_EMOJI_IMAGE_64 == 1))
     ui_font->emoji = (lv_font_t *)font_emoji_64_init();
     ui_font->emoji_list = sg_emo_list;
-#endif
-#elif defined(BOARD_CHOICE_BREAD_COMPACT_WIFI)
-    ui_font->text = (lv_font_t *)&font_puhui_14_1;
-    ui_font->icon = (lv_font_t *)&font_awesome_14_1;
-    ui_font->emoji = (lv_font_t *)&font_awesome_30_1;
+#else
+    ui_font->emoji = (lv_font_t *)&font_awesome_14_1;
     ui_font->emoji_list = sg_awesome_emo_list;
-#elif defined(BOARD_CHOICE_XINGZHI_CUBE_0_96_OLED_WIFI)
-    ui_font->text = (lv_font_t *)&font_puhui_14_1;
-    ui_font->icon = (lv_font_t *)&font_awesome_14_1;
-    ui_font->emoji = (lv_font_t *)&font_awesome_30_1;
-    ui_font->emoji_list = sg_awesome_emo_list;
-#elif defined(BOARD_CHOICE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_1_8)
-    ui_font->text = (lv_font_t *)&font_puhui_30_4;
-    ui_font->icon = (lv_font_t *)&font_awesome_30_4;
-#if defined(ENABLE_GUI_WECHAT)
-    ui_font->emoji = font_emoji_32_init();
-#else
-    ui_font->emoji = font_emoji_64_init();
 #endif
-    ui_font->emoji_list = sg_emo_list;
-#elif defined(BOARD_CHOICE_DNESP32S3)
-    ui_font->text = (lv_font_t *)&font_puhui_20_4;
-    ui_font->icon = (lv_font_t *)&font_awesome_20_4;
-#if defined(ENABLE_GUI_WECHAT)
-    ui_font->emoji = font_emoji_32_init();
-#else
-    ui_font->emoji = font_emoji_64_init();
-#endif
-    ui_font->emoji_list = sg_emo_list;
-#else
-#error "Please define the font for your board"
-#endif
+    // ------------------------------
+    // emoji font start
+    //-------------------------------
 
     return rt;
 }

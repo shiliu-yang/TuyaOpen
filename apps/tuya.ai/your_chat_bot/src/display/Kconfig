@@ -1,25 +1,97 @@
-if(ENABLE_CHAT_DISPLAY) 
+if(ENABLE_CHAT_DISPLAY)
+config ENABLE_GUI_STREAM_AI_TEXT
+    depends on ENABLE_GUI_WECHAT
+    bool "support streaming display of ai text"
+    default n
+
+# UI choice
 choice
     prompt "choose display gui"
     default ENABLE_GUI_WECHAT
 
     config ENABLE_GUI_WECHAT
-        bool "Use WeChat-like ui"
+        bool "WeChat-like"
 
     config ENABLE_GUI_CHATBOT
-        bool "Use Chatbot ui"
+        bool "Chatbot"
 
     config ENABLE_GUI_OLED
-        bool "Use OLED ui"
-
-    config ENABLE_GUI_EYES
-        bool "Use Eyes ui"
-
+        bool "OLED"
 endchoice
 
-config ENABLE_GUI_STREAM_AI_TEXT
-    depends on ENABLE_GUI_WECHAT
-    bool "support streaming display of ai text"
-    default n
+# text choice
+choice
+    prompt "choose text font"
+    default FONT_TEXT_PUHUI_14_1
+
+    config FONT_TEXT_PUHUI_14_1
+        bool "Puhui 14 1"
+
+    config FONT_TEXT_PUHUI_16_2
+        bool "Puhui 16 2"
+
+    config FONT_TEXT_PUHUI_16_4
+        bool "Puhui 16 4"
+
+    config FONT_TEXT_PUHUI_18_2
+        bool "Puhui 18 2"
+
+    config FONT_TEXT_PUHUI_20_2
+        bool "Puhui 20 2"
+
+    config FONT_TEXT_PUHUI_20_4
+        bool "Puhui 20 4"
+
+    config FONT_TEXT_PUHUI_30_4
+        bool "Puhui 30 4"
+endchoice
+
+# icon choice
+choice
+    prompt "choose icon font"
+    default FONT_ICON_AWESOME_14_1
+
+    config FONT_ICON_AWESOME_14_1
+        bool "awesome 14 1"
+
+    config FONT_ICON_AWESOME_16_4
+        bool "awesome 16 4"
+
+    config FONT_ICON_AWESOME_20_4
+        bool "awesome 20 4"
+
+    config FONT_ICON_AWESOME_30_1
+        bool "awesome 30 1"
+
+    config FONT_ICON_AWESOME_30_4
+        bool "awesome 30 4"
+endchoice
+
+# emoji choice
+choice
+    prompt "choose emoji font"
+    default FONT_EMOJI_AWESOME_14_1
+
+    config FONT_EMOJI_AWESOME_14_1
+        bool "awesome 14 1"
+
+    config FONT_EMOJI_AWESOME_16_4
+        bool "awesome 16 4"
+
+    config FONT_EMOJI_AWESOME_20_4
+        bool "awesome 20 4"
+
+    config FONT_EMOJI_AWESOME_30_1
+        bool "awesome 30 1"
+
+    config FONT_EMOJI_AWESOME_30_4
+        bool "awesome 30 4"
+
+    config FONT_EMOJI_IMAGE_32
+        bool "image 32"
+
+    config FONT_EMOJI_IMAGE_64
+        bool "image 64"
+endchoice
 
 endif
