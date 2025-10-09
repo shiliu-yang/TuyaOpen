@@ -1,0 +1,34 @@
+menu "BMM150 Magnetometer Demo"
+
+config BMM150_DEMO_ENABLE
+    bool "Enable BMM150 Magnetometer Demo"
+    default y
+    help
+        Enable the BMM150 magnetometer demo application.
+        This demo uses software I2C on pins P20 (SCL) and P21 (SDA).
+
+config BMM150_DATA_RATE
+    int "BMM150 Data Rate (Hz)"
+    default 10
+    depends on BMM150_DEMO_ENABLE
+    help
+        Data rate for BMM150 magnetometer readings in Hz.
+        Valid values: 2, 6, 8, 10, 15, 20, 25, 30
+
+config BMM150_REPETITION_XY
+    int "BMM150 XY Repetition"
+    default 4
+    depends on BMM150_DEMO_ENABLE
+    help
+        XY axis repetition setting for BMM150.
+        Higher values provide better accuracy but slower response.
+
+config BMM150_REPETITION_Z
+    int "BMM150 Z Repetition"
+    default 4
+    depends on BMM150_DEMO_ENABLE
+    help
+        Z axis repetition setting for BMM150.
+        Higher values provide better accuracy but slower response.
+
+endmenu
