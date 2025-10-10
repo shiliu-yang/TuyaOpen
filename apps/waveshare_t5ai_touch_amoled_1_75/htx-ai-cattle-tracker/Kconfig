@@ -69,3 +69,8 @@ config ENABLE_CATTLE_TRACKER_UI
         This provides a compass/GPS-based tracking interface.
 
 endmenu
+
+config APP_HARDWARE_CAPABILITY_CONFIG
+    bool
+    default y
+    select ENABLE_CELLULAR

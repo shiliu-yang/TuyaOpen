@@ -61,4 +61,13 @@ OPERATE_RET tal_cellular_get_ipv6(NW_IP_TYPE type, NW_IP_S *ip)
     return tkl_cellular_get_ipv6(type, (NW_IP_S *)ip);
 }
 
+OPERATE_RET tal_cellular_get_ccid(char *ccid)
+{
+    return tkl_cellular_get_ccid(ccid);
+}
+
+OPERATE_RET tal_cellular_get_rssi(char *ccid)
+{
+    return tkl_cellular_get_rssi(ccid);
+}
 #endif // defined(ENABLE_CELLULAR) && (ENABLE_CELLULAR == 1)

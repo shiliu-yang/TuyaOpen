@@ -13,9 +13,10 @@
 #include "netconn_cellular.h"
 
 #if defined(ENABLE_CELLULAR) && (ENABLE_CELLULAR == 1)
-#include "tal_log.h"
+#include "tal_api.h"
 #include "netmgr.h"
 #include "tal_cellular.h"
+#include "mqtt_bind.h"
 
 /***********************************************************
 ************************macro define************************
@@ -32,7 +33,6 @@
 /***********************************************************
 ***********************variable define**********************
 ***********************************************************/
-
 netmgr_conn_cellular_t s_netmgr_cellular = {
     .base =
         {
@@ -54,10 +54,15 @@ netmgr_conn_cellular_t s_netmgr_cellular = {
 /***********************************************************
 ***********************function define**********************
 ***********************************************************/
-
 static void __netconn_cellular_event(CELLULAR_STAT_E event)
 {
     netmgr_conn_cellular_t *netmgr_cellular = &s_netmgr_cellular;
+
+    if ((event == TAL_CELLULAR_LINK_UP && netmgr_cellular->base.status == NETMGR_LINK_UP) ||
+        (event == TAL_CELLULAR_LINK_DOWN && netmgr_cellular->base.status == NETMGR_LINK_DOWN)) {
+        // no change
+        return;
+    }
 
     PR_NOTICE("cellular status changed to %d, old stat: %d", event, netmgr_cellular->base.status);
     netmgr_cellular->base.status = (event == TAL_CELLULAR_LINK_UP) ? NETMGR_LINK_UP : NETMGR_LINK_DOWN;
@@ -83,9 +88,10 @@ OPERATE_RET netconn_cellular_open(void *config)
     tal_cellular_init(&cfg);
 
     netmgr_cellular->base.status = NETMGR_LINK_DOWN;
+
     TUYA_CALL_ERR_RETURN(tal_cellular_set_status_cb(__netconn_cellular_event));
 
-    // Not supported get token from cellular connection
+    tuya_iot_token_get_port_register(tuya_iot_client_get(), mqtt_bind_token_get);
 
     return rt;
 }

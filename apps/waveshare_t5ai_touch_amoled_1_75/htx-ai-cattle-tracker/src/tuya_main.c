@@ -136,6 +136,52 @@ OPERATE_RET ai_audio_volume_upload(void)
     return tuya_iot_dp_obj_report(client, client->activate.devid, &dp_obj, 1, 0);
 }
 
+#if defined(ENABLE_CELLULAR) && (ENABLE_CELLULAR == 1)
+#include "tal_cellular.h"
+#define TI_META_SAVE "tuya.device.meta.save"
+
+OPERATE_RET httpc_put_iccid(char iccid[21])
+{
+    OPERATE_RET rt = OPRT_OK;
+    int buffer_len = 72;
+    char *post_data = tal_malloc(buffer_len);
+    TUYA_CHECK_NULL_RETURN(post_data, OPRT_MALLOC_FAILED);
+
+    memset(post_data, 0, buffer_len);
+
+    TIME_T timestamp = 0;
+    timestamp = tal_time_get_posix();
+
+    snprintf(post_data, buffer_len, "{\"metas\":{\"catIccId\":\"%s\"},\"t\":\"%d\"}", iccid, timestamp);
+
+    rt = atop_service_comm_post_simple(TI_META_SAVE, "1.0", post_data, NULL, NULL);
+    tal_free(post_data);
+    return rt;
+}
+
+OPERATE_RET cellular_http_upload_iccid(void)
+{
+    OPERATE_RET rt;
+    static uint8_t is_cellular_ccid_reported = FALSE;
+    char iccid[TAL_CELLULAR_CCID_LEN + 1] = {0};
+
+    if (is_cellular_ccid_reported) {
+        return OPRT_OK;
+    }
+
+    TUYA_CALL_ERR_RETURN(tal_cellular_get_ccid(iccid));
+
+    if (strlen(iccid) == 0) {
+        return OPRT_COM_ERROR;
+    }
+
+    TUYA_CALL_ERR_RETURN(httpc_put_iccid(iccid));
+
+    is_cellular_ccid_reported = TRUE;
+    PR_NOTICE("cellular report ccid %s to Tuya cloud", iccid);
+    return rt;
+}
+#endif
 /**
  * @brief user defined event handler
  *
@@ -196,6 +242,9 @@ void user_event_handler_on(tuya_iot_client_t *client, tuya_event_msg_t *event)
     case TUYA_EVENT_TIMESTAMP_SYNC:
         PR_INFO("Sync timestamp:%d", event->value.asInteger);
         tal_time_set_posix(event->value.asInteger, 1);
+#if defined(ENABLE_CELLULAR) && (ENABLE_CELLULAR == 1)
+        cellular_http_upload_iccid();
+#endif
         break;
 
     case TUYA_EVENT_RESET:
@@ -241,6 +290,29 @@ void user_event_handler_on(tuya_iot_client_t *client, tuya_event_msg_t *event)
         break;
     }
 }
+
+#if defined(ENABLE_CELLULAR) && (ENABLE_CELLULAR == 1)
+#include "tkl_gpio.h"
+
+static void __cellular_module_reset(void)
+{
+    TUYA_GPIO_BASE_CFG_T gpio_cfg;
+
+    gpio_cfg.direct = TUYA_GPIO_OUTPUT;
+    gpio_cfg.level = TUYA_GPIO_LEVEL_HIGH;
+    gpio_cfg.mode = TUYA_GPIO_PUSH_PULL;
+    tkl_gpio_init(TUYA_GPIO_NUM_46, &gpio_cfg); // reset pin 24 is 1;
+    tkl_gpio_write(TUYA_GPIO_NUM_46, TUYA_GPIO_LEVEL_HIGH);
+    gpio_cfg.level = TUYA_GPIO_LEVEL_HIGH;
+    tkl_gpio_init(TUYA_GPIO_NUM_45, &gpio_cfg); // power pin 9;
+    tkl_gpio_write(TUYA_GPIO_NUM_45, TUYA_GPIO_LEVEL_HIGH);
+    tal_system_sleep(200);                                 // delay 200ms
+    tkl_gpio_write(TUYA_GPIO_NUM_45, TUYA_GPIO_LEVEL_LOW); // power on pin LOW
+    tal_system_sleep(1200);                                // delay up 1s
+
+    return;
+}
+#endif // ENABLE_CELLULAR
 
 /**
  * @brief user defined network check callback, it will check the network every 1sec,
@@ -320,6 +392,10 @@ void user_main(void)
 #endif
 #if defined(ENABLE_WIRED) && (ENABLE_WIRED == 1)
     type |= NETCONN_WIRED;
+#endif
+#if defined(ENABLE_CELLULAR) && (ENABLE_CELLULAR == 1)
+    type |= NETCONN_CELLULAR;
+    __cellular_module_reset();
 #endif
     netmgr_init(type);
 #if defined(ENABLE_WIFI) && (ENABLE_WIFI == 1)
