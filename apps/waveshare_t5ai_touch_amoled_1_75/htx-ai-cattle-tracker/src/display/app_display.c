@@ -91,7 +91,7 @@ static TUYA_DISPLAY_T sg_display = {0};
 ***********************function define**********************
 ***********************************************************/
 
-static OPERATE_RET __get_ui_font(UI_FONT_T *ui_font)
+__attribute__((unused)) static OPERATE_RET __get_ui_font(UI_FONT_T *ui_font)
 {
     OPERATE_RET rt = OPRT_OK;
 
@@ -245,15 +245,16 @@ static void __chat_bot_ui_task(void *args)
 
     tuya_lvgl_mutex_lock();
     
+    // Initialize the display font
+    TUYA_CALL_ERR_LOG(__get_ui_font(&sg_display.ui_font));
+    
 #if defined(ENABLE_CATTLE_TRACKER_UI) && (ENABLE_CATTLE_TRACKER_UI == 1)
     // Initialize Cattle AI Tracker UI instead of chat UI
     PR_INFO("Initializing Cattle AI Tracker UI...");
     lv_demo_cattle_ai_tracker();
     PR_INFO("Cattle AI Tracker UI initialized successfully");
 #else
-    // Initialize the display font
-    TUYA_CALL_ERR_LOG(__get_ui_font(&sg_display.ui_font));
-    // ui initialization
+    // ui initialization for chat UI
     TUYA_CALL_ERR_LOG(ui_init(&sg_display.ui_font));
 #endif
 

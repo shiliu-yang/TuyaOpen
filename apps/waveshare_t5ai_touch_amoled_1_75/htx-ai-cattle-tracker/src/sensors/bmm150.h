@@ -3,7 +3,7 @@
 
 #include "tuya_cloud_types.h"
 #include "tal_api.h"
-// #include "bmm150_dev_config.h"
+#include "dev_config.h"
 
 // Software I2C Pin Definitions - using P20 and P21
 #define BMM150_I2C_SCL_PIN      EXAMPLE_I2C_SCL_PIN

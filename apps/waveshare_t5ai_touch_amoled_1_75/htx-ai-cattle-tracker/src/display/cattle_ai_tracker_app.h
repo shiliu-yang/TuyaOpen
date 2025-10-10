@@ -9,7 +9,7 @@
 extern "C" {
 #endif
 
-#include "../lvgl/lvgl.h"
+#include "lvgl.h"
 
 /* Target marker colors */
 typedef enum {

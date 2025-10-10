@@ -10,6 +10,7 @@
 *
 ******************************************************************************/
 #include "dev_config.h"
+#include "sensor_integration.h"
 
 TDL_BUTTON_HANDLE button_hdl = NULL;
 
@@ -117,8 +118,9 @@ OPERATE_RET dev_i2c_init()
 {
     TUYA_IIC_BASE_CFG_T cfg;
 
-    tkl_io_pinmux_config(EXAMPLE_I2C_SCL_PIN, TUYA_IIC0_SCL);
-    tkl_io_pinmux_config(EXAMPLE_I2C_SDA_PIN, TUYA_IIC0_SDA);
+    // GPS uses I2C Port 0 (GPIO 20/21) - exactly like working demo
+    tkl_io_pinmux_config(GPS_I2C_SCL_PIN, TUYA_IIC0_SCL);
+    tkl_io_pinmux_config(GPS_I2C_SDA_PIN, TUYA_IIC0_SDA);
 
     /*i2c init*/
     cfg.role = TUYA_IIC_MODE_MASTER;
@@ -127,10 +129,14 @@ OPERATE_RET dev_i2c_init()
 
     OPERATE_RET ret = tkl_i2c_init(TUYA_I2C_NUM_0, &cfg);
     if (OPRT_OK != ret) {
-        PR_ERR("i2c init fail, err<%d>!", ret);
+        PR_ERR("GPS I2C Port 0 init fail, err<%d>!", ret);
+    } else {
+        PR_INFO("GPS I2C Port 0 initialized on GPIO %d/%d", GPS_I2C_SCL_PIN, GPS_I2C_SDA_PIN);
     }
     return ret;
 }
+
+// Standard I2C functions - same as working GPS demo
 
 OPERATE_RET dev_i2c_write(uint8_t addr, uint8_t reg, uint8_t value)
 {
@@ -155,55 +161,55 @@ OPERATE_RET dev_i2c_read_only_nbytes(uint8_t addr, uint8_t *pdata, uint32_t len)
 }
 
 /**
- * @brief Initialize BMM150 I2C port (Port 1 with GPIO 24/25)
+ * @brief Initialize BMM150 I2C port (Port 2 with GPIO 14/15)
  */
 OPERATE_RET bmm150_i2c_port_init()
 {
     OPERATE_RET ret = OPRT_OK;
 
-    // Configure pinmux for BMM150 I2C (Port 1)
-    tkl_io_pinmux_config(BMM150_I2C_SCL_PIN_NUM, TUYA_IIC1_SCL);
-    tkl_io_pinmux_config(BMM150_I2C_SDA_PIN_NUM, TUYA_IIC1_SDA);
+    // Configure pinmux for BMM150 I2C (Port 2)
+    tkl_io_pinmux_config(BMM150_I2C_SCL_PIN_NUM, TUYA_IIC2_SCL);
+    tkl_io_pinmux_config(BMM150_I2C_SDA_PIN_NUM, TUYA_IIC2_SDA);
 
-    // Initialize I2C Port 1
+    // Initialize I2C Port 2
     TUYA_IIC_BASE_CFG_T cfg = {
         .role = TUYA_IIC_MODE_MASTER,
         .addr_width = TUYA_IIC_ADDRESS_7BIT,
         .speed = TUYA_IIC_BUS_SPEED_100K  // BMM150 supports up to 400kHz
     };
 
-    ret = tkl_i2c_init(TUYA_I2C_NUM_1, &cfg);
+    ret = tkl_i2c_init(TUYA_I2C_NUM_2, &cfg);
     if (ret != OPRT_OK) {
         PR_ERR("BMM150 I2C init failed: %d", ret);
         return ret;
     }
 
-    PR_INFO("BMM150 I2C initialized on Port 1 (GPIO24/25)");
+    PR_INFO("BMM150 I2C initialized on Port 2 (GPIO14/15)");
     return OPRT_OK;
 }
 
 /**
- * @brief Write BMM150 register via I2C Port 1
+ * @brief Write BMM150 register via I2C Port 2
  */
 OPERATE_RET bmm150_i2c_write_reg(uint8_t addr, uint8_t reg, uint8_t value)
 {
     uint8_t send_buf[2] = {reg, value};
-    return tkl_i2c_master_send(TUYA_I2C_NUM_1, addr, send_buf, 2, TRUE);
+    return tkl_i2c_master_send(TUYA_I2C_NUM_2, addr, send_buf, 2, TRUE);
 }
 
 /**
- * @brief Read BMM150 register via I2C Port 1
+ * @brief Read BMM150 register via I2C Port 2
  */
 OPERATE_RET bmm150_i2c_read_reg(uint8_t addr, uint8_t reg, uint8_t *buffer, uint8_t length)
 {
     OPERATE_RET ret = OPRT_OK;
     
     // Send register address
-    ret = tkl_i2c_master_send(TUYA_I2C_NUM_1, addr, &reg, 1, FALSE);
+    ret = tkl_i2c_master_send(TUYA_I2C_NUM_2, addr, &reg, 1, FALSE);
     if (ret != OPRT_OK) {
         return ret;
     }
     
     // Read data
-    return tkl_i2c_master_receive(TUYA_I2C_NUM_1, addr, buffer, length, TRUE);
+    return tkl_i2c_master_receive(TUYA_I2C_NUM_2, addr, buffer, length, TRUE);
 }

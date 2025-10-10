@@ -12,6 +12,10 @@
 #define __SENSOR_INTEGRATION_H__
 
 #include "tuya_cloud_types.h"
+#include "tal_api.h"
+
+// I2C bus coordination mutex for shared I2C Port 0 (GPS + Touch)
+extern MUTEX_HANDLE g_i2c_bus_mutex;
 
 #ifdef __cplusplus
 extern "C" {

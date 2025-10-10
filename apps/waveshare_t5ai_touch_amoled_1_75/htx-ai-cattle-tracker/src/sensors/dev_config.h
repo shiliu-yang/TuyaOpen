@@ -35,7 +35,7 @@
 #define EXAMPLE_SYS_EN_PIN TUYA_GPIO_NUM_19
 #endif
 
-// GPS I2C Pins (I2C Port 0 - GPIO 20/21)
+// GPS I2C Pins (I2C Port 0 - GPIO 20/21) - Shared with touch display
 #ifndef GPS_I2C_SCL_PIN
 #define GPS_I2C_SCL_PIN TUYA_GPIO_NUM_20
 #endif
@@ -43,12 +43,12 @@
 #define GPS_I2C_SDA_PIN TUYA_GPIO_NUM_21
 #endif
 
-// BMM150 Magnetometer I2C Pins (I2C Port 1 - GPIO 24/25)
+// BMM150 Magnetometer I2C Pins (I2C Port 2 - GPIO 14/15)
 #ifndef BMM150_I2C_SCL_PIN_NUM
-#define BMM150_I2C_SCL_PIN_NUM TUYA_GPIO_NUM_24
+#define BMM150_I2C_SCL_PIN_NUM TUYA_GPIO_NUM_14
 #endif
 #ifndef BMM150_I2C_SDA_PIN_NUM
-#define BMM150_I2C_SDA_PIN_NUM TUYA_GPIO_NUM_25
+#define BMM150_I2C_SDA_PIN_NUM TUYA_GPIO_NUM_15
 #endif
 
 // Legacy compatibility - defaults to GPS pins
@@ -66,7 +66,7 @@ OPERATE_RET dev_sys_init();
 OPERATE_RET dev_digital_write(uint8_t pin, uint8_t value);
 OPERATE_RET dev_digital_read(uint8_t pin, uint8_t *value);
 
-// GPS I2C functions (uses I2C port 0 with GPIO 20/21)
+// GPS I2C functions (uses I2C port 0 with GPIO 20/21) - shared with touch display
 OPERATE_RET dev_i2c_init();
 OPERATE_RET dev_i2c_write(uint8_t addr, uint8_t reg, uint8_t value);
 OPERATE_RET dev_i2c_write_nbytes(uint8_t addr, uint8_t *pdata, uint32_t len);
