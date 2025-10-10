@@ -47,4 +47,25 @@ config ENABLE_CHAT_DISPLAY
     if (ENABLE_CHAT_DISPLAY)
         rsource "./src/display/Kconfig"
     endif
+
+config ENABLE_BMM150_SENSOR
+    bool "enable BMM150 magnetometer sensor"
+    default y
+    help
+        Enable BMM150 3-axis magnetometer for compass heading
+
+config ENABLE_GPS_LC76G
+    bool "enable LC76G GPS module"
+    default y
+    help
+        Enable LC76G GPS module for location tracking
+
+config ENABLE_CATTLE_TRACKER_UI
+    bool "enable Cattle AI Tracker UI (alternative UI)"
+    default y
+    depends on ENABLE_CHAT_DISPLAY
+    help
+        Enable the Cattle AI Tracker UI as an alternative to the default chat UI.
+        This provides a compass/GPS-based tracking interface.
+
 endmenu

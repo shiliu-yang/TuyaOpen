@@ -16,10 +16,18 @@ list(APPEND media_srcs "${APP_PATH}/src/media")
 
 list(APPEND APP_SRCS ${media_srcs})
 
+# Add sensor integration sources if enabled
+if (CONFIG_ENABLE_BMM150_SENSOR STREQUAL "y" OR CONFIG_ENABLE_GPS_LC76G STREQUAL "y")
+    message(STATUS "Adding sensor integration sources")
+    aux_source_directory(${APP_PATH}/src/sensors SENSOR_SRCS)
+    list(APPEND APP_SRCS ${SENSOR_SRCS})
+endif()
+
 set(APP_INC 
             ${APP_PATH}/assets
             ${APP_PATH}/include
             ${APP_PATH}/include/media
+            ${APP_PATH}/src/sensors
 )
 
 list(APPEND APP_INC "${APP_PATH}/assets")

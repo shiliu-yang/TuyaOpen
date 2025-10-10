@@ -456,7 +456,7 @@ void lc76g_get_utc(int *hh, int *mm, int *ss, int *ms)
     if (ms) *ms = g_state.utc_millisecond;
 }
 
-void lc76g_get_position(double *lat_deg, double *lon_deg, double *alt_m)
+void lc76g_get_position(float *lat_deg, float *lon_deg, float *alt_m)
 {
     if (lat_deg) *lat_deg = g_state.latitude_deg;
     if (lon_deg) *lon_deg = g_state.longitude_deg;
@@ -491,12 +491,12 @@ int lc76g_get_signal_level5(void)
     return g_state.signal_level_5;
 }
 
-double lc76g_get_speed_kmh(void)
+float lc76g_get_speed_kmh(void)
 {
     return g_state.speed_kmh;
 }
 
-double lc76g_get_course_deg(void)
+float lc76g_get_course_deg(void)
 {
     return g_state.course_deg;
 }

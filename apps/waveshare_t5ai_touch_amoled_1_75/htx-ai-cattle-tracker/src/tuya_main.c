@@ -47,6 +47,11 @@
 #include "reset_netcfg.h"
 #include "app_system_info.h"
 
+#if defined(ENABLE_BMM150_SENSOR) && (ENABLE_BMM150_SENSOR == 1) || \
+    defined(ENABLE_GPS_LC76G) && (ENABLE_GPS_LC76G == 1)
+#include "sensor_integration.h"
+#endif
+
 /* Tuya device handle */
 tuya_iot_client_t ai_client;
 
@@ -99,7 +104,7 @@ OPERATE_RET audio_dp_obj_proc(dp_obj_recv_t *dpobj)
         case DPID_VOLUME: {
             uint8_t volume = dp->value.dp_value;
             PR_DEBUG("volume:%d", volume);
-            ai_audio_set_volume(volume);
+            // ai_audio_set_volume(volume);
 #if defined(ENABLE_CHAT_DISPLAY) && (ENABLE_CHAT_DISPLAY == 1)
             char volume_str[20] = {0};
             snprintf(volume_str, sizeof(volume_str), "%s%d", VOLUME, volume);
@@ -280,6 +285,8 @@ void user_main(void)
     tuya_authorize_init();
 
     reset_netconfig_start();
+    ai_audio_set_volume(255);
+
 
     tuya_iot_license_t license;
 
@@ -339,6 +346,38 @@ void user_main(void)
     tkl_wifi_set_lp_mode(0, 0);
 
     reset_netconfig_check();
+
+#if defined(ENABLE_BMM150_SENSOR) && (ENABLE_BMM150_SENSOR == 1)
+    PR_INFO("Initializing BMM150 sensor...");
+    ret = sensor_bmm150_init();
+    if (ret != OPRT_OK) {
+        PR_ERR("BMM150 initialization failed: %d", ret);
+    } else {
+        PR_INFO("BMM150 sensor initialized successfully");
+    }
+#endif
+
+#if defined(ENABLE_GPS_LC76G) && (ENABLE_GPS_LC76G == 1)
+    PR_INFO("Initializing GPS module...");
+    ret = sensor_gps_init();
+    if (ret != OPRT_OK) {
+        PR_ERR("GPS initialization failed: %d", ret);
+    } else {
+        PR_INFO("GPS module initialized successfully");
+    }
+#endif
+
+#if defined(ENABLE_BMM150_SENSOR) && (ENABLE_BMM150_SENSOR == 1) || \
+    defined(ENABLE_GPS_LC76G) && (ENABLE_GPS_LC76G == 1)
+    PR_INFO("Starting sensor tasks...");
+    ret = sensor_tasks_start();
+    if (ret != OPRT_OK) {
+        PR_ERR("Sensor tasks start failed: %d", ret);
+    } else {
+        PR_INFO("Sensor tasks started successfully");
+        PR_INFO("BMM150 and GPS readings will be printed to console");
+    }
+#endif
 
     for (;;) {
         /* Loop to receive packets, and handles client keepalive */

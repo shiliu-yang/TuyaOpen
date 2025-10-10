@@ -74,10 +74,10 @@ static void __example_i2c_task(void *param)
     }
     
     while (1) {
-        lc76g_get_date(&dev);
+        lc76g_get_data(&dev);
         const lc76g_state_t *s = lc76g_get_state();
         char datebuf[7] = {0};
-        lc76g_get_date_ddmmyy(datebuf);
+        lc76g_get_data_ddmmyy(datebuf);
         PR_INFO("GNSS: %02d:%02d:%02d.%03dZ  lat=%.6f lon=%.6f alt=%.1fm  date=%s  sats=%d fix=%d conn=%d sig=%d  spd=%.1fkm/h crs=%.1f stat=%c",
                 s->utc_hour, s->utc_minute, s->utc_second, s->utc_millisecond,
                 s->latitude_deg, s->longitude_deg, s->altitude_m,

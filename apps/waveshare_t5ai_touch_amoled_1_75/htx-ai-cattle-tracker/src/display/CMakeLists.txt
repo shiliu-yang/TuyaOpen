@@ -19,6 +19,14 @@ aux_source_directory(${APP_MODULE_PATH}/image/eyes128 IMAG_EYES_SRCS)
 
 set(IMAGE_SRCS ${APP_MODULE_PATH}/image/TuyaOpen_img_320_480.c)
 
+# Add cattle tracker UI if enabled
+if (CONFIG_ENABLE_CATTLE_TRACKER_UI STREQUAL "y")
+    message(STATUS "Adding Cattle AI Tracker UI sources")
+    list(APPEND APP_MODULE_SRCS ${APP_MODULE_PATH}/cattle_ai_tracker_app.c)
+    aux_source_directory(${APP_MODULE_PATH}/resources TRACKER_RESOURCES)
+    list(APPEND APP_MODULE_SRCS ${TRACKER_RESOURCES})
+endif()
+
 list(APPEND APP_MODULE_SRCS
     ${FONT_SRCS}
     ${EMOJI_SRCS}

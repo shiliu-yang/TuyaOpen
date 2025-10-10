@@ -28,6 +28,10 @@
 
 #include "lvgl.h"
 
+#if defined(ENABLE_CATTLE_TRACKER_UI) && (ENABLE_CATTLE_TRACKER_UI == 1)
+#include "cattle_ai_tracker_app.h"
+#endif
+
 /***********************************************************
 ************************macro define************************
 ***********************************************************/
@@ -240,14 +244,25 @@ static void __chat_bot_ui_task(void *args)
     (void)args;
 
     tuya_lvgl_mutex_lock();
+    
+#if defined(ENABLE_CATTLE_TRACKER_UI) && (ENABLE_CATTLE_TRACKER_UI == 1)
+    // Initialize Cattle AI Tracker UI instead of chat UI
+    PR_INFO("Initializing Cattle AI Tracker UI...");
+    lv_demo_cattle_ai_tracker();
+    PR_INFO("Cattle AI Tracker UI initialized successfully");
+#else
     // Initialize the display font
     TUYA_CALL_ERR_LOG(__get_ui_font(&sg_display.ui_font));
     // ui initialization
     TUYA_CALL_ERR_LOG(ui_init(&sg_display.ui_font));
+#endif
+
 #if defined(BOARD_CHOICE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_1_8)
     extern void lcd_sh8601_set_backlight(uint8_t brightness);
     lcd_sh8601_set_backlight(80); // set backlight to 80%
+#if !defined(ENABLE_CATTLE_TRACKER_UI) || (ENABLE_CATTLE_TRACKER_UI == 0)
     ui_set_status_bar_pad(LV_HOR_RES * 0.1);
+#endif
 #endif
     tuya_lvgl_mutex_unlock();
     PR_DEBUG("ui init success");

@@ -25,6 +25,6 @@ OPERATE_RET lc76g_init(lc76g_dev_t *dev, uint8_t i2c_addr_wr, uint8_t i2c_addr_r
 /**
  * Software reset PCF85063A 
  **/
-OPERATE_RET lc76g_get_date(lc76g_dev_t *dev);
+OPERATE_RET lc76g_get_data(lc76g_dev_t *dev);
 
 #endif // PCF85063A_H
