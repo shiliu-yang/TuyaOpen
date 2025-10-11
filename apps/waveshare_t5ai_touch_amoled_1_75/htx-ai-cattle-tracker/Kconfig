@@ -64,9 +64,12 @@ config ENABLE_ENCODER_INPUT
     bool "enable rotary encoder input"
     default y
     select ENABLE_ENCODER
-    select ENABLE_ENCODER_DRIVER
     help
         Enable rotary encoder for user input (rotation and button press detection)
+        
+config ENABLE_ENCODER_DRIVER
+    bool
+    default y if ENABLE_ENCODER_INPUT
 
 if ENABLE_ENCODER_INPUT
     config DECODER_INPUT_A
