@@ -420,8 +420,8 @@ static void compass_build(lv_obj_t *parent)
     /* Note: lv_img_cache_set_size not available in this LVGL version */
 
     /* Pre-cache the compass face ring image */
-    lv_img_cache_invalidate_src(&compass_face_ring);
-    lv_img_cache_invalidate_src(&compass_face_ring); /* Force cache */
+    // lv_img_cache_invalidate_src(&compass_face_ring);
+    // lv_img_cache_invalidate_src(&compass_face_ring); /* Force cache */
 
     /* Set rendering optimizations */
     lv_obj_set_style_radius(g.compass_face_ring_img, 0, 0);        /* No rounded corners */
