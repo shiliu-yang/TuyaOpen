@@ -45,6 +45,11 @@ int mbedtls_cipher_auth_encrypt_wrapper(const cipher_params_t *input, unsigned c
     }
 
     enc_tmpbuf = tal_malloc(input->data_len + tag_len);
+    if (enc_tmpbuf == NULL) {
+        PR_ERR("malloc enc_tmpbuf failed");
+        ret = OPRT_MALLOC_FAILED;
+        goto EXIT;
+    }
 
     /*
      * Encrypt and write the ciphertext.
