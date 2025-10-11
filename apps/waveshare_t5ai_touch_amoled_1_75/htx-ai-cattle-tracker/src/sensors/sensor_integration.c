@@ -1,8 +1,9 @@
 /**
  * @file sensor_integration.c
- * @brief Integration wrapper for BMM150 and GPS sensors
+ * @brief Integration wrapper for BMM150, GPS, and Encoder sensors
  *
- * This source provides unified implementation for the BMM150 magnetometer and LC76G GPS module.
+ * This source provides unified implementation for the BMM150 magnetometer, LC76G GPS module,
+ * and rotary encoder input.
  *
  * @copyright Copyright (c) 2021-2025 Tuya Inc. All Rights Reserved.
  */
@@ -11,6 +12,10 @@
 #include "bmm150.h"
 #include "lc76g.h"
 #include "dev_config.h"
+
+#ifdef ENABLE_ENCODER_INPUT
+#include "drv_encoder.h"
+#endif
 
 #include "tal_log.h"
 #include "tal_thread.h"
@@ -22,10 +27,13 @@
 /***********************************************************
 ************************macro define************************
 ***********************************************************/
-#define TASK_BMM150_PRIORITY THREAD_PRIO_2
-#define TASK_BMM150_SIZE     4096
-#define TASK_GPS_PRIORITY    THREAD_PRIO_2
-#define TASK_GPS_SIZE        4096
+#define TASK_BMM150_PRIORITY  THREAD_PRIO_2
+#define TASK_BMM150_SIZE      4096
+#define TASK_GPS_PRIORITY     THREAD_PRIO_2
+#define TASK_GPS_SIZE         4096
+#define TASK_ENCODER_PRIORITY THREAD_PRIO_2
+#define TASK_ENCODER_SIZE     2048
+#define ENCODER_POLL_INTERVAL_MS 100  /* Poll encoder every 100ms */
 
 /***********************************************************
 ***********************typedef define***********************
@@ -43,6 +51,10 @@ static bmm150_dev_t g_bmm150_dev;
 #ifdef ENABLE_GPS_LC76G
 static THREAD_HANDLE sg_gps_handle = NULL;
 static lc76g_dev_t g_gps_dev;
+#endif
+
+#ifdef ENABLE_ENCODER_INPUT
+static THREAD_HANDLE sg_encoder_handle = NULL;
 #endif
 
 static sensor_data_t g_sensor_data = {0};
@@ -169,7 +181,88 @@ static void __bmm150_task(void *param)
 }
 #endif
 
+#ifdef ENABLE_ENCODER_INPUT
+/**
+ * @brief Rotary encoder monitoring task
+ */
+static void __encoder_task(void *param)
+{
+    OPERATE_RET op_ret = OPRT_OK;
+    int32_t last_angle = 0;
+    uint8_t last_button_state = 0;
 
+    PR_INFO("[ENCODER] Task started - initializing encoder...");
+    PR_INFO("[ENCODER] GPIO Configuration:");
+    PR_INFO("[ENCODER] - Input A Pin (clockwise):        GPIO %d", DECODER_INPUT_A);
+    PR_INFO("[ENCODER] - Input B Pin (counter-clockwise): GPIO %d", DECODER_INPUT_B);
+    PR_INFO("[ENCODER] - Button Press Pin:                GPIO %d", DECODER_INPUT_P);
+    
+    // Initialize encoder driver
+    op_ret = tkl_encoder_init();
+    if (op_ret != OPRT_OK) {
+        PR_ERR("[ENCODER] Failed to initialize encoder driver (error: %d)", op_ret);
+        tal_thread_delete(NULL);
+        return;
+    }
+    
+    PR_INFO("[ENCODER] Initialized successfully!");
+    
+    // Update sensor status
+    tal_mutex_lock(g_sensor_mutex);
+    g_sensor_data.encoder_ready = true;
+    last_angle = encoder_get_angle();
+    g_sensor_data.encoder_angle = last_angle;
+    tal_mutex_unlock(g_sensor_mutex);
+    
+    PR_INFO("[ENCODER] Initial angle: %d", last_angle);
+    
+    // Main monitoring loop
+    while (1) {
+        int32_t current_angle = encoder_get_angle();
+        uint8_t button_pressed = encoder_get_pressed();
+        
+        // Check for angle changes
+        if (current_angle != last_angle) {
+            int32_t angle_delta = current_angle - last_angle;
+            
+            // Update global sensor data
+            tal_mutex_lock(g_sensor_mutex);
+            g_sensor_data.encoder_angle = current_angle;
+            tal_mutex_unlock(g_sensor_mutex);
+            
+            if (angle_delta > 0) {
+                PR_DEBUG("[ENCODER] Rotated clockwise: angle = %d (delta: +%d)", 
+                         current_angle, angle_delta);
+            } else {
+                PR_DEBUG("[ENCODER] Rotated counter-clockwise: angle = %d (delta: %d)", 
+                         current_angle, angle_delta);
+            }
+            
+            last_angle = current_angle;
+        }
+        
+        // Check button state changes
+        if (button_pressed && !last_button_state) {
+            tal_mutex_lock(g_sensor_mutex);
+            g_sensor_data.encoder_button = true;
+            tal_mutex_unlock(g_sensor_mutex);
+            
+            PR_INFO("[ENCODER] Button pressed! Current angle: %d", current_angle);
+            last_button_state = 1;
+        } else if (!button_pressed && last_button_state) {
+            tal_mutex_lock(g_sensor_mutex);
+            g_sensor_data.encoder_button = false;
+            tal_mutex_unlock(g_sensor_mutex);
+            
+            PR_INFO("[ENCODER] Button released");
+            last_button_state = 0;
+        }
+        
+        // Sleep for polling interval
+        tal_system_sleep(ENCODER_POLL_INTERVAL_MS);
+    }
+}
+#endif
 
 /**
  * @brief GPS sensor reading task
@@ -315,6 +408,29 @@ OPERATE_RET sensor_gps_init(void)
 }
 
 /**
+ * @brief Initialize rotary encoder input
+ */
+OPERATE_RET sensor_encoder_init(void)
+{
+    PR_INFO("[SENSOR] Initializing rotary encoder...");
+    
+    // Create mutex if not exists
+    if (g_sensor_mutex == NULL) {
+        OPERATE_RET ret = tal_mutex_create_init(&g_sensor_mutex);
+        if (ret != OPRT_OK) {
+            PR_ERR("[SENSOR] Failed to create mutex (error: %d)", ret);
+            return ret;
+        }
+    }
+    
+    // Note: Encoder initialization is done in the encoder task thread
+    // to avoid blocking the main initialization
+    PR_INFO("[SENSOR] Encoder init ready (will initialize in task thread)");
+    
+    return OPRT_OK;
+}
+
+/**
  * @brief Start sensor reading tasks
  */
 OPERATE_RET sensor_tasks_start(void)
@@ -357,6 +473,23 @@ OPERATE_RET sensor_tasks_start(void)
     }
     #endif
     
+    // Start Encoder task
+    #ifdef ENABLE_ENCODER_INPUT
+    if (sg_encoder_handle == NULL) {
+        static THREAD_CFG_T encoder_param = {
+            .priority = TASK_ENCODER_PRIORITY,
+            .stackDepth = TASK_ENCODER_SIZE,
+            .thrdname = "encoder"
+        };
+        ret = tal_thread_create_and_start(&sg_encoder_handle, NULL, NULL, __encoder_task, NULL, &encoder_param);
+        if (ret != OPRT_OK) {
+            PR_ERR("[SENSOR] Failed to create encoder task (error: %d)", ret);
+            return ret;
+        }
+        PR_INFO("[SENSOR] Encoder task started");
+    }
+    #endif
+    
     return OPRT_OK;
 }
 
@@ -388,11 +521,22 @@ void sensor_print_readings(void)
     sensor_data_t data;
     if (sensor_get_data(&data) == OPRT_OK) {
         PR_INFO("=== Sensor Readings ===");
-        // PR_INFO("BMM150: heading=%.1f° mag_x=%d mag_y=%d mag_z=%d ready=%d", 
-                // data.heading_degrees, data.mag_x, data.mag_y, data.mag_z, data.bmm150_ready);
+        
+        #ifdef ENABLE_BMM150_SENSOR
+        PR_INFO("BMM150: heading=%.1f° mag_x=%d mag_y=%d mag_z=%d ready=%d", 
+                data.heading_degrees, data.mag_x, data.mag_y, data.mag_z, data.bmm150_ready);
+        #endif
+        
+        #ifdef ENABLE_GPS_LC76G
         PR_INFO("GPS: lat=%.6f lon=%.6f alt=%.1fm sats=%d fix=%d ready=%d",
                 data.latitude_deg, data.longitude_deg, data.altitude_m,
                 data.satellites_in_use, data.fix_quality, data.gps_ready);
+        #endif
+        
+        #ifdef ENABLE_ENCODER_INPUT
+        PR_INFO("ENCODER: angle=%d button=%s ready=%d",
+                data.encoder_angle, data.encoder_button ? "PRESSED" : "released", data.encoder_ready);
+        #endif
     }
 }
 

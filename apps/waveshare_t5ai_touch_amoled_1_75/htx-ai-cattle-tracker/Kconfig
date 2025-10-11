@@ -60,6 +60,40 @@ config ENABLE_GPS_LC76G
     help
         Enable LC76G GPS module for location tracking
 
+config ENABLE_ENCODER_INPUT
+    bool "enable rotary encoder input"
+    default y
+    select ENABLE_ENCODER
+    select ENABLE_ENCODER_DRIVER
+    help
+        Enable rotary encoder for user input (rotation and button press detection)
+
+if ENABLE_ENCODER_INPUT
+    config DECODER_INPUT_A
+        int "encoder A signal pin (clockwise detection)"
+        range 0 63
+        default 16
+        help
+            GPIO pin for encoder A signal (quadrature input).
+            This pin detects clockwise rotation when combined with B signal.
+
+    config DECODER_INPUT_B
+        int "encoder B signal pin (counter-clockwise detection)"
+        range 0 63
+        default 17
+        help
+            GPIO pin for encoder B signal (quadrature input).
+            This pin detects counter-clockwise rotation when combined with A signal.
+
+    config DECODER_INPUT_P
+        int "encoder button press detection pin"
+        range 0 63
+        default 47
+        help
+            GPIO pin for encoder button/press detection.
+            Active low - reads LOW when button is pressed.
+endif
+
 config ENABLE_CATTLE_TRACKER_UI
     bool "enable Cattle AI Tracker UI (alternative UI)"
     default y

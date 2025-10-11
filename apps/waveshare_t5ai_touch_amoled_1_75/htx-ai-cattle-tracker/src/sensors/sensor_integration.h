@@ -1,9 +1,9 @@
 /**
  * @file sensor_integration.h
- * @brief Integration wrapper for BMM150 and GPS sensors
+ * @brief Integration wrapper for BMM150, GPS, and Encoder sensors
  *
- * This header provides unified interfaces for the BMM150 magnetometer and LC76G GPS module,
- * making it easy to integrate with the cattle tracker application.
+ * This header provides unified interfaces for the BMM150 magnetometer, LC76G GPS module,
+ * and rotary encoder, making it easy to integrate with the cattle tracker application.
  *
  * @copyright Copyright (c) 2021-2025 Tuya Inc. All Rights Reserved.
  */
@@ -45,6 +45,11 @@ typedef struct {
     int satellites_in_use;    /* Number of GPS satellites in use */
     int fix_quality;          /* GPS fix quality (0=no fix, 1=GPS fix, 2=DGPS fix) */
     bool gps_ready;           /* GPS sensor initialized and ready */
+    
+    // Encoder data
+    int32_t encoder_angle;    /* Encoder rotation angle (incremental) */
+    bool encoder_button;      /* Encoder button state (true=pressed) */
+    bool encoder_ready;       /* Encoder initialized and ready */
 } sensor_data_t;
 
 /***********************************************************
@@ -63,6 +68,13 @@ OPERATE_RET sensor_bmm150_init(void);
  * @return OPERATE_RET Initialization result, OPRT_OK indicates success
  */
 OPERATE_RET sensor_gps_init(void);
+
+/**
+ * @brief Initialize rotary encoder input
+ *
+ * @return OPERATE_RET Initialization result, OPRT_OK indicates success
+ */
+OPERATE_RET sensor_encoder_init(void);
 
 /**
  * @brief Start sensor reading tasks
