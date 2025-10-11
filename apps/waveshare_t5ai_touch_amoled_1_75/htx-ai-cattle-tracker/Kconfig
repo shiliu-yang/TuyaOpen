@@ -2,7 +2,7 @@ menu "configure app (htx-ai-cattle-tracker) "
 
 config TUYA_PRODUCT_ID
     string "product ID of project"
-    default "p320pepzvmm1ghse"
+    default "awtowrksuozwqqmx"
 
 choice 
     prompt "choose chat mode"
@@ -70,7 +70,10 @@ config ENABLE_CATTLE_TRACKER_UI
 
 endmenu
 
-config APP_HARDWARE_CAPABILITY_CONFIG
-    bool
+config ENABLE_CELLULAR_SUPPORT
+    bool "enable cellular support"
     default y
-    select ENABLE_CELLULAR
+    select ENABLE_CELLULAR if ENABLE_CELLULAR_SUPPORT
+    help
+        Enable app hardware capability configuration including cellular network functionality.
+        This enables 4G/LTE connectivity. Disable this if you only need WiFi connectivity.
