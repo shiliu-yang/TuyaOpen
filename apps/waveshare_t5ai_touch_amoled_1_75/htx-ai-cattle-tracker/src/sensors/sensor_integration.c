@@ -15,6 +15,9 @@
 
 #ifdef ENABLE_ENCODER_INPUT
 #include "drv_encoder.h"
+#ifdef ENABLE_GUI_TRACKER
+#include "cattle_ai_tracker_app.h"
+#endif
 #endif
 
 #include "tal_log.h"
@@ -34,6 +37,10 @@
 #define TASK_ENCODER_PRIORITY THREAD_PRIO_2
 #define TASK_ENCODER_SIZE     2048
 #define ENCODER_POLL_INTERVAL_MS 100  /* Poll encoder every 100ms */
+
+#ifdef ENABLE_ENCODER_INPUT
+#define ENCODER_STEPS_PER_ZOOM 2  /* Number of encoder steps per zoom level change */
+#endif
 
 /***********************************************************
 ***********************typedef define***********************
@@ -55,6 +62,25 @@ static lc76g_dev_t g_gps_dev;
 
 #ifdef ENABLE_ENCODER_INPUT
 static THREAD_HANDLE sg_encoder_handle = NULL;
+
+/* Zoom control variables */
+#ifdef ENABLE_GUI_TRACKER
+/* Predefined zoom levels in meters */
+static const int ZOOM_LEVELS[] = {
+    50,    /* Level 0: 50m */
+    100,   /* Level 1: 100m */
+    200,   /* Level 2: 200m */
+    500,   /* Level 3: 500m */
+    1000,  /* Level 4: 1km */
+    3000,  /* Level 5: 3km */
+    5000,  /* Level 6: 5km */
+    10000, /* Level 7: 10km */
+    20000  /* Level 8: 20km */
+};
+#define ZOOM_LEVEL_COUNT (sizeof(ZOOM_LEVELS) / sizeof(ZOOM_LEVELS[0]))
+static int sg_current_zoom_index = 2; /* Start at 200m (index 2) */
+static int sg_accumulated_steps = 0;
+#endif
 #endif
 
 static sensor_data_t g_sensor_data = {0};
@@ -238,6 +264,46 @@ static void __encoder_task(void *param)
                          current_angle, angle_delta);
             }
             
+#ifdef ENABLE_GUI_TRACKER
+            // Handle UI zoom control
+            sg_accumulated_steps += angle_delta;
+            
+            // Check if we've accumulated enough steps to change zoom level
+            if (sg_accumulated_steps >= ENCODER_STEPS_PER_ZOOM) {
+                // Zoom out (increase scale)
+                int steps = sg_accumulated_steps / ENCODER_STEPS_PER_ZOOM;
+                sg_accumulated_steps = sg_accumulated_steps % ENCODER_STEPS_PER_ZOOM;
+                
+                if (sg_current_zoom_index + steps < (int)ZOOM_LEVEL_COUNT) {
+                    sg_current_zoom_index += steps;
+                    animate_distance_scale(ZOOM_LEVELS[sg_current_zoom_index]);
+                    PR_INFO("[ENCODER] Zoom OUT to %dm (index %d)", 
+                            ZOOM_LEVELS[sg_current_zoom_index], sg_current_zoom_index);
+                } else {
+                    // Clamp to max zoom level
+                    sg_current_zoom_index = ZOOM_LEVEL_COUNT - 1;
+                    sg_accumulated_steps = 0;
+                    PR_DEBUG("[ENCODER] Already at maximum zoom level");
+                }
+            } else if (sg_accumulated_steps <= -ENCODER_STEPS_PER_ZOOM) {
+                // Zoom in (decrease scale)
+                int steps = (-sg_accumulated_steps) / ENCODER_STEPS_PER_ZOOM;
+                sg_accumulated_steps = -((-sg_accumulated_steps) % ENCODER_STEPS_PER_ZOOM);
+                
+                if (sg_current_zoom_index - steps >= 0) {
+                    sg_current_zoom_index -= steps;
+                    animate_distance_scale(ZOOM_LEVELS[sg_current_zoom_index]);
+                    PR_INFO("[ENCODER] Zoom IN to %dm (index %d)", 
+                            ZOOM_LEVELS[sg_current_zoom_index], sg_current_zoom_index);
+                } else {
+                    // Clamp to min zoom level
+                    sg_current_zoom_index = 0;
+                    sg_accumulated_steps = 0;
+                    PR_DEBUG("[ENCODER] Already at minimum zoom level");
+                }
+            }
+#endif
+            
             last_angle = current_angle;
         }
         
@@ -248,6 +314,16 @@ static void __encoder_task(void *param)
             tal_mutex_unlock(g_sensor_mutex);
             
             PR_INFO("[ENCODER] Button pressed! Current angle: %d", current_angle);
+            
+#ifdef ENABLE_GUI_TRACKER
+            // Reset to default zoom (200m)
+            sg_current_zoom_index = 2;
+            sg_accumulated_steps = 0;
+            animate_distance_scale(ZOOM_LEVELS[sg_current_zoom_index]);
+            PR_INFO("[ENCODER] Button pressed - reset to default zoom: %dm", 
+                    ZOOM_LEVELS[sg_current_zoom_index]);
+#endif
+            
             last_button_state = 1;
         } else if (!button_pressed && last_button_state) {
             tal_mutex_lock(g_sensor_mutex);

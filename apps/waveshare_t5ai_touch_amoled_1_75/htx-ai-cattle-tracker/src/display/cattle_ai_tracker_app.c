@@ -174,7 +174,7 @@ static void clamp_input_coordinates(lv_point_t *point);
 static void set_distance_text(int meters);
 static void update_rotation_text(float yaw_degrees);
 static void __attribute__((unused)) update_distance_scale(void);
-static void animate_distance_scale(int target_scale);
+/* animate_distance_scale is now public - declared in header */
 static void on_distance_anim_value(void *var, int32_t value);
 static void on_distance_anim_ready(lv_anim_t *anim);
 static void update_interval_lines(void);
@@ -634,7 +634,7 @@ static void __attribute__((unused)) update_distance_scale(void)
     render_target_markers();
 }
 
-static void animate_distance_scale(int target_scale)
+void animate_distance_scale(int target_scale)
 {
     /* Stop any existing animation */
     if (g.distance_anim) {
