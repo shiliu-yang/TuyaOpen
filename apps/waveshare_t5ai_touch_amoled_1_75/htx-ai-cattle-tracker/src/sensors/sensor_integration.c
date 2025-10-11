@@ -34,12 +34,20 @@
 /***********************************************************
 ***********************variable define**********************
 ***********************************************************/
+
+#ifdef ENABLE_BMM150_SENSOR
 static THREAD_HANDLE sg_bmm150_handle = NULL;
-static THREAD_HANDLE sg_gps_handle = NULL;
 static bmm150_dev_t g_bmm150_dev;
+#endif
+
+#ifdef ENABLE_GPS_LC76G
+static THREAD_HANDLE sg_gps_handle = NULL;
 static lc76g_dev_t g_gps_dev;
+#endif
+
 static sensor_data_t g_sensor_data = {0};
 static MUTEX_HANDLE g_sensor_mutex = NULL;
+
 
 // I2C bus coordination mutex for shared I2C Port 0 (GPS + Touch)
 MUTEX_HANDLE g_i2c_bus_mutex = NULL;
@@ -64,7 +72,7 @@ MUTEX_HANDLE g_i2c_bus_mutex = NULL;
 //     return OPRT_OK;
 // }
 
-
+#ifdef ENABLE_BMM150_SENSOR
 /**
  * @brief BMM150 sensor reading task
  */
@@ -159,11 +167,15 @@ static void __bmm150_task(void *param)
         tal_system_sleep(100); // Read at 10Hz
     }
 }
+#endif
+
+
 
 /**
  * @brief GPS sensor reading task
  */
-static void __gps_task(void *param)
+#ifdef ENABLE_GPS_LC76G
+__attribute__((unused)) static void __gps_task(void *param)
 {
     OPERATE_RET op_ret = OPRT_OK;
 
@@ -255,7 +267,7 @@ static void __gps_task(void *param)
         tal_system_sleep(5000); // Sleep for 5 seconds on success
     }
 }
-
+#endif
 /**
  * @brief Initialize BMM150 magnetometer sensor
  */
