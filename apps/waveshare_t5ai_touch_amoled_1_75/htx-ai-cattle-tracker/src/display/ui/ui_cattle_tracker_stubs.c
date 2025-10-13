@@ -42,6 +42,7 @@ int ui_init(UI_FONT_T *ui_font)
     (void)ui_font;
     // Cattle tracker UI is initialized via lv_demo_cattle_ai_tracker()
     // This is just a stub to satisfy the interface
+    // Note: Encoder zoom control is now integrated into sensor_integration.c
     PR_DEBUG("ui_init stub - cattle tracker UI handles its own initialization");
     return 0;
 }
@@ -163,6 +164,37 @@ void ui_set_assistant_msg_stream_interrupt(void)
     PR_DEBUG("Stream interrupt (not used in tracker UI)");
 }
 #endif
+
+/***********************************************************
+******************Zoom Control Functions********************
+***********************************************************/
+
+/* Global variable to track current distance scale */
+static int sg_current_distance_scale = 200; /* Default 200m */
+
+/**
+ * @brief Set the tracker distance scale (zoom level)
+ * @param scale_meters Distance scale in meters
+ * 
+ * This function directly calls animate_distance_scale() from cattle_ai_tracker_app.c
+ * to trigger smooth zoom animations.
+ */
+void tracker_set_distance_scale(int scale_meters)
+{
+    /* Directly call the animate_distance_scale API */
+    animate_distance_scale(scale_meters);
+    sg_current_distance_scale = scale_meters;
+    PR_DEBUG("[ZOOM] Distance scale set to %dm", scale_meters);
+}
+
+/**
+ * @brief Get current tracker distance scale
+ * @return Current distance scale in meters
+ */
+int tracker_get_distance_scale(void)
+{
+    return sg_current_distance_scale;
+}
 
 #endif /* ENABLE_GUI_TRACKER */
 

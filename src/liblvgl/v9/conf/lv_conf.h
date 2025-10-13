@@ -34,9 +34,24 @@
  *====================*/
 
 /*Color depth: 1 (I1), 8 (L8), 16 (RGB565), 24 (RGB888), 32 (XRGB8888)*/
-#define LV_COLOR_DEPTH 16
+#define LV_COLOR_DEPTH 32
 
-#define LV_COLOR_16_SWAP    0
+// #define LV_COLOR_16_SWAP    0
+
+
+/*Color depth: 8 (A8), 16 (RGB565), 24 (RGB888), 32 (XRGB8888)*/
+// #define LV_COLOR_DEPTH 32
+
+#define LV_COLOR_SCREEN_TRANSP 1
+
+
+#if LV_COLOR_DEPTH == 1 || LV_COLOR_DEPTH == 8
+#define LV_IMG_PX_SIZE_ALPHA_BYTE 2
+#elif LV_COLOR_DEPTH == 16
+#define LV_IMG_PX_SIZE_ALPHA_BYTE 3
+#elif LV_COLOR_DEPTH == 32
+#define LV_IMG_PX_SIZE_ALPHA_BYTE 4
+#endif
 
 /*=========================
    STDLIB WRAPPER SETTINGS
@@ -75,9 +90,9 @@
  *====================*/
 
 /*Default display refresh, input device read and animation step period.*/
-#define LV_DEF_REFR_PERIOD  10      /*[ms]*/
+#define LV_DEF_REFR_PERIOD  120      /*[ms]*/
 
-#define LV_INDEV_REFR_PERIOD  30    /*[ms]*/
+#define LV_INDEV_REFR_PERIOD  60    /*[ms]*/
 
 /*Default Dot Per Inch. Used to initialize default sizes such as widgets sized, style paddings.
  *(Not so important, you can adjust it to modify default sizes and spaces)*/
@@ -410,7 +425,7 @@
 #define LV_FONT_MONTSERRAT_14 1
 #define LV_FONT_MONTSERRAT_16 1
 #define LV_FONT_MONTSERRAT_18 0
-#define LV_FONT_MONTSERRAT_20 0
+#define LV_FONT_MONTSERRAT_20 1
 #define LV_FONT_MONTSERRAT_22 0
 #define LV_FONT_MONTSERRAT_24 1
 #define LV_FONT_MONTSERRAT_26 0

@@ -48,6 +48,11 @@ float gps_get_dummy_self_lon(void);
 int gps_get_dummy_target_count(void);
 const void *gps_get_dummy_target(int index);
 
+/* Zoom/Scale control functions */
+void animate_distance_scale(int target_scale);
+void tracker_set_distance_scale(int scale_meters);
+int tracker_get_distance_scale(void);
+
 #ifdef __cplusplus
 }
 #endif

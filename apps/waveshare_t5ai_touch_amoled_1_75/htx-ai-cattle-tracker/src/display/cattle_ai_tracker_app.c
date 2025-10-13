@@ -174,7 +174,7 @@ static void clamp_input_coordinates(lv_point_t *point);
 static void set_distance_text(int meters);
 static void update_rotation_text(float yaw_degrees);
 static void __attribute__((unused)) update_distance_scale(void);
-static void animate_distance_scale(int target_scale);
+/* animate_distance_scale is now public - declared in header */
 static void on_distance_anim_value(void *var, int32_t value);
 static void on_distance_anim_ready(lv_anim_t *anim);
 static void update_interval_lines(void);
@@ -420,8 +420,8 @@ static void compass_build(lv_obj_t *parent)
     /* Note: lv_img_cache_set_size not available in this LVGL version */
 
     /* Pre-cache the compass face ring image */
-    lv_img_cache_invalidate_src(&compass_face_ring);
-    lv_img_cache_invalidate_src(&compass_face_ring); /* Force cache */
+    // lv_img_cache_invalidate_src(&compass_face_ring);
+    // lv_img_cache_invalidate_src(&compass_face_ring); /* Force cache */
 
     /* Set rendering optimizations */
     lv_obj_set_style_radius(g.compass_face_ring_img, 0, 0);        /* No rounded corners */
@@ -634,7 +634,7 @@ static void __attribute__((unused)) update_distance_scale(void)
     render_target_markers();
 }
 
-static void animate_distance_scale(int target_scale)
+void animate_distance_scale(int target_scale)
 {
     /* Stop any existing animation */
     if (g.distance_anim) {
@@ -726,30 +726,33 @@ static void update_interval_lines(void)
     float dynamic_intervals[12];
     int interval_count = 0;
 
-    /* Optimized step size lookup table */
-    static const struct {
-        float max_distance;
-        float step_size;
-    } step_lookup[] = {
-        {100.0f, 20.0f},         /* 20m steps for small scales */
-        {500.0f, 50.0f},         /* 50m steps for medium scales */
-        {2000.0f, 200.0f},       /* 200m steps for larger scales */
-        {10000.0f, 1000.0f},     /* 1km steps for km scales */
-        {50000.0f, 5000.0f},     /* 5km steps for larger km scales */
-        {200000.0f, 20000.0f},   /* 20km steps for very large scales */
-        {999999999.0f, 50000.0f} /* 50km steps for huge scales */
-    };
+   /* Optimized step size lookup table */
+   static const struct {
+       float max_distance;
+       float step_size;
+   } step_lookup[] = {
+       {100.0f, 20.0f},         /* 20m steps for small scales */
+       {200.0f, 50.0f},         /* 50m steps at 200m scale (doubled tick lines) */
+       {500.0f, 100.0f},        /* 100m steps for medium scales (reduced from 50m) */
+       {1000.0f, 200.0f},       /* 200m steps at 1KM scale (reduced tick lines by half) */
+       {2000.0f, 100.0f},       /* 100m steps for larger scales */
+       {10000.0f, 1000.0f},     /* 1km steps for km scales */
+       {50000.0f, 5000.0f},     /* 5km steps for larger km scales */
+       {100000.0f, 2000.0f},   /* 10km steps for very large scales */
+       {200000.0f, 20000.0f},   /* 20km steps for very large scales */
+       {999999999.0f, 50000.0f} /* 50km steps for huge scales */
+   };
 
-    float total_distance = g.distance_scale_meters;
-    float step_size = 50000.0f; /* Default fallback */
+   float total_distance = g.distance_scale_meters;
+   float step_size = 50000.0f; /* Default fallback */
 
-    /* Find appropriate step size using lookup table */
-    for (int i = 0; i < 7; i++) {
-        if (total_distance <= step_lookup[i].max_distance) {
-            step_size = step_lookup[i].step_size;
-            break;
-        }
-    }
+   /* Find appropriate step size using lookup table */
+   for (int i = 0; i < 9; i++) {
+       if (total_distance <= step_lookup[i].max_distance) {
+           step_size = step_lookup[i].step_size;
+           break;
+       }
+   }
 
     /* Generate evenly spaced intervals */
     for (float interval = step_size; interval <= total_distance; interval += step_size) {
@@ -835,6 +838,9 @@ static void update_interval_lines(void)
         }
     }
 }
+
+
+
 
 static void create_interval_lines(void)
 {
