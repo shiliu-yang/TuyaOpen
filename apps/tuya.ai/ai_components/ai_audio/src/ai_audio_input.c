@@ -378,7 +378,7 @@ static void __ai_audio_get_input_frame(TDL_AUDIO_FRAME_FORMAT_E type, TDL_AUDIO_
     }
 #endif
 
-    if (true == sg_audio_input.is_enable_get_valid_data) {
+    if (true == sg_audio_input.is_enable_get_valid_data && false == ai_audio_player_is_playing()) {
         __ai_audio_detect_valid_data_feed(sg_audio_input.method, (uint8_t *)data, len);
     }
 
