@@ -32,6 +32,11 @@ set(APP_INC
 
 list(APPEND APP_INC "${APP_PATH}/assets")
 
+# cloud api
+aux_source_directory(${APP_PATH}/src/cloud_api CLOUD_API_SRCS)
+list(APPEND APP_SRCS ${CLOUD_API_SRCS})
+list(APPEND APP_INC "${APP_PATH}/src/cloud_api")
+
 ########################################
 # Target Configure
 ########################################
