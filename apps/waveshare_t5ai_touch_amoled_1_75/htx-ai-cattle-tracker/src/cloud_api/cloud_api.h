@@ -1,0 +1,51 @@
+/**
+ * @file cloud_api.h
+ * @brief cloud_api module is used to
+ * @version 0.1
+ * @copyright Copyright (c) 2021-2025 Tuya Inc. All Rights Reserved.
+ */
+
+#ifndef __CLOUD_API_H__
+#define __CLOUD_API_H__
+
+#include "tuya_cloud_types.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/***********************************************************
+************************macro define************************
+***********************************************************/
+#define CATTLE_ID_LEN   32
+#define CATTLE_NAME_LEN 64
+
+// cattle location data structure
+typedef struct {
+    int accuracy;                     // accuracy in meters
+    char cattleId[CATTLE_ID_LEN];     // unique identifier for the cattle
+    char cattleName[CATTLE_NAME_LEN]; // name of the cattle
+    uint32_t direction;               // direction in degrees
+    double lat;                       // latitude (double precision for better accuracy)
+    double lon;                       // longitude (double precision for better accuracy)
+    uint64_t locationTime;            // timestamp of the location data
+    uint32_t speed;                   // speed in meters/second
+} cattle_location_t;
+
+/***********************************************************
+***********************typedef define***********************
+***********************************************************/
+
+/***********************************************************
+********************function declaration********************
+***********************************************************/
+
+OPERATE_RET cloud_api_init(void);
+
+OPERATE_RET cloud_api_get_cattle_location(cattle_location_t *location);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* __CLOUD_API_H__ */
