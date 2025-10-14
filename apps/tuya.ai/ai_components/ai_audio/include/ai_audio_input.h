@@ -87,6 +87,8 @@ uint32_t ai_audio_get_input_data_size(void);
 
 void ai_audio_discard_input_data(uint32_t discard_size);
 
+void ai_audio_reset_input_data(void);
+
 #ifdef __cplusplus
 }
 #endif

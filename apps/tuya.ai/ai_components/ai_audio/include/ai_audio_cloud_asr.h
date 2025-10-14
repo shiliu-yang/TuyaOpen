@@ -56,6 +56,8 @@ OPERATE_RET ai_audio_cloud_asr_start(void);
  */
 OPERATE_RET ai_audio_cloud_asr_stop(void);
 
+OPERATE_RET ai_audio_cloud_upload_forced_stop(void);
+
 /**
  * @brief Stops waiting for the cloud ASR response and transitions the state to idle.
  * @param None

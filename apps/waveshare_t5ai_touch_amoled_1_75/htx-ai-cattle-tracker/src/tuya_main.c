@@ -47,8 +47,7 @@
 #include "reset_netcfg.h"
 #include "app_system_info.h"
 
-#if defined(ENABLE_BMM150_SENSOR) && (ENABLE_BMM150_SENSOR == 1) || \
-    defined(ENABLE_GPS_LC76G) && (ENABLE_GPS_LC76G == 1)
+#if defined(ENABLE_BMM150_SENSOR) && (ENABLE_BMM150_SENSOR == 1) || defined(ENABLE_GPS_LC76G) && (ENABLE_GPS_LC76G == 1)
 #include "sensor_integration.h"
 #endif
 
@@ -297,7 +296,7 @@ void user_event_handler_on(tuya_iot_client_t *client, tuya_event_msg_t *event)
 static void __cellular_module_reset(void)
 {
     TUYA_GPIO_BASE_CFG_T gpio_cfg;
-
+#if 0 // for waveshare
     gpio_cfg.direct = TUYA_GPIO_OUTPUT;
     gpio_cfg.level = TUYA_GPIO_LEVEL_HIGH;
     gpio_cfg.mode = TUYA_GPIO_PUSH_PULL;
@@ -309,7 +308,19 @@ static void __cellular_module_reset(void)
     tal_system_sleep(200);                                 // delay 200ms
     tkl_gpio_write(TUYA_GPIO_NUM_45, TUYA_GPIO_LEVEL_LOW); // power on pin LOW
     tal_system_sleep(1200);                                // delay up 1s
-
+#else // for T5AI+4G
+    gpio_cfg.direct = TUYA_GPIO_OUTPUT;
+    gpio_cfg.level = TUYA_GPIO_LEVEL_HIGH;
+    gpio_cfg.mode = TUYA_GPIO_PUSH_PULL;
+    tkl_gpio_init(TUYA_GPIO_NUM_24, &gpio_cfg); // reset pin 24 is 1;
+    tkl_gpio_write(TUYA_GPIO_NUM_24, TUYA_GPIO_LEVEL_HIGH);
+    gpio_cfg.level = TUYA_GPIO_LEVEL_HIGH;
+    tkl_gpio_init(TUYA_GPIO_NUM_9, &gpio_cfg); // power pin 9;
+    tkl_gpio_write(TUYA_GPIO_NUM_9, TUYA_GPIO_LEVEL_HIGH);
+    tal_system_sleep(200);                                // delay 200ms
+    tkl_gpio_write(TUYA_GPIO_NUM_9, TUYA_GPIO_LEVEL_LOW); // power on pin LOW
+    tal_system_sleep(1200);                               // delay up 1s
+#endif
     return;
 }
 #endif // ENABLE_CELLULAR
@@ -357,8 +368,7 @@ void user_main(void)
     tuya_authorize_init();
 
     reset_netconfig_start();
-    ai_audio_set_volume(255);
-
+    ai_audio_set_volume(20);
 
     tuya_iot_license_t license;
 
@@ -443,8 +453,7 @@ void user_main(void)
     }
 #endif
 
-#if defined(ENABLE_BMM150_SENSOR) && (ENABLE_BMM150_SENSOR == 1) || \
-    defined(ENABLE_GPS_LC76G) && (ENABLE_GPS_LC76G == 1)
+#if defined(ENABLE_BMM150_SENSOR) && (ENABLE_BMM150_SENSOR == 1) || defined(ENABLE_GPS_LC76G) && (ENABLE_GPS_LC76G == 1)
     PR_INFO("Starting sensor tasks...");
     ret = sensor_tasks_start();
     if (ret != OPRT_OK) {

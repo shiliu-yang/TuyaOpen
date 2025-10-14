@@ -628,3 +628,10 @@ void ai_audio_discard_input_data(uint32_t discard_size)
     tuya_ring_buff_discard(sg_audio_input.ringbuff_hdl, discard_size);
     tal_mutex_unlock(sg_audio_input.rb_mutex);
 }
+
+void ai_audio_reset_input_data(void)
+{
+    tal_mutex_lock(sg_audio_input.rb_mutex);
+    tuya_ring_buff_reset(sg_audio_input.ringbuff_hdl);
+    tal_mutex_unlock(sg_audio_input.rb_mutex);
+}
