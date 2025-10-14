@@ -47,6 +47,11 @@
 #include "ai_audio.h"
 #include "reset_netcfg.h"
 #include "app_system_info.h"
+#include "app_dp.h"
+
+#if defined(ENABLE_BATTERY) && (ENABLE_BATTERY == 1)
+#include "app_battery.h"
+#endif
 
 #if defined(ENABLE_BMM150_SENSOR) && (ENABLE_BMM150_SENSOR == 1) || defined(ENABLE_GPS_LC76G) && (ENABLE_GPS_LC76G == 1)
 #include "sensor_integration.h"
@@ -108,7 +113,7 @@ OPERATE_RET audio_dp_obj_proc(dp_obj_recv_t *dpobj)
 #if defined(ENABLE_CHAT_DISPLAY) && (ENABLE_CHAT_DISPLAY == 1)
             /* Update UI volume slider */
             ui_set_system_volume(volume);
-            
+
             /* Show notification */
             char volume_str[20] = {0};
             snprintf(volume_str, sizeof(volume_str), "%s%d", VOLUME, volume);
@@ -124,22 +129,6 @@ OPERATE_RET audio_dp_obj_proc(dp_obj_recv_t *dpobj)
     return OPRT_OK;
 }
 
-OPERATE_RET ai_audio_volume_upload(void)
-{
-    tuya_iot_client_t *client = tuya_iot_client_get();
-    dp_obj_t dp_obj = {0};
-
-    uint8_t volume = ai_audio_get_volume();
-
-    dp_obj.id = DPID_VOLUME;
-    dp_obj.type = PROP_VALUE;
-    dp_obj.value.dp_value = volume;
-
-    PR_DEBUG("DP upload volume:%d", volume);
-
-    return tuya_iot_dp_obj_report(client, client->activate.devid, &dp_obj, 1, 0);
-}
-
 #if defined(ENABLE_CHAT_DISPLAY) && (ENABLE_CHAT_DISPLAY == 1)
 /**
  * @brief Volume change handler called when UI slider changes
@@ -148,48 +137,27 @@ OPERATE_RET ai_audio_volume_upload(void)
 static void volume_ui_change_handler(int volume)
 {
     PR_INFO("Volume changed from UI: %d%%", volume);
-    
-    /* Convert 0-100 (UI) to 0-255 (audio system) */
-    uint8_t audio_volume = (uint8_t)((volume * 255) / 100);
-    
-    /* Set audio volume */
-    ai_audio_set_volume(audio_volume);
-    
-    /* Upload to cloud */
-    tuya_iot_client_t *client = tuya_iot_client_get();
-    if (client && client->is_activated) {
-        dp_obj_t dp_obj = {0};
-        dp_obj.id = DPID_VOLUME;
-        dp_obj.type = PROP_VALUE;
-        dp_obj.value.dp_value = volume; /* Use 0-100 range for DP */
-        
-        OPERATE_RET ret = tuya_iot_dp_obj_report(client, client->activate.devid, &dp_obj, 1, 0);
-        if (ret == OPRT_OK) {
-            PR_DEBUG("Volume %d%% uploaded to cloud successfully", volume);
-        } else {
-            PR_ERR("Failed to upload volume to cloud: %d", ret);
-        }
-    }
+    app_volume_set(volume);
 }
 
 /**
  * @brief Network link type change callback
  * @param data Event data (unused)
  * @return OPRT_OK
- * 
+ *
  * This callback is triggered whenever the network connection type changes
  * (e.g., WiFi to Cellular, or connection goes up/down). It updates the
  * settings panel network icon to reflect the current active connection.
  */
 static OPERATE_RET __network_link_type_change_cb(void *data)
 {
-    (void)data;  /* Unused parameter */
-    
+    (void)data; /* Unused parameter */
+
     PR_INFO("Network link type changed - updating UI");
-    
+
     /* Update network status icon in settings panel */
     ui_update_network_status();
-    
+
     return OPRT_OK;
 }
 #endif
@@ -281,7 +249,7 @@ void user_event_handler_on(tuya_iot_client_t *client, tuya_event_msg_t *event)
 #endif
 
             ai_audio_player_play_alert(AI_AUDIO_ALERT_NETWORK_CONNECTED);
-            ai_audio_volume_upload();
+            app_dp_update_all();
         }
         break;
 
@@ -300,7 +268,7 @@ void user_event_handler_on(tuya_iot_client_t *client, tuya_event_msg_t *event)
     case TUYA_EVENT_TIMESTAMP_SYNC:
         PR_INFO("Sync timestamp:%d", event->value.asInteger);
         tal_time_set_posix(event->value.asInteger, 1);
-        
+
 #if defined(ENABLE_CHAT_DISPLAY) && (ENABLE_CHAT_DISPLAY == 1)
         /* Update UI with current local time and date */
         {
@@ -310,17 +278,16 @@ void user_event_handler_on(tuya_iot_client_t *client, tuya_event_msg_t *event)
             if (ret == OPRT_OK) {
                 /* Update time (HH:MM) */
                 ui_set_settings_time(tm_time.tm_hour, tm_time.tm_min);
-                
+
                 /* Update date (YYYY/MM/DD) */
                 ui_set_settings_date(tm_time.tm_year + 1900, tm_time.tm_mon + 1, tm_time.tm_mday);
-                
-                PR_INFO("UI time updated (local): %04d/%02d/%02d %02d:%02d", 
-                         tm_time.tm_year + 1900, tm_time.tm_mon + 1, tm_time.tm_mday,
-                         tm_time.tm_hour, tm_time.tm_min);
+
+                PR_INFO("UI time updated (local): %04d/%02d/%02d %02d:%02d", tm_time.tm_year + 1900, tm_time.tm_mon + 1,
+                        tm_time.tm_mday, tm_time.tm_hour, tm_time.tm_min);
             }
         }
 #endif
-        
+
 #if defined(ENABLE_CELLULAR) && (ENABLE_CELLULAR == 1)
         cellular_http_upload_iccid();
 #endif
@@ -340,10 +307,9 @@ void user_event_handler_on(tuya_iot_client_t *client, tuya_event_msg_t *event)
             PR_DEBUG("devid.%s", dpobj->devid);
         }
 
-        audio_dp_obj_proc(dpobj);
-
-        tuya_iot_dp_obj_report(client, dpobj->devid, dpobj->dps, dpobj->dpscnt, 0);
-
+        for (uint32_t i = 0; i < dpobj->dpscnt; i++) {
+            app_dp_process(dpobj->dps[i].id, dpobj->dps[i].type, dpobj->dps[i].value);
+        }
     } break;
 
     /* RECV RAW DP */
@@ -436,7 +402,6 @@ void user_main(void)
     tuya_authorize_init();
 
     reset_netconfig_start();
-    ai_audio_set_volume(100);
 
     tuya_iot_license_t license;
 
@@ -496,7 +461,7 @@ void user_main(void)
     /* Register volume change handler to upload to cloud when UI slider changes */
     ui_register_volume_change_handler(volume_ui_change_handler);
     PR_INFO("Volume change handler registered");
-    
+
     /* Subscribe to network link type change events for automatic UI updates */
     tal_event_subscribe(EVENT_LINK_TYPE_CHG, "ui_net", __network_link_type_change_cb, SUBSCRIBE_TYPE_NORMAL);
     PR_INFO("Network link type change event subscribed");
@@ -540,6 +505,11 @@ void user_main(void)
         PR_INFO("Sensor tasks started successfully");
         PR_INFO("BMM150 and GPS readings will be printed to console");
     }
+#endif
+
+#if defined(ENABLE_BATTERY) && (ENABLE_BATTERY == 1)
+    PR_INFO("Battery monitoring initialized");
+    app_battery_init();
 #endif
 
     for (;;) {
