@@ -511,9 +511,9 @@ OPERATE_RET ai_audio_agent_upload_start(uint8_t enable_vad)
     char attr_asr_enable_vad[64] = {0};
     if (enable_vad) {
         snprintf(attr_asr_enable_vad, sizeof(attr_asr_enable_vad),
-                 "{\"asr.enableVad\":false,\"processing.interrupt\":true}");
+                 "{\"asr.enableVad\":true,\"processing.interrupt\":true}");
     } else {
-        snprintf(attr_asr_enable_vad, sizeof(attr_asr_enable_vad), "{\"asr.enableVad\":false}");
+        snprintf(attr_asr_enable_vad, sizeof(attr_asr_enable_vad), "{\"asr.enableVad\":true}");
     }
 
     AI_ATTRIBUTE_T attr[] = {{
