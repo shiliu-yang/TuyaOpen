@@ -21,9 +21,15 @@
 #define BATTERY_CHARGE_CHECK_TIME_MS (1500)          // 1.5 seconds
 
 // for T5AI+4G
-#define ADC_BATTERY_CAP_PIN    TUYA_GPIO_NUM_23
-#define ADC_BATTERY_CHANNEL    3
-#define ADC_BATTERY_CHARGE_PIN TUYA_GPIO_NUM_20
+#if 0
+#define ADC_BATTERY_ADC_PIN     TUYA_GPIO_NUM_23
+#define ADC_BATTERY_ADC_CHANNEL 3
+#define ADC_BATTERY_CHARGE_PIN  TUYA_GPIO_NUM_20
+#else
+#define ADC_BATTERY_ADC_PIN     TUYA_GPIO_NUM_13
+#define ADC_BATTERY_ADC_CHANNEL 15
+#define ADC_BATTERY_CHARGE_PIN  TUYA_GPIO_NUM_30
+#endif
 
 /***********************************************************
 ***********************typedef define***********************
@@ -41,7 +47,7 @@ void __battery_charge_pin_deinit(void);
 ***********************variable define**********************
 ***********************************************************/
 static TUYA_ADC_BASE_CFG_T sg_adc_cfg = {
-    .ch_list.data = 1 << ADC_BATTERY_CHANNEL,
+    .ch_list.data = 1 << ADC_BATTERY_ADC_CHANNEL,
     .ch_nums = 1, // adc Number of channel lists
     .width = 12,
     .mode = TUYA_ADC_CONTINUOUS,
@@ -55,6 +61,11 @@ static TIMER_ID sg_charge_check_timer_id = NULL;
 volatile static bool sg_is_charging = false;
 
 static uint8_t sg_battery_percentage = 50;
+
+#define BVC_MAP_CNT 11
+static const int32_t bvc_map[] = {
+    2800, 3100, 3280, 3440, 3570, 3680, 3780, 3880, 3980, 4090, 4200,
+};
 
 /***********************************************************
 ***********************function define**********************
@@ -97,11 +108,20 @@ static void __battery_status_process(void)
         PR_ERR("read battery adc failed");
         return;
     }
+    battery_value = battery_value / 1000; // convert to mV
 
     PR_INFO("battery voltage: %d mV", battery_value);
 
+    // 2M/510K
+    battery_value = battery_value * 4; // voltage divider ratio
+
     // WAIT todo convert voltage to percentage
-    // sg_battery_percentage = 50;
+    sg_battery_percentage = 100;
+    for (uint8_t i = 0; i < BVC_MAP_CNT - 1; i++) {
+        if (battery_value >= bvc_map[i]) {
+            sg_battery_percentage = i * 10;
+        }
+    }
 
     // update dp
     app_dp_battery_upload(sg_is_charging, sg_battery_percentage);
