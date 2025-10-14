@@ -55,15 +55,16 @@ typedef struct {
 /***********************************************************
 ********************function declaration********************
 ***********************************************************/
-LV_FONT_DECLARE(font_puhui_14_1);
-LV_FONT_DECLARE(font_puhui_18_2);
-LV_FONT_DECLARE(font_puhui_20_4);
-LV_FONT_DECLARE(font_puhui_30_4);
-LV_FONT_DECLARE(font_awesome_14_1);
+// LV_FONT_DECLARE(font_puhui_14_1);
+// LV_FONT_DECLARE(font_puhui_18_2);
+// LV_FONT_DECLARE(font_puhui_18_2);
+// LV_FONT_DECLARE(font_puhui_20_4);
+// LV_FONT_DECLARE(font_puhui_30_4);
+// LV_FONT_DECLARE(font_awesome_14_1);
 LV_FONT_DECLARE(font_awesome_16_4);
-LV_FONT_DECLARE(font_awesome_20_4);
-LV_FONT_DECLARE(font_awesome_30_1);
-LV_FONT_DECLARE(font_awesome_30_4);
+// LV_FONT_DECLARE(font_awesome_20_4);
+// LV_FONT_DECLARE(font_awesome_30_1);
+// LV_FONT_DECLARE(font_awesome_30_4);
 
 extern const lv_font_t *font_emoji_32_init(void);
 extern const lv_font_t *font_emoji_64_init(void);
@@ -114,7 +115,7 @@ __attribute__((unused)) static OPERATE_RET __get_ui_font(UI_FONT_T *ui_font)
     ui_font->emoji = (lv_font_t *)font_emoji_64_init();
     ui_font->emoji_list = sg_emo_list;
 #elif defined(ENABLE_GUI_TRACKER)
-    ui_font->text = (lv_font_t *)&font_puhui_18_2;
+    ui_font->text = (lv_font_t *)&font_awesome_16_4;
     ui_font->icon = (lv_font_t *)&font_awesome_16_4;
     ui_font->emoji = (lv_font_t *)font_emoji_32_init();
     ui_font->emoji_list = sg_emo_list;
@@ -227,6 +228,12 @@ static void __app_display_msg_handle(DISPLAY_MSG_T *msg_data)
     } break;
     case TY_DISPLAY_TP_CHAT_MODE: {
         ui_set_chat_mode(msg_data->data);
+    } break;
+    case TY_DISPLAY_TP_RECORDING_START: {
+        ui_set_recording_indicator(true);
+    } break;
+    case TY_DISPLAY_TP_RECORDING_STOP: {
+        ui_set_recording_indicator(false);
     } break;
     default: {
         PR_ERR("Invalid display type: %d", msg_data->type);

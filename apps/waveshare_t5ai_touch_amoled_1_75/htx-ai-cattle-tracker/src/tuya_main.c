@@ -38,6 +38,7 @@
 
 #if defined(ENABLE_CHAT_DISPLAY) && (ENABLE_CHAT_DISPLAY == 1)
 #include "app_display.h"
+#include "ui_display.h"
 #endif
 
 #include "board_com_api.h"
@@ -104,8 +105,12 @@ OPERATE_RET audio_dp_obj_proc(dp_obj_recv_t *dpobj)
         case DPID_VOLUME: {
             uint8_t volume = dp->value.dp_value;
             PR_DEBUG("volume:%d", volume);
-            // ai_audio_set_volume(volume);
+            ai_audio_set_volume(volume);
 #if defined(ENABLE_CHAT_DISPLAY) && (ENABLE_CHAT_DISPLAY == 1)
+            /* Update UI volume slider */
+            ui_set_system_volume(volume);
+            
+            /* Show notification */
             char volume_str[20] = {0};
             snprintf(volume_str, sizeof(volume_str), "%s%d", VOLUME, volume);
             app_display_send_msg(TY_DISPLAY_TP_NOTIFICATION, (uint8_t *)volume_str, strlen(volume_str));
@@ -135,6 +140,60 @@ OPERATE_RET ai_audio_volume_upload(void)
 
     return tuya_iot_dp_obj_report(client, client->activate.devid, &dp_obj, 1, 0);
 }
+
+#if defined(ENABLE_CHAT_DISPLAY) && (ENABLE_CHAT_DISPLAY == 1)
+/**
+ * @brief Volume change handler called when UI slider changes
+ * @param volume Volume value from UI (0-100)
+ */
+static void volume_ui_change_handler(int volume)
+{
+    PR_INFO("Volume changed from UI: %d%%", volume);
+    
+    /* Convert 0-100 (UI) to 0-255 (audio system) */
+    uint8_t audio_volume = (uint8_t)((volume * 255) / 100);
+    
+    /* Set audio volume */
+    ai_audio_set_volume(audio_volume);
+    
+    /* Upload to cloud */
+    tuya_iot_client_t *client = tuya_iot_client_get();
+    if (client && client->is_activated) {
+        dp_obj_t dp_obj = {0};
+        dp_obj.id = DPID_VOLUME;
+        dp_obj.type = PROP_VALUE;
+        dp_obj.value.dp_value = volume; /* Use 0-100 range for DP */
+        
+        OPERATE_RET ret = tuya_iot_dp_obj_report(client, client->activate.devid, &dp_obj, 1, 0);
+        if (ret == OPRT_OK) {
+            PR_DEBUG("Volume %d%% uploaded to cloud successfully", volume);
+        } else {
+            PR_ERR("Failed to upload volume to cloud: %d", ret);
+        }
+    }
+}
+
+/**
+ * @brief Network link type change callback
+ * @param data Event data (unused)
+ * @return OPRT_OK
+ * 
+ * This callback is triggered whenever the network connection type changes
+ * (e.g., WiFi to Cellular, or connection goes up/down). It updates the
+ * settings panel network icon to reflect the current active connection.
+ */
+static OPERATE_RET __network_link_type_change_cb(void *data)
+{
+    (void)data;  /* Unused parameter */
+    
+    PR_INFO("Network link type changed - updating UI");
+    
+    /* Update network status icon in settings panel */
+    ui_update_network_status();
+    
+    return OPRT_OK;
+}
+#endif
 
 #if defined(ENABLE_CELLULAR) && (ENABLE_CELLULAR == 1)
 #include "tal_cellular.h"
@@ -242,6 +301,27 @@ void user_event_handler_on(tuya_iot_client_t *client, tuya_event_msg_t *event)
     case TUYA_EVENT_TIMESTAMP_SYNC:
         PR_INFO("Sync timestamp:%d", event->value.asInteger);
         tal_time_set_posix(event->value.asInteger, 1);
+        
+#if defined(ENABLE_CHAT_DISPLAY) && (ENABLE_CHAT_DISPLAY == 1)
+        /* Update UI with current local time and date */
+        {
+            TIME_T posix_time = tal_time_get_posix();
+            POSIX_TM_S tm_time;
+            OPERATE_RET ret = tal_time_get_local_time_custom(posix_time, &tm_time);
+            if (ret == OPRT_OK) {
+                /* Update time (HH:MM) */
+                ui_set_settings_time(tm_time.tm_hour, tm_time.tm_min);
+                
+                /* Update date (YYYY/MM/DD) */
+                ui_set_settings_date(tm_time.tm_year + 1900, tm_time.tm_mon + 1, tm_time.tm_mday);
+                
+                PR_INFO("UI time updated (local): %04d/%02d/%02d %02d:%02d", 
+                         tm_time.tm_year + 1900, tm_time.tm_mon + 1, tm_time.tm_mday,
+                         tm_time.tm_hour, tm_time.tm_min);
+            }
+        }
+#endif
+        
 #if defined(ENABLE_CELLULAR) && (ENABLE_CELLULAR == 1)
         cellular_http_upload_iccid();
 #endif
@@ -413,6 +493,16 @@ void user_main(void)
     if (ret != OPRT_OK) {
         PR_ERR("tuya_audio_recorde_init failed");
     }
+
+#if defined(ENABLE_CHAT_DISPLAY) && (ENABLE_CHAT_DISPLAY == 1)
+    /* Register volume change handler to upload to cloud when UI slider changes */
+    ui_register_volume_change_handler(volume_ui_change_handler);
+    PR_INFO("Volume change handler registered");
+    
+    /* Subscribe to network link type change events for automatic UI updates */
+    tal_event_subscribe(EVENT_LINK_TYPE_CHG, "ui_net", __network_link_type_change_cb, SUBSCRIBE_TYPE_NORMAL);
+    PR_INFO("Network link type change event subscribed");
+#endif
 
     app_system_info();
 

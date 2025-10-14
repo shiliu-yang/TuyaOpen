@@ -71,6 +71,20 @@ void ui_set_chat_mode(const char *chat_mode);
 
 void ui_set_status_bar_pad(int32_t value);
 
+void ui_set_recording_indicator(bool is_recording);
+
+/* Volume control functions */
+void ui_register_volume_change_handler(void (*handler)(int volume));
+void ui_set_system_volume(int volume);
+int ui_get_current_volume(void);
+
+/* Time/Date control functions */
+void ui_set_settings_time(int hour, int minute);
+void ui_set_settings_date(int year, int month, int day);
+
+/* Network connection status functions */
+void ui_update_network_status(void);
+
 #if defined(ENABLE_GUI_STREAM_AI_TEXT) && (ENABLE_GUI_STREAM_AI_TEXT == 1)
 void ui_set_assistant_msg_stream_start(void);
 

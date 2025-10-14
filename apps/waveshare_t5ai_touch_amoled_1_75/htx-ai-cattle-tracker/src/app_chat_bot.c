@@ -259,6 +259,8 @@ static void __app_ai_audio_state_inform_cb(AI_AUDIO_STATE_E state)
 #if defined(ENABLE_CHAT_DISPLAY) && (ENABLE_CHAT_DISPLAY == 1)
         app_display_send_msg(TY_DISPLAY_TP_EMOTION, (uint8_t *)EMOJI_NEUTRAL, strlen(EMOJI_NEUTRAL));
         app_display_send_msg(TY_DISPLAY_TP_STATUS, (uint8_t *)STANDBY, strlen(STANDBY));
+        /* Hide red ring when in standby */
+        app_display_send_msg(TY_DISPLAY_TP_RECORDING_STOP, NULL, 0);
 #endif
         break;
     case AI_AUDIO_STATE_LISTEN:
@@ -268,6 +270,8 @@ static void __app_ai_audio_state_inform_cb(AI_AUDIO_STATE_E state)
 
 #if defined(ENABLE_CHAT_DISPLAY) && (ENABLE_CHAT_DISPLAY == 1)
         app_display_send_msg(TY_DISPLAY_TP_STATUS, (uint8_t *)LISTENING, strlen(LISTENING));
+        /* Show red ring when recording/listening */
+        app_display_send_msg(TY_DISPLAY_TP_RECORDING_START, NULL, 0);
 #endif
         break;
     case AI_AUDIO_STATE_UPLOAD:
@@ -276,6 +280,8 @@ static void __app_ai_audio_state_inform_cb(AI_AUDIO_STATE_E state)
     case AI_AUDIO_STATE_AI_SPEAK:
 #if defined(ENABLE_CHAT_DISPLAY) && (ENABLE_CHAT_DISPLAY == 1)
         app_display_send_msg(TY_DISPLAY_TP_STATUS, (uint8_t *)SPEAKING, strlen(SPEAKING));
+        /* Hide red ring when AI is speaking */
+        app_display_send_msg(TY_DISPLAY_TP_RECORDING_STOP, NULL, 0);
 #endif
 
         break;

@@ -2,18 +2,32 @@
  * @file cattle_ai_tracker_app.h
  */
 
-#ifndef CATTLE_AI_TRACKER_APP_H
-#define CATTLE_AI_TRACKER_APP_H
+ #ifndef CATTLE_AI_TRACKER_APP_H
+ #define CATTLE_AI_TRACKER_APP_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+ #ifdef __cplusplus
+ extern "C" {
+ #endif
 
-#include "lvgl.h"
+#include "../lvgl/lvgl.h"
 
-/* Font declarations - only fonts actually used */
-LV_FONT_DECLARE(font_puhui_18_2);  /* Used for idle text, settings labels */
-LV_FONT_DECLARE(montserrat_time_82_extra_bold);  /* Used for large time display */
+/* Font declarations */
+/* FontAwesome fonts */
+LV_FONT_DECLARE(font_awesome_14_1);
+LV_FONT_DECLARE(font_awesome_16_4);
+LV_FONT_DECLARE(font_awesome_20_4);
+LV_FONT_DECLARE(font_awesome_30_1);
+LV_FONT_DECLARE(font_awesome_30_4);
+
+/* PuHui fonts */
+LV_FONT_DECLARE(font_puhui_14_1);
+LV_FONT_DECLARE(font_puhui_16_2);
+LV_FONT_DECLARE(font_puhui_16_4);
+LV_FONT_DECLARE(font_puhui_18_2);
+LV_FONT_DECLARE(font_puhui_20_2);
+LV_FONT_DECLARE(font_puhui_20_4);
+// LV_FONT_DECLARE(font_puhui_30_4);
+LV_FONT_DECLARE(montserrat_time_82_extra_bold);
 
 /* Icon image declarations */
 LV_IMG_DECLARE(battery_full);
@@ -28,23 +42,23 @@ LV_IMG_DECLARE(gps_icon);
 LV_IMG_DECLARE(volume_icon);
 
 /* Target marker colors */
-typedef enum {
-    TARGET_COLOR_GREEN = 0x7ED643,  /* 绿 - Green */
-    TARGET_COLOR_YELLOW = 0xFFA000, /* 黄 - Yellow */
-    TARGET_COLOR_PINK = 0xEC8FD4,   /* 粉 - Pink */
-    TARGET_COLOR_CYAN = 0x78CFD1,   /* 青 - Cyan */
-    TARGET_COLOR_PURPLE = 0x8A66F9, /* 紫 - Purple */
-    TARGET_COLOR_COW = 0x6A6AF2     /* 牛 - Cow (special marker) */
-} target_color_t;
+ typedef enum {
+     TARGET_COLOR_GREEN = 0x7ED643,  /* 绿 - Green */
+     TARGET_COLOR_YELLOW = 0xFFA000, /* 黄 - Yellow */
+     TARGET_COLOR_PINK = 0xEC8FD4,   /* 粉 - Pink */
+     TARGET_COLOR_CYAN = 0x78CFD1,   /* 青 - Cyan */
+     TARGET_COLOR_PURPLE = 0x8A66F9, /* 紫 - Purple */
+     TARGET_COLOR_COW = 0x6A6AF2     /* 牛 - Cow (special marker) */
+ } target_color_t;
 
-#ifndef CATTLE_SCREEN_WIDTH
-#define CATTLE_SCREEN_WIDTH 466
-#endif
-#ifndef CATTLE_SCREEN_HEIGHT
-#define CATTLE_SCREEN_HEIGHT 466
-#endif
+ #ifndef CATTLE_SCREEN_WIDTH
+ #define CATTLE_SCREEN_WIDTH 466
+ #endif
+ #ifndef CATTLE_SCREEN_HEIGHT
+ #define CATTLE_SCREEN_HEIGHT 466
+ #endif
 
-void lv_demo_cattle_ai_tracker(void);
+ void lv_demo_cattle_ai_tracker(void);
 
 /* Bottom text display function with typewriter animation
  * Displays text with character-by-character typewriter effect and sliding window
@@ -140,15 +154,15 @@ void update_idle_bottom_text(const char *text);
 void set_idle_eye_state(int state);
 
 /* GPS API Functions */
-void gps_add_target(float lat, float lon, uint32_t color);
-void gps_add_target_at_distance(float distance_meters, float bearing_degrees, uint32_t color);
-void gps_remove_target(int index);
-void gps_clear_all_targets(void);
-void gps_set_tracker_position(float lat, float lon);
-int gps_get_target_count(void);
-int gps_get_target_distance(int index);
-void gps_update_target_markers(void);
-void gps_mark_data_dirty(void);
+ void gps_add_target(float lat, float lon, uint32_t color);
+ void gps_add_target_at_distance(float distance_meters, float bearing_degrees, uint32_t color);
+ void gps_remove_target(int index);
+ void gps_clear_all_targets(void);
+ void gps_set_tracker_position(float lat, float lon);
+ int gps_get_target_count(void);
+ int gps_get_target_distance(int index);
+ void gps_update_target_markers(void);
+ void gps_mark_data_dirty(void);
 
 /* Dummy data access functions */
 float gps_get_dummy_self_lat(void);
@@ -198,11 +212,6 @@ void set_volume(int volume);
  */
 int get_volume(void);
 
-/* Sets the volume change callback
- * @param callback: Function pointer to call when volume changes (can be NULL to disable)
- */
-void set_volume_change_callback(void (*callback)(int volume));
-
 /* GPS satellite count management
  * Sets the GPS satellite count display with English numbering
  * Text color changes based on signal strength:
@@ -231,11 +240,6 @@ void set_idle_red_ring(bool visible);
  * Switches between shown and hidden state
  */
 void toggle_idle_red_ring(void);
-
-/* Zoom/Scale control functions */
-void animate_distance_scale(int target_scale);
-void tracker_set_distance_scale(int scale_meters);
-int tracker_get_distance_scale(void);
 
 #ifdef __cplusplus
 }

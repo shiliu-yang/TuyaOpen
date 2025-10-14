@@ -18,7 +18,6 @@
  #include "resources/closing_nav_arrow.c"
  #include "resources/closing_nav_ring.c"
  #include "resources/closing_nav_cow_icon.c"
- #include "resources/icons/mic_red_icon.c"
 
  /*********************
   *      DEFINES
@@ -189,7 +188,6 @@
     lv_obj_t *settings_volume_slider; /* Volume slider control */
     lv_obj_t *settings_gps_sats_label; /* GPS satellites count label */
     int current_volume;              /* Current volume value (0-100) */
-    void (*volume_change_callback)(int volume); /* Callback for volume changes */
 
  #if ENABLE_CLOSE_TRACKING
      /* Close-range navigation mode */
@@ -214,12 +212,12 @@
   *  STATIC PROTOTYPES
   **********************/
  static void clamp_input_coordinates(lv_point_t *point);
-static void set_distance_text(int meters);
-static void update_rotation_text(float yaw_degrees);
-static void __attribute__((unused)) update_distance_scale(void);
-/* animate_distance_scale is now public - declared in header */
-static void on_distance_anim_value(void *var, int32_t value);
-static void on_distance_anim_ready(lv_anim_t *anim);
+ static void set_distance_text(int meters);
+ static void update_rotation_text(float yaw_degrees);
+ static void __attribute__((unused)) update_distance_scale(void);
+ static void animate_distance_scale(int target_scale);
+ static void on_distance_anim_value(void *var, int32_t value);
+ static void on_distance_anim_ready(lv_anim_t *anim);
 static void typewriter_timer_cb(lv_timer_t *timer);
 static void update_idle_bottom_text_static(const char *text);
 static int utf8_next_char_size(const char *text, int pos);
@@ -268,7 +266,6 @@ static void update_pupil_position(void);
  static void on_released(lv_event_t *e);
  static void on_gesture(lv_event_t *e);
  static void on_settings_drag(lv_event_t *e);
- static void on_volume_slider_changed(lv_event_t *e);
  static void on_tracking_drag(lv_event_t *e);
  static void on_settings_backdrop_click(lv_event_t *e);
  static void __attribute__((unused)) on_sos_cancel(lv_event_t *e);
@@ -423,32 +420,6 @@ int get_volume(void)
 }
 
 /**
- * Sets the volume change callback
- * @param callback: Function pointer to call when volume changes
- */
-void set_volume_change_callback(void (*callback)(int volume))
-{
-    g.volume_change_callback = callback;
-}
-
-/**
- * Volume slider event handler - called when user changes volume
- */
-static void on_volume_slider_changed(lv_event_t *e)
-{
-    lv_obj_t *slider = lv_event_get_target(e);
-    int volume = lv_slider_get_value(slider);
-    g.current_volume = volume;
-    
-    /* Call the callback if set */
-    if (g.volume_change_callback) {
-        g.volume_change_callback(volume);
-    }
-    
-    printf("Volume changed to: %d%%\n", volume);
-}
-
-/**
  * Sets the red ring indicator visibility on the idle screen
  * @param visible: true to show red ring and microphone icon, false to hide
  */
@@ -568,14 +539,11 @@ void lv_demo_cattle_ai_tracker(void)
      /* Pinch gesture handling for zoom */
      lv_obj_add_event_cb(g.screen, on_pinch_gesture, LV_EVENT_GESTURE, NULL);
 
-    /* Timer-based animation - 5 second intervals, 45 degrees per rotation */
-    g.tick_timer = lv_timer_create(on_tick, 5000, NULL); /* 5000ms = 5 seconds */
+     /* Timer-based animation - 5 second intervals, 45 degrees per rotation */
+     g.tick_timer = lv_timer_create(on_tick, 5000, NULL); /* 5000ms = 5 seconds */
 
-    set_gps_satellite_count(0);
-    
-    /* Set default bottom text with typewriter animation */
-    update_idle_bottom_text("你好，今天怎么帮你找牛？");
-}
+     set_gps_satellite_count(0);
+ }
 
  /**********************
   *   STATIC FUNCTIONS
@@ -1030,6 +998,9 @@ static void eye_look_timer_cb(lv_timer_t *timer)
      */
     lv_obj_align(g.idle_bottom_text, LV_ALIGN_BOTTOM_MID, 0, -20);
 
+    /* Set initial text using update function to apply line breaking */
+    update_idle_bottom_text("你好，你知道我的牛在哪里吗？ 这个是长句子的断句测试，跨行换行功能，如果有太多行语音回复那就直接用滚动的动效来替代。希望长文本回复在小屏幕上面显示有更加好的效果。");
+
     /* Create red ring indicator (hidden by default) */
     g.idle_red_ring = lv_obj_create(g.idle_screen);
     lv_obj_remove_style_all(g.idle_red_ring);
@@ -1044,9 +1015,11 @@ static void eye_look_timer_cb(lv_timer_t *timer)
     lv_obj_clear_flag(g.idle_red_ring, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_flag(g.idle_red_ring, LV_OBJ_FLAG_HIDDEN);  /* Hidden by default */
 
-    /* Create red microphone icon image at top (hidden by default) */
-    g.idle_mic_icon = lv_img_create(g.idle_screen);
-    lv_img_set_src(g.idle_mic_icon, &mic_red_icon);  /* Use custom red microphone icon */
+    /* Create red microphone icon at top (hidden by default) */
+    g.idle_mic_icon = lv_label_create(g.idle_screen);
+    lv_label_set_text(g.idle_mic_icon, LV_SYMBOL_AUDIO);  /* Microphone/audio symbol */
+    lv_obj_set_style_text_color(g.idle_mic_icon, lv_color_hex(0xFF0000), 0);
+    lv_obj_set_style_text_font(g.idle_mic_icon, &lv_font_montserrat_30, 0);
     lv_obj_align(g.idle_mic_icon, LV_ALIGN_TOP_MID, 0, 30);  /* Top center, 30px from edge */
     lv_obj_clear_flag(g.idle_mic_icon, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_clear_flag(g.idle_mic_icon, LV_OBJ_FLAG_SCROLLABLE);
@@ -1303,7 +1276,7 @@ static void eye_look_timer_cb(lv_timer_t *timer)
      render_target_markers();
  }
 
- void animate_distance_scale(int target_scale)
+ static void animate_distance_scale(int target_scale)
  {
      /* Stop any existing animation */
      if (g.distance_anim) {
@@ -2112,7 +2085,7 @@ static void eye_look_timer_cb(lv_timer_t *timer)
     g.settings_date_label = lv_label_create(g.settings_panel);
     lv_label_set_text(g.settings_date_label, "1970 / 01 / 01");
     lv_obj_set_style_text_color(g.settings_date_label, lv_color_white(), 0);
-    lv_obj_set_style_text_font(g.settings_date_label, &lv_font_montserrat_20, 0);  /* Use montserrat_20 instead of 22 */
+    lv_obj_set_style_text_font(g.settings_date_label, &lv_font_montserrat_22, 0);
     lv_obj_set_style_text_align(g.settings_date_label, LV_TEXT_ALIGN_LEFT, 0);  /* Align to left */
     lv_obj_align(g.settings_date_label, LV_ALIGN_CENTER, -95, -65);  // Move to left by 20px
 
@@ -2175,9 +2148,6 @@ static void eye_look_timer_cb(lv_timer_t *timer)
     lv_obj_set_style_shadow_width(g.settings_volume_slider, 8, LV_PART_KNOB);
     lv_obj_set_style_shadow_color(g.settings_volume_slider, lv_color_black(), LV_PART_KNOB);
     lv_obj_set_style_shadow_opa(g.settings_volume_slider, LV_OPA_20, LV_PART_KNOB);
-    
-    /* Add event handler for volume changes */
-    lv_obj_add_event_cb(g.settings_volume_slider, on_volume_slider_changed, LV_EVENT_VALUE_CHANGED, NULL);
 
 
     /* Draggable tab at very bottom */
@@ -2868,38 +2838,38 @@ static void eye_look_timer_cb(lv_timer_t *timer)
      }
  }
 
-// /* Helper function to count UTF-8 characters */
-// static int utf8_char_count(const char *text)
-// {
-//     int count = 0;
-//     const unsigned char *str = (const unsigned char *)text;
+/* Helper function to count UTF-8 characters */
+static int utf8_char_count(const char *text)
+{
+    int count = 0;
+    const unsigned char *str = (const unsigned char *)text;
 
-//     while (*str) {
-//         /* Skip continuation bytes (10xxxxxx) */
-//         if ((*str & 0xC0) != 0x80) {
-//             count++;
-//         }
-//         str++;
-//     }
-//     return count;
-// }
+    while (*str) {
+        /* Skip continuation bytes (10xxxxxx) */
+        if ((*str & 0xC0) != 0x80) {
+            count++;
+        }
+        str++;
+    }
+    return count;
+}
 
-// /* Helper function to get byte position of Nth UTF-8 character */
-// static int utf8_char_to_byte_pos(const char *text, int char_limit)
-// {
-//     int char_count = 0;
-//     int byte_pos = 0;
-//     const unsigned char *str = (const unsigned char *)text;
+/* Helper function to get byte position of Nth UTF-8 character */
+static int utf8_char_to_byte_pos(const char *text, int char_limit)
+{
+    int char_count = 0;
+    int byte_pos = 0;
+    const unsigned char *str = (const unsigned char *)text;
 
-//     while (str[byte_pos] && char_count < char_limit) {
-//         /* Count characters (not continuation bytes) */
-//         if ((str[byte_pos] & 0xC0) != 0x80) {
-//             char_count++;
-//         }
-//         byte_pos++;
-//     }
-//     return byte_pos;
-// }
+    while (str[byte_pos] && char_count < char_limit) {
+        /* Count characters (not continuation bytes) */
+        if ((str[byte_pos] & 0xC0) != 0x80) {
+            char_count++;
+        }
+        byte_pos++;
+    }
+    return byte_pos;
+}
 
 /* Helper function to get the size of the next UTF-8 character */
 static int utf8_next_char_size(const char *text, int pos)

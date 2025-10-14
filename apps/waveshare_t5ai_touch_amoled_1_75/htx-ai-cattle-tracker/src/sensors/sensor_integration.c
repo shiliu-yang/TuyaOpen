@@ -233,6 +233,12 @@ static void __encoder_task(void *param)
     
     PR_INFO("[ENCODER] Initialized successfully!");
     
+#ifdef ENABLE_GUI_TRACKER
+    PR_INFO("[ENCODER] Zoom control enabled - steps per zoom: %d", ENCODER_STEPS_PER_ZOOM);
+    PR_INFO("[ENCODER] Initial zoom level: %dm (index %d)", 
+            ZOOM_LEVELS[sg_current_zoom_index], sg_current_zoom_index);
+#endif
+    
     // Update sensor status
     tal_mutex_lock(g_sensor_mutex);
     g_sensor_data.encoder_ready = true;
