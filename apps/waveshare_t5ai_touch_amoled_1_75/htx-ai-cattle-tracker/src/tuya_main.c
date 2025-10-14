@@ -356,7 +356,7 @@ void user_main(void)
     tuya_authorize_init();
 
     reset_netconfig_start();
-    ai_audio_set_volume(20);
+    ai_audio_set_volume(100);
 
     tuya_iot_license_t license;
 
