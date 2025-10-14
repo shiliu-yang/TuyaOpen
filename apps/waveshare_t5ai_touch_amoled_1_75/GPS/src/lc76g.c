@@ -1,12 +1,41 @@
+/**
+ * @file lc76g.c
+ * @brief LC76G GPS Module Driver - Supports both I2C and UART interfaces
+ * 
+ * Debug/Logging Controls:
+ * -----------------------
+ * To control logging output, define these macros before including this file
+ * or set them in your build configuration:
+ * 
+ * LC76G_ENABLE_NMEA_LOGS (default: 0)
+ *   - Set to 1 to enable detailed NMEA sentence parsing logs
+ *   - Shows individual field values from each sentence type
+ * 
+ * LC76G_ENABLE_RAW_UART_DUMP (default: 1)
+ *   - Raw UART ASCII data is ALWAYS printed when using UART interface
+ *   - Set to 1 to also display hex dump of first 128 bytes for debugging
+ *   - Set to 0 to skip hex dump (ASCII still shown)
+ * 
+ * Example: To disable raw UART dump, add to your build:
+ *   -DLC76G_ENABLE_RAW_UART_DUMP=0
+ */
+
 #include "lc76g.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <stdio.h>
 
 uint8_t readData[4];
 
+// Enable/disable detailed NMEA parsing logs
 #ifndef LC76G_ENABLE_NMEA_LOGS
 #define LC76G_ENABLE_NMEA_LOGS 0
+#endif
+
+// Enable/disable raw UART data dump (set to 1 to always show raw data, 0 to disable)
+#ifndef LC76G_ENABLE_RAW_UART_DUMP
+#define LC76G_ENABLE_RAW_UART_DUMP 1
 #endif
 
 static lc76g_state_t g_state = {
@@ -359,11 +388,12 @@ static void parse_and_print_nmea(char *buffer, uint32_t len)
     }
 }
 
-OPERATE_RET lc76g_init(lc76g_dev_t *dev, uint8_t i2c_addr_wr, uint8_t i2c_addr_r) {
+OPERATE_RET lc76g_init_i2c(lc76g_dev_t *dev, uint8_t i2c_addr_wr, uint8_t i2c_addr_r) {
     if (!dev) return OPRT_COM_ERROR;
     
-    dev->i2c_addr_wr = i2c_addr_wr;
-    dev->i2c_addr_r = i2c_addr_r;
+    dev->interface = LC76G_INTERFACE_I2C;
+    dev->config.i2c.addr_wr = i2c_addr_wr;
+    dev->config.i2c.addr_r = i2c_addr_r;
 
     //拉高复位引脚
     dev_gpio_init(EXAMPLE_GPS_RESET_PIN, TUYA_GPIO_OUTPUT);
@@ -371,18 +401,72 @@ OPERATE_RET lc76g_init(lc76g_dev_t *dev, uint8_t i2c_addr_wr, uint8_t i2c_addr_r
     tal_system_sleep(50);
     dev_digital_write(EXAMPLE_GPS_RESET_PIN, 1);
     tal_system_sleep(500);
-    PR_INFO("LC76G initialized successfully");
+    PR_INFO("LC76G initialized successfully with I2C interface");
     return OPRT_OK;
+}
+
+// UART interface configuration (following Waveshare demo)
+#define UART_BUFFER_SIZE 1600  // Match demo code buffer size
+#define UART_READ_TIMEOUT_MS 1000  // Total timeout for reading
+
+OPERATE_RET lc76g_init_uart(lc76g_dev_t *dev, TUYA_UART_NUM_E port, uint32_t baudrate) {
+    if (!dev) return OPRT_COM_ERROR;
+    
+    dev->interface = LC76G_INTERFACE_UART;
+    dev->config.uart.port = port;
+    dev->config.uart.baudrate = baudrate;
+    
+    // LC76G Hardware Reset Sequence (per Waveshare documentation)
+    // GPS_RST is active LOW: 0=RESET, 1=NORMAL
+    PR_NOTICE("========================================");
+    PR_NOTICE("LC76G GPS Module Initialization");
+    PR_NOTICE("========================================");
+    PR_NOTICE("Resetting GPS module on pin %d...", EXAMPLE_GPS_RESET_PIN);
+    
+    dev_gpio_init(EXAMPLE_GPS_RESET_PIN, TUYA_GPIO_OUTPUT);
+    
+    // Assert reset (active low)
+    dev_digital_write(EXAMPLE_GPS_RESET_PIN, 0);
+    PR_NOTICE("GPS in RESET state (pin LOW)");
+    tal_system_sleep(200);  // Hold reset for 200ms
+    
+    // Release reset - GPS module starts
+    dev_digital_write(EXAMPLE_GPS_RESET_PIN, 1);
+    PR_NOTICE("GPS RESET released (pin HIGH)");
+    PR_NOTICE("GPS module starting...");
+    PR_NOTICE("Waiting for GPS to boot and start transmitting NMEA...");
+    tal_system_sleep(2000);  // Wait 2s for GPS to fully boot and start transmitting
+    
+    // LC76G default baudrate is 115200 (per PAIR864 documentation)
+    // It automatically outputs NMEA - no commands needed!
+    
+    PR_NOTICE("LC76G Configuration:");
+    PR_NOTICE("  Interface: UART (continuous read mode)");
+    PR_NOTICE("  Port: UART%d", port);
+    PR_NOTICE("  Baudrate: %d", baudrate);
+    PR_NOTICE("  TX Pin: P41 (MCU transmits to GPS RX)");
+    PR_NOTICE("  RX Pin: P40 (MCU receives from GPS TX)");
+    PR_NOTICE("  Buffer: %d bytes", UART_BUFFER_SIZE);
+    PR_NOTICE("========================================");
+    PR_NOTICE("NOTE: LC76G streams NMEA continuously");
+    PR_NOTICE("      Cold start takes ~26 seconds for first fix");
+    PR_NOTICE("========================================");
+    
+    return OPRT_OK;
+}
+
+// Backward compatibility wrapper
+OPERATE_RET lc76g_init(lc76g_dev_t *dev, uint8_t i2c_addr_wr, uint8_t i2c_addr_r) {
+    return lc76g_init_i2c(dev, i2c_addr_wr, i2c_addr_r);
 }
 
 uint8_t data[] = { 0x08, 0x00, 0x51, 0xAA, 0x04, 0x00, 0x00, 0x00 };
 
-OPERATE_RET lc76g_get_data(lc76g_dev_t *dev)
+static OPERATE_RET lc76g_get_data_i2c(lc76g_dev_t *dev)
 {
-    if (!dev ) return OPRT_COM_ERROR;
     OPERATE_RET ret;
 
-    ret = dev_i2c_write_nbytes(dev->i2c_addr_wr, data, sizeof(data));
+    ret = dev_i2c_write_nbytes(dev->config.i2c.addr_wr, data, sizeof(data));
     if (ret != OPRT_OK)
     {
         PR_ERR("Failed to write data from device");
@@ -390,7 +474,7 @@ OPERATE_RET lc76g_get_data(lc76g_dev_t *dev)
     }
     tal_system_sleep(100);
     
-    ret = dev_i2c_read_only_nbytes(dev->i2c_addr_r, readData, sizeof(readData));
+    ret = dev_i2c_read_only_nbytes(dev->config.i2c.addr_r, readData, sizeof(readData));
     if (ret != OPRT_OK)
     {
         PR_ERR("Failed to read data from device");
@@ -410,24 +494,21 @@ OPERATE_RET lc76g_get_data(lc76g_dev_t *dev)
     memcpy(dataToSend + sizeof(data2), readData, sizeof(readData));
     tal_system_sleep(100);
 
-    ret = dev_i2c_write_nbytes(dev->i2c_addr_wr, dataToSend, sizeof(dataToSend));
+    ret = dev_i2c_write_nbytes(dev->config.i2c.addr_wr, dataToSend, sizeof(dataToSend));
     if (ret != OPRT_OK)
     {
         PR_ERR("Failed to write concatenated data");
         return ret;
     }
 
-    // PR_INFO("I2C read data (%d bytes): ", dataLength);
-
     uint8_t *dynamicReadData = (uint8_t *)malloc(dataLength + 1);
     if (!dynamicReadData) {
         PR_ERR("Memory allocation failed");
         return OPRT_COM_ERROR;
     }
-    // memset(dynamicReadData, 0, dataLength);
     tal_system_sleep(10 + dataLength / 100);
 
-    ret = dev_i2c_read_only_nbytes(dev->i2c_addr_r, dynamicReadData, dataLength);
+    ret = dev_i2c_read_only_nbytes(dev->config.i2c.addr_r, dynamicReadData, dataLength);
     if (ret != OPRT_OK)
     {
         PR_ERR("Failed to read dynamic data");
@@ -439,7 +520,75 @@ OPERATE_RET lc76g_get_data(lc76g_dev_t *dev)
     parse_and_print_nmea((char *)dynamicReadData, dataLength);
 
     free(dynamicReadData);
-	return ret;
+    return ret;
+}
+
+static OPERATE_RET lc76g_get_data_uart(lc76g_dev_t *dev)
+{
+    // Allocate buffer (like demo code: 1600 bytes)
+    uint8_t *buffer = (uint8_t *)malloc(UART_BUFFER_SIZE);
+    if (!buffer) {
+        PR_ERR("Memory allocation failed for UART buffer");
+        return OPRT_COM_ERROR;
+    }
+    memset(buffer, 0, UART_BUFFER_SIZE);
+    
+    // Simplified read: try to read a larger chunk at once
+    PR_NOTICE("Attempting to read GPS data from UART...");
+    
+    // Try a single bulk read first
+    int total_bytes = tal_uart_read(dev->config.uart.port, buffer, UART_BUFFER_SIZE - 1);
+    
+    PR_NOTICE("Initial read returned: %d bytes", total_bytes);
+    
+    if (total_bytes < 0) {
+        PR_ERR("UART read error: %d", total_bytes);
+        free(buffer);
+        return OPRT_COM_ERROR;
+    }
+    
+    if (total_bytes == 0) {
+        PR_NOTICE("No data on first read, waiting 500ms and retrying...");
+        tal_system_sleep(500);
+        
+        total_bytes = tal_uart_read(dev->config.uart.port, buffer, UART_BUFFER_SIZE - 1);
+        PR_NOTICE("Second read returned: %d bytes", total_bytes);
+        
+        if (total_bytes <= 0) {
+            PR_WARN("Still no GPS data after retry");
+            free(buffer);
+            return OPRT_OK;
+        }
+    }
+    
+    buffer[total_bytes] = '\0';
+    PR_NOTICE("GPS: Received %d bytes from UART", total_bytes);
+    
+    // Print raw NMEA data using printf
+    printf("\n========================================\n");
+    printf("LC76G NMEA DATA: %d bytes\n", total_bytes);
+    printf("NMEA DATA: %s\n", buffer);
+    printf("========================================\n");
+    
+    // Parse NMEA sentences
+    parse_and_print_nmea((char *)buffer, total_bytes);
+    
+    free(buffer);
+    return OPRT_OK;
+}
+
+OPERATE_RET lc76g_get_data(lc76g_dev_t *dev)
+{
+    if (!dev) return OPRT_COM_ERROR;
+    
+    if (dev->interface == LC76G_INTERFACE_I2C) {
+        return lc76g_get_data_i2c(dev);
+    } else if (dev->interface == LC76G_INTERFACE_UART) {
+        return lc76g_get_data_uart(dev);
+    }
+    
+    PR_ERR("Unknown interface type");
+    return OPRT_COM_ERROR;
 }
 
 /* Getter implementations */

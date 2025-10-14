@@ -18,6 +18,7 @@
 
 #include "lc76g.h"
 
+#define CONFIG_USE_GPS_UART 1
 /***********************************************************
 *************************micro define***********************
 ***********************************************************/
@@ -31,19 +32,19 @@
 /***********************************************************
 ***********************variable define**********************
 ***********************************************************/
-static THREAD_HANDLE sg_i2c_handle;
+static THREAD_HANDLE sg_gps_handle;
 
 /***********************************************************
 ***********************function define**********************
 ***********************************************************/
 
 /**
- * @brief i2c task
+ * @brief GPS task (supports both I2C and UART)
  *
  * @param[in] param:Task parameters
  * @return none
  */
-static void __example_i2c_task(void *param)
+static void __example_gps_task(void *param)
 {
     OPERATE_RET op_ret = OPRT_OK;
 
@@ -61,29 +62,58 @@ static void __example_i2c_task(void *param)
 
     lc76g_dev_t dev;
 
+#ifdef CONFIG_USE_GPS_I2C
+    PR_NOTICE("Using GPS I2C interface");
     op_ret = dev_i2c_init();
     if (op_ret != OPRT_OK) {
-        PR_INFO("Failed to initialize I2C (error: %d)", op_ret);
-        tal_thread_delete(NULL); // 删除自己
+        PR_ERR("Failed to initialize I2C (error: %d)", op_ret);
+        tal_thread_delete(NULL);
     }
     
-    op_ret = lc76g_init(&dev, LC76G_ADDRESS, DEVICE_ADDRESS_R);
+    op_ret = lc76g_init_i2c(&dev, LC76G_ADDRESS, DEVICE_ADDRESS_R);
     if (op_ret != OPRT_OK) {
-        PR_ERR("Failed to initialize I2C (error: %d)", op_ret);
-        tal_thread_delete(NULL); // 删除自己
+        PR_ERR("Failed to initialize LC76G with I2C (error: %d)", op_ret);
+        tal_thread_delete(NULL);
     }
+#elif defined(CONFIG_USE_GPS_UART)
+    PR_NOTICE("Using GPS UART interface");
+    op_ret = dev_uart_init(EXAMPLE_UART_PORT, EXAMPLE_UART_BAUDRATE);
+    if (op_ret != OPRT_OK) {
+        PR_ERR("Failed to initialize UART (error: %d)", op_ret);
+        tal_thread_delete(NULL);
+    }
+    
+    op_ret = lc76g_init_uart(&dev, EXAMPLE_UART_PORT, EXAMPLE_UART_BAUDRATE);
+    if (op_ret != OPRT_OK) {
+        PR_ERR("Failed to initialize LC76G with UART (error: %d)", op_ret);
+        tal_thread_delete(NULL);
+    }
+#else
+    #error "Please select GPS interface: CONFIG_USE_GPS_I2C or CONFIG_USE_GPS_UART"
+#endif
     
     while (1) {
         lc76g_get_data(&dev);
         const lc76g_state_t *s = lc76g_get_state();
         char datebuf[7] = {0};
         lc76g_get_data_ddmmyy(datebuf);
-        PR_INFO("GNSS: %02d:%02d:%02d.%03dZ  lat=%.6f lon=%.6f alt=%.1fm  date=%s  sats=%d fix=%d conn=%d sig=%d  spd=%.1fkm/h crs=%.1f stat=%c",
-                s->utc_hour, s->utc_minute, s->utc_second, s->utc_millisecond,
-                s->latitude_deg, s->longitude_deg, s->altitude_m,
-                datebuf,
-                s->satellites_in_use, s->fix_quality, s->connect_state, s->signal_level_5,
-                s->speed_kmh, s->course_deg, s->last_status);
+        
+        PR_NOTICE("----------------------------------------");
+        PR_NOTICE("Parsed GPS Data:");
+        PR_INFO("  Time (UTC):    %02d:%02d:%02d.%03d", s->utc_hour, s->utc_minute, s->utc_second, s->utc_millisecond);
+        PR_INFO("  Date:          %s", datebuf);
+        PR_INFO("  Latitude:      %.6f°", s->latitude_deg);
+        PR_INFO("  Longitude:     %.6f°", s->longitude_deg);
+        PR_INFO("  Altitude:      %.1f m", s->altitude_m);
+        PR_INFO("  Satellites:    %d", s->satellites_in_use);
+        PR_INFO("  Fix Quality:   %d (0=invalid, 1=GPS, 2=DGPS)", s->fix_quality);
+        PR_INFO("  Connection:    %d (0=no fix, 1=fixed)", s->connect_state);
+        PR_INFO("  Signal Level:  %d/5", s->signal_level_5);
+        PR_INFO("  Speed:         %.1f km/h", s->speed_kmh);
+        PR_INFO("  Course:        %.1f°", s->course_deg);
+        PR_INFO("  Status:        %c (A=active, V=void)", s->last_status);
+        PR_NOTICE("----------------------------------------");
+        
         tal_system_sleep(1000);
     }
 }
@@ -102,8 +132,8 @@ void user_main(void)
 
     dev_sys_init();
     
-    static THREAD_CFG_T thrd_param = {.priority = TASK_GPIO_PRIORITY, .stackDepth = TASK_GPIO_SIZE, .thrdname = "i2c"};
-    TUYA_CALL_ERR_LOG(tal_thread_create_and_start(&sg_i2c_handle, NULL, NULL, __example_i2c_task, NULL, &thrd_param));
+    static THREAD_CFG_T thrd_param = {.priority = TASK_GPIO_PRIORITY, .stackDepth = TASK_GPIO_SIZE, .thrdname = "gps"};
+    TUYA_CALL_ERR_LOG(tal_thread_create_and_start(&sg_gps_handle, NULL, NULL, __example_gps_task, NULL, &thrd_param));
 
     return;
 }

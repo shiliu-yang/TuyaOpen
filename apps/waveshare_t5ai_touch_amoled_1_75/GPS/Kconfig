@@ -1,13 +1,69 @@
 menu "Application config"
 
+    choice GPS_INTERFACE
+        prompt "GPS Interface Type"
+        default USE_GPS_I2C
+        help
+            Select the communication interface for GPS module
+
+        config USE_GPS_I2C
+            bool "I2C Interface"
+            help
+                Use I2C interface for GPS communication
+
+        config USE_GPS_UART
+            bool "UART Interface"
+            help
+                Use UART interface for GPS communication
+    endchoice
+
     config EXAMPLE_I2C_SCL_PIN
         int "scl pin"
         default 20
         range 0 63
+        depends on USE_GPS_I2C
 
     config EXAMPLE_I2C_SDA_PIN
         int "sda pin"
         default 21
         range 0 63
+        depends on USE_GPS_I2C
+
+    config EXAMPLE_UART_PORT
+        int "UART Port Number (0-5)"
+        default 2
+        range 0 5
+        depends on USE_GPS_UART
+        help
+            Select UART port number for GPS module
+
+    config EXAMPLE_UART_TX_PIN
+        int "UART TX pin"
+        default 41
+        range 0 63
+        depends on USE_GPS_UART
+        help
+            GPIO pin for UART TX (P41 for UART2_TX)
+
+    config EXAMPLE_UART_RX_PIN
+        int "UART RX pin"
+        default 40
+        range 0 63
+        depends on USE_GPS_UART
+        help
+            GPIO pin for UART RX (P40 for UART2_RX)
+
+    config EXAMPLE_UART_BAUDRATE
+        int "UART Baudrate"
+        default 9600
+        depends on USE_GPS_UART
+        help
+            Baudrate for UART communication with GPS module
+
+    config GPS_ENABLE_NMEA_DEBUG
+        bool "Enable NMEA sentence debug output"
+        default n
+        help
+            Enable detailed NMEA sentence parsing logs for debugging
 
 endmenu
