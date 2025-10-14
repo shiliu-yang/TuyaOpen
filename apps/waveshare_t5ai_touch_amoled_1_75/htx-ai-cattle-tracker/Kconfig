@@ -105,8 +105,6 @@ config ENABLE_CATTLE_TRACKER_UI
         Enable the Cattle AI Tracker UI as an alternative to the default chat UI.
         This provides a compass/GPS-based tracking interface.
 
-endmenu
-
 config ENABLE_CELLULAR_SUPPORT
     bool "enable cellular support"
     default y
@@ -114,3 +112,6 @@ config ENABLE_CELLULAR_SUPPORT
     help
         Enable app hardware capability configuration including cellular network functionality.
         This enables 4G/LTE connectivity. Disable this if you only need WiFi connectivity.
+
+endmenu
+

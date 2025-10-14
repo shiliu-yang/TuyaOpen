@@ -48,8 +48,7 @@
 #include "reset_netcfg.h"
 #include "app_system_info.h"
 
-#if defined(ENABLE_BMM150_SENSOR) && (ENABLE_BMM150_SENSOR == 1) || \
-    defined(ENABLE_GPS_LC76G) && (ENABLE_GPS_LC76G == 1)
+#if defined(ENABLE_BMM150_SENSOR) && (ENABLE_BMM150_SENSOR == 1) || defined(ENABLE_GPS_LC76G) && (ENABLE_GPS_LC76G == 1)
 #include "sensor_integration.h"
 #endif
 
@@ -437,8 +436,7 @@ void user_main(void)
     tuya_authorize_init();
 
     reset_netconfig_start();
-    ai_audio_set_volume(255);
-
+    ai_audio_set_volume(100);
 
     tuya_iot_license_t license;
 
@@ -533,8 +531,7 @@ void user_main(void)
     }
 #endif
 
-#if defined(ENABLE_BMM150_SENSOR) && (ENABLE_BMM150_SENSOR == 1) || \
-    defined(ENABLE_GPS_LC76G) && (ENABLE_GPS_LC76G == 1)
+#if defined(ENABLE_BMM150_SENSOR) && (ENABLE_BMM150_SENSOR == 1) || defined(ENABLE_GPS_LC76G) && (ENABLE_GPS_LC76G == 1)
     PR_INFO("Starting sensor tasks...");
     ret = sensor_tasks_start();
     if (ret != OPRT_OK) {

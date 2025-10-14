@@ -82,6 +82,8 @@ OPERATE_RET netconn_cellular_open(void *config)
     netmgr_conn_cellular_t *netmgr_cellular = &s_netmgr_cellular;
 
     // init
+    // if device is actived, cellular init
+    // else wait for active
     TAL_CELLULAR_BASE_CFG_T cfg;
     memset(&cfg, 0, sizeof(cfg));
     strcpy(cfg.apn, "");
