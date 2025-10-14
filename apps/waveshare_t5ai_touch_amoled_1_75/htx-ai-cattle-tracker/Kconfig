@@ -113,5 +113,12 @@ config ENABLE_CELLULAR_SUPPORT
         Enable app hardware capability configuration including cellular network functionality.
         This enables 4G/LTE connectivity. Disable this if you only need WiFi connectivity.
 
+config ENABLE_BATTERY
+    bool "enable battery"
+    default y
+    help
+        Enable battery voltage monitoring and status reporting functionality.
+        This includes battery level detection, charging status, and low battery warnings.
+
 endmenu
 

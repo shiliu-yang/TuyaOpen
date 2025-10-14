@@ -49,6 +49,10 @@
 #include "app_system_info.h"
 #include "app_dp.h"
 
+#if defined(ENABLE_BATTERY) && (ENABLE_BATTERY == 1)
+#include "app_battery.h"
+#endif
+
 #if defined(ENABLE_BMM150_SENSOR) && (ENABLE_BMM150_SENSOR == 1) || defined(ENABLE_GPS_LC76G) && (ENABLE_GPS_LC76G == 1)
 #include "sensor_integration.h"
 #endif
@@ -501,6 +505,11 @@ void user_main(void)
         PR_INFO("Sensor tasks started successfully");
         PR_INFO("BMM150 and GPS readings will be printed to console");
     }
+#endif
+
+#if defined(ENABLE_BATTERY) && (ENABLE_BATTERY == 1)
+    PR_INFO("Battery monitoring initialized");
+    app_battery_init();
 #endif
 
     for (;;) {
