@@ -296,7 +296,7 @@ void user_event_handler_on(tuya_iot_client_t *client, tuya_event_msg_t *event)
 static void __cellular_module_reset(void)
 {
     TUYA_GPIO_BASE_CFG_T gpio_cfg;
-#if 0 // for waveshare
+
     gpio_cfg.direct = TUYA_GPIO_OUTPUT;
     gpio_cfg.level = TUYA_GPIO_LEVEL_HIGH;
     gpio_cfg.mode = TUYA_GPIO_PUSH_PULL;
@@ -308,19 +308,7 @@ static void __cellular_module_reset(void)
     tal_system_sleep(200);                                 // delay 200ms
     tkl_gpio_write(TUYA_GPIO_NUM_45, TUYA_GPIO_LEVEL_LOW); // power on pin LOW
     tal_system_sleep(1200);                                // delay up 1s
-#else // for T5AI+4G
-    gpio_cfg.direct = TUYA_GPIO_OUTPUT;
-    gpio_cfg.level = TUYA_GPIO_LEVEL_HIGH;
-    gpio_cfg.mode = TUYA_GPIO_PUSH_PULL;
-    tkl_gpio_init(TUYA_GPIO_NUM_24, &gpio_cfg); // reset pin 24 is 1;
-    tkl_gpio_write(TUYA_GPIO_NUM_24, TUYA_GPIO_LEVEL_HIGH);
-    gpio_cfg.level = TUYA_GPIO_LEVEL_HIGH;
-    tkl_gpio_init(TUYA_GPIO_NUM_9, &gpio_cfg); // power pin 9;
-    tkl_gpio_write(TUYA_GPIO_NUM_9, TUYA_GPIO_LEVEL_HIGH);
-    tal_system_sleep(200);                                // delay 200ms
-    tkl_gpio_write(TUYA_GPIO_NUM_9, TUYA_GPIO_LEVEL_LOW); // power on pin LOW
-    tal_system_sleep(1200);                               // delay up 1s
-#endif
+
     return;
 }
 #endif // ENABLE_CELLULAR
