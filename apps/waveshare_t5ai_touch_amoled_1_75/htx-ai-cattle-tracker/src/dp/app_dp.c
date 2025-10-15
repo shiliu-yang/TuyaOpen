@@ -49,7 +49,7 @@
 // gps
 static double s_last_latitude = 0.0;
 static double s_last_longitude = 0.0;
-static SYS_TICK_T s_last_gps_report_time = 0;
+static SYS_TIME_T s_last_gps_report_time = 0;
 
 // tracking id
 static uint8_t s_tracking_id = 1;
@@ -107,7 +107,7 @@ OPERATE_RET app_gps_position_upload(double latitude, double longitude)
     // Latitude change: ≥0.00003°
     // Longitude change: ≥0.00004°
     // Force report every 5 minutes
-    SYS_TICK_T now = tal_time_get_posix_ms();
+    SYS_TIME_T now = tal_time_get_posix_ms();
     if (latitude == 0.0 && longitude == 0.0) {
         // Not get any gps position
         PR_WARN("gps position invalid, skip upload");

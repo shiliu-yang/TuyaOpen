@@ -1,11 +1,11 @@
 /**
  * @file cloud_api.c
  * @brief Cloud API implementation for cattle location tracking
- * 
+ *
  * This file implements cloud API functionality with conditional compilation support.
  * Set ENABLE_CLOUD_API=1 to enable full cloud functionality, or ENABLE_CLOUD_API=0
  * to use stub implementations for testing without cloud dependencies.
- * 
+ *
  * @version 0.1
  * @copyright Copyright (c) 2021-2025 Tuya Inc. All Rights Reserved.
  */
@@ -14,6 +14,8 @@
 
 #include "tal_api.h"
 #include "tuya_iot.h"
+
+#include "app_dp.h"
 
 /***********************************************************
 ************************macro define************************
@@ -91,8 +93,9 @@ static void __get_cattle_location_work_queue_cb(void *data)
     TIME_T timestamp = 0;
     timestamp = tal_time_get_posix();
     (void)timestamp;
+    uint8_t cattle_id = app_get_current_tracking_id();
     snprintf(post_data, post_data_len, "{\"compassDeviceId\":\"%s\",\"cattleId\":\"%d\",\"t\":%d}",
-             tuya_iot_devid_get(tuya_iot_client_get()), 1, timestamp);
+             tuya_iot_devid_get(tuya_iot_client_get()), cattle_id, timestamp);
 
     PR_DEBUG("cattle location post data: %s", post_data);
 
@@ -211,6 +214,8 @@ OPERATE_RET cloud_api_get_cattle_location(cattle_location_t *location)
 {
     OPERATE_RET rt = OPRT_OK;
 
+    static SYS_TIME_T last_query_time = 0;
+
     TUYA_CHECK_NULL_RETURN(location, OPRT_INVALID_PARM);
 
     if (sg_cloud_api_ctx.mutex == NULL || sg_cloud_api_ctx.sem == NULL) {
@@ -220,15 +225,31 @@ OPERATE_RET cloud_api_get_cattle_location(cattle_location_t *location)
 
     // check time is sync
     if (OPRT_OK != tal_time_check_time_sync()) {
-        PR_ERR("time not sync");
+        // PR_ERR("time not sync");
+        return OPRT_COM_ERROR;
+    }
+
+    // check network is ready
+    extern bool app_check_network_ready(void);
+    if (!app_check_network_ready()) {
+        PR_WARN("network not ready");
+        return OPRT_COM_ERROR;
+    }
+
+    SYS_TIME_T now = tal_time_get_posix_ms();
+    if (now - last_query_time < 30 * 1000) {
+        // PR_WARN("query too frequently, must be >=30s");
         return OPRT_COM_ERROR;
     }
 
     tal_mutex_lock(sg_cloud_api_ctx.mutex);
 
     TUYA_CALL_ERR_GOTO(tal_workq_schedule(WORKQ_SYSTEM, __get_cattle_location_work_queue_cb, location), __EXIT);
-    tal_semaphore_wait(sg_cloud_api_ctx.sem, SEM_WAIT_FOREVER);
+    tal_semaphore_wait(sg_cloud_api_ctx.sem, 10 * 1024);
     rt = sg_cloud_api_ctx.api_rt;
+    if (rt == OPRT_OK) {
+        last_query_time = now;
+    }
 
 __EXIT:
     tal_mutex_unlock(sg_cloud_api_ctx.mutex);

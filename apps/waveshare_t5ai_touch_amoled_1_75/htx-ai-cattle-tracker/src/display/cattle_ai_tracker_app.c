@@ -20,6 +20,8 @@
  #include "resources/closing_nav_cow_icon.c"
  #include "resources/icons/mic_red_icon.c"
 
+#include "ai_audio.h"
+
  /*********************
   *      DEFINES
   *********************/
@@ -2158,8 +2160,8 @@ static void eye_look_timer_cb(lv_timer_t *timer)
     lv_obj_set_height(g.settings_volume_slider, 10);
     lv_obj_align(g.settings_volume_slider, LV_ALIGN_BOTTOM_MID, 0, -105);  /* Moved up by 15px */
     lv_slider_set_range(g.settings_volume_slider, 0, 100);
-    lv_slider_set_value(g.settings_volume_slider, 60, LV_ANIM_OFF);
-    g.current_volume = 60;  /* Initialize volume to 60% */
+    g.current_volume = ai_audio_get_volume();
+    lv_slider_set_value(g.settings_volume_slider, g.current_volume, LV_ANIM_OFF);
 
     /* Style for the main track (background/unfilled part) */
     lv_obj_set_style_bg_opa(g.settings_volume_slider, LV_OPA_COVER, LV_PART_MAIN);

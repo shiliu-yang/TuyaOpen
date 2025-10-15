@@ -45,6 +45,8 @@
 
 #include "app_dp.h"
 
+#include "cloud_api.h"
+
 #include "tal_log.h"
 #include "tal_thread.h"
 #include "tal_system.h"
@@ -518,6 +520,12 @@ __attribute__((unused)) static void __gps_task(void *param)
 #endif
 
         app_gps_position_upload(g_sensor_data.latitude_deg, g_sensor_data.longitude_deg);
+
+#if defined(ENABLE_CLOUD_API) && (ENABLE_CLOUD_API == 1)
+        // get cloud cattle position
+        cattle_location_t loc = {0};
+        cloud_api_get_cattle_location(&loc);
+#endif
 
         tal_system_sleep(5000); // Sleep for 5 seconds on success
     }

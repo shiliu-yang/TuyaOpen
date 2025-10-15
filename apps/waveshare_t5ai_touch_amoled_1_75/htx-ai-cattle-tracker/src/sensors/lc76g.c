@@ -677,7 +677,7 @@ static OPERATE_RET lc76g_get_data_uart(lc76g_dev_t *dev)
     int total_bytes = dev_uart_read(dev->config.uart.port, buffer, UART_BUFFER_SIZE - 1, UART_READ_TIMEOUT_MS);
 
     // for test
-#if 1
+#if 0
     strncpy((char *)buffer, "$GNRMC,075546.000,A,3018.160614,N,12003.807444,E,0.94,292.56,151025,,,A,V*0F\r\n",
             UART_BUFFER_SIZE - 1);
     total_bytes = (int)strlen((char *)buffer);
