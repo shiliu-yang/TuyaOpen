@@ -1,19 +1,19 @@
 /**
  * @file cloud_api.h
  * @brief Cloud API module for cattle location tracking
- * 
+ *
  * This module provides cloud API functionality for querying cattle location data
  * from the Tuya IoT platform. The functionality can be enabled/disabled through
  * the ENABLE_CLOUD_API configuration option.
- * 
+ *
  * When ENABLE_CLOUD_API is enabled:
  * - Provides real-time cattle location queries from cloud
  * - Includes full API implementation with authentication and data parsing
- * 
+ *
  * When ENABLE_CLOUD_API is disabled:
  * - Provides stub implementations that return mock data
  * - Reduces binary size and removes cloud dependencies
- * 
+ *
  * @version 0.1
  * @copyright Copyright (c) 2021-2025 Tuya Inc. All Rights Reserved.
  */
@@ -56,6 +56,24 @@ typedef struct {
 OPERATE_RET cloud_api_init(void);
 
 OPERATE_RET cloud_api_get_cattle_location(cattle_location_t *location);
+
+/**
+ * @brief Get current error count
+ * @return Current consecutive error count
+ */
+uint8_t cloud_api_get_error_count(void);
+
+/**
+ * @brief Get current request interval
+ * @return Current request interval in milliseconds
+ */
+uint32_t cloud_api_get_request_interval(void);
+
+/**
+ * @brief Reset error state manually
+ * @note This can be used to reset the backoff state when network conditions improve
+ */
+void cloud_api_reset_error_state(void);
 
 #ifdef __cplusplus
 }

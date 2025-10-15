@@ -27,6 +27,10 @@
 #define CATTLE_LOCATION_QUERY_API "thing.cattle.location.query"
 #define CATTLE_LOCATION_QUERY_VER "1.0"
 
+#define DEFAULT_REQUEST_INTERVAL_MS (30 * 1000)     // default minimum interval between requests in milliseconds
+#define MAX_ERROR_COUNT             5               // maximum consecutive error count before using max interval
+#define MAX_REQUEST_INTERVAL_MS     (5 * 60 * 1000) // maximum interval of 5 minutes
+
 /***********************************************************
 ***********************typedef define***********************
 ***********************************************************/
@@ -34,6 +38,10 @@ typedef struct {
     MUTEX_HANDLE mutex;
     SEM_HANDLE sem;
     OPERATE_RET api_rt;
+    uint8_t is_getting;
+    uint8_t error_count;
+    SYS_TIME_T last_query_time;
+    SYS_TIME_T request_interval_ms;
 } cloud_api_ctx_t;
 
 /***********************************************************
@@ -47,10 +55,70 @@ static cloud_api_ctx_t sg_cloud_api_ctx = {
     .mutex = NULL,
     .sem = NULL,
     .api_rt = OPRT_OK,
+    .is_getting = 0,
+    .error_count = 0,
+    .last_query_time = 0,
+    .request_interval_ms = DEFAULT_REQUEST_INTERVAL_MS, // minimum interval between requests in milliseconds
 };
+
+static SYS_TIME_T sg_request_interval_ms[] = {
+    DEFAULT_REQUEST_INTERVAL_MS, // 30 seconds  - error_count 0
+    50 * 1000,                   // 50 seconds  - error_count 1
+    60 * 1000,                   // 1 minute    - error_count 2
+    3 * 60 * 1000,               // 3 minutes   - error_count 3
+    5 * 60 * 1000,               // 5 minutes   - error_count 4+
+};
+
 /***********************************************************
 ***********************function define**********************
 ***********************************************************/
+
+/**
+ * @brief Get current request interval based on error count
+ * @return Current request interval in milliseconds
+ */
+static SYS_TIME_T __get_current_request_interval(void)
+{
+    uint8_t error_count = sg_cloud_api_ctx.error_count;
+    uint8_t max_index = sizeof(sg_request_interval_ms) / sizeof(sg_request_interval_ms[0]) - 1;
+
+    if (error_count > max_index) {
+        PR_WARN("error_count %d exceeds max_index %d, clamping to max", error_count, max_index);
+        error_count = max_index;
+        sg_cloud_api_ctx.error_count = max_index;
+    }
+
+    SYS_TIME_T interval = sg_request_interval_ms[error_count];
+    PR_DEBUG("get_interval: error_count=%d, max_index=%d, interval=%u ms", 
+             error_count, max_index, (uint32_t)interval);
+    
+    return interval;
+}
+
+/**
+ * @brief Reset error count and request interval on success
+ */
+static void __reset_error_state(void)
+{
+    sg_cloud_api_ctx.error_count = 0;
+    sg_cloud_api_ctx.request_interval_ms = DEFAULT_REQUEST_INTERVAL_MS;
+    PR_DEBUG("Reset error state, interval back to %u ms", DEFAULT_REQUEST_INTERVAL_MS);
+}
+
+/**
+ * @brief Increment error count and adjust request interval
+ */
+static void __increment_error_count(void)
+{
+    if (sg_cloud_api_ctx.error_count < MAX_ERROR_COUNT) {
+        sg_cloud_api_ctx.error_count++;
+    }
+
+    sg_cloud_api_ctx.request_interval_ms = __get_current_request_interval();
+
+    PR_WARN("Request failed, error_count: %d, next interval: %u ms", sg_cloud_api_ctx.error_count,
+            (uint32_t)sg_cloud_api_ctx.request_interval_ms);
+}
 
 OPERATE_RET cloud_api_init(void)
 {
@@ -63,6 +131,15 @@ OPERATE_RET cloud_api_init(void)
     if (sg_cloud_api_ctx.sem == NULL) {
         TUYA_CALL_ERR_GOTO(tal_semaphore_create_init(&sg_cloud_api_ctx.sem, 0, 1), __EXIT);
     }
+
+    // Initialize error state
+    sg_cloud_api_ctx.error_count = 0;
+    sg_cloud_api_ctx.request_interval_ms = DEFAULT_REQUEST_INTERVAL_MS;
+    sg_cloud_api_ctx.last_query_time = 0;
+    sg_cloud_api_ctx.is_getting = 0;
+    sg_cloud_api_ctx.api_rt = OPRT_OK;
+
+    PR_INFO("Cloud API initialized with default interval: %u ms", DEFAULT_REQUEST_INTERVAL_MS);
 
 __EXIT:
 
@@ -204,6 +281,13 @@ static void __get_cattle_location_work_queue_cb(void *data)
              loc->accuracy, loc->cattleId, loc->direction, loc->lat, loc->lon, loc->locationTime, loc->speed);
 
 __EXIT:
+    // Update error state based on request result
+    if (sg_cloud_api_ctx.api_rt == OPRT_OK) {
+        __reset_error_state();
+    } else {
+        __increment_error_count();
+    }
+
     if (post_data) {
         CLOUD_API_FREE(post_data);
         post_data = NULL;
@@ -222,8 +306,6 @@ __EXIT:
 OPERATE_RET cloud_api_get_cattle_location(cattle_location_t *location)
 {
     OPERATE_RET rt = OPRT_OK;
-
-    static SYS_TIME_T last_query_time = 0;
 
     TUYA_CHECK_NULL_RETURN(location, OPRT_INVALID_PARM);
 
@@ -246,8 +328,11 @@ OPERATE_RET cloud_api_get_cattle_location(cattle_location_t *location)
     }
 
     SYS_TIME_T now = tal_time_get_posix_ms();
-    if (now - last_query_time < 30 * 1000) {
-        // PR_WARN("query too frequently, must be >=30s");
+    SYS_TIME_T current_interval = __get_current_request_interval();
+
+    if (now - sg_cloud_api_ctx.last_query_time < current_interval) {
+        PR_WARN("query too frequently, current interval: %u ms, time since last: %u ms", (uint32_t)current_interval,
+                (uint32_t)(now - sg_cloud_api_ctx.last_query_time));
         return OPRT_COM_ERROR;
     }
 
@@ -256,12 +341,32 @@ OPERATE_RET cloud_api_get_cattle_location(cattle_location_t *location)
     TUYA_CALL_ERR_GOTO(tal_workq_schedule(WORKQ_SYSTEM, __get_cattle_location_work_queue_cb, location), __EXIT);
     tal_semaphore_wait(sg_cloud_api_ctx.sem, 10 * 1024);
     rt = sg_cloud_api_ctx.api_rt;
-    if (rt == OPRT_OK) {
-        last_query_time = now;
-    }
+
+    // Always update last_query_time to ensure backoff works correctly
+    // whether the request succeeds or fails
+    sg_cloud_api_ctx.last_query_time = now;
 
 __EXIT:
     tal_mutex_unlock(sg_cloud_api_ctx.mutex);
 
     return rt;
+}
+
+uint8_t cloud_api_get_error_count(void)
+{
+    return sg_cloud_api_ctx.error_count;
+}
+
+uint32_t cloud_api_get_request_interval(void)
+{
+    return (uint32_t)sg_cloud_api_ctx.request_interval_ms;
+}
+
+void cloud_api_reset_error_state(void)
+{
+    if (sg_cloud_api_ctx.mutex != NULL) {
+        tal_mutex_lock(sg_cloud_api_ctx.mutex);
+        __reset_error_state();
+        tal_mutex_unlock(sg_cloud_api_ctx.mutex);
+    }
 }
