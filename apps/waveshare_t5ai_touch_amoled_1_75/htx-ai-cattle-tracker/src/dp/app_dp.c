@@ -115,8 +115,10 @@ OPERATE_RET app_gps_position_upload(double latitude, double longitude)
     double lat_diff = latitude > s_last_latitude ? (latitude - s_last_latitude) : (s_last_latitude - latitude);
     double lon_diff = longitude > s_last_longitude ? (longitude - s_last_longitude) : (s_last_longitude - longitude);
 
+#if defined(LC76G_ENABLE_NMEA_LOGS) && (LC76G_ENABLE_NMEA_LOGS == 1)
     PR_DEBUG("lat_diff: %.6f, lon_diff: %.6f, time_diff: %u ms", lat_diff, lon_diff,
              (unsigned int)(now - s_last_gps_report_time));
+#endif
 
     if (lat_diff >= GPS_POSITION_DELTA_LAT || lon_diff >= GPS_POSITION_DELTA_LON ||
         (now - s_last_gps_report_time) >= GPS_REPORT_MIN_INTERVAL_MS) {
@@ -124,7 +126,9 @@ OPERATE_RET app_gps_position_upload(double latitude, double longitude)
         s_last_longitude = longitude;
         s_last_gps_report_time = now;
     } else {
+#if defined(LC76G_ENABLE_NMEA_LOGS) && (LC76G_ENABLE_NMEA_LOGS == 1)
         PR_DEBUG("gps position change too small or report interval too short, skip upload");
+#endif
         return OPRT_OK;
     }
 

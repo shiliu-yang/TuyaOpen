@@ -512,7 +512,13 @@ void set_gps_satellite_count(int count)
 
 void lv_demo_cattle_ai_tracker(void)
  {
+     /* Save the volume callback before memset clears it */
+     void (*saved_callback)(int volume) = g.volume_change_callback;
+     
      memset(&g, 0, sizeof(g));
+     
+     /* Restore the volume callback */
+     g.volume_change_callback = saved_callback;
 
      /* Dummy data */
      g.gps_sat_count = 7;

@@ -504,6 +504,7 @@ __attribute__((unused)) static void __gps_task(void *param)
         char datebuf[7] = {0};
         lc76g_get_data_ddmmyy(datebuf);
 
+#if defined(LC76G_ENABLE_NMEA_LOGS) && (LC76G_ENABLE_NMEA_LOGS == 1)
         const char *fix_status = (s->fix_quality > 0) ? "FIX" : "SEARCH";
         const char *data_valid = (s->connect_state > 0) ? "VALID" : "INVALID";
 
@@ -512,6 +513,7 @@ __attribute__((unused)) static void __gps_task(void *param)
         PR_INFO("Position: %.6f, %.6f", s->latitude_deg, s->longitude_deg);
         PR_INFO("Altitude: %.1fm | Satellites: %d | Signal: %d/5 | Speed: %.1fkm/h", s->altitude_m,
                 s->satellites_in_use, s->signal_level_5, s->speed_kmh);
+#endif
 
         TUYA_CALL_ERR_LOG(app_gps_position_upload(g_sensor_data.latitude_deg, g_sensor_data.longitude_deg));
 

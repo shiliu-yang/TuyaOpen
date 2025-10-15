@@ -349,6 +349,7 @@ static void parse_and_print_nmea(char *buffer, uint32_t len)
     int sentences_parsed = 0;
     int checksum_failures = 0;
     bool has_fix_data = false;
+    (void)has_fix_data;
 
     // Iterate lines split by \n or \r\n
     char *p = buffer;
@@ -426,6 +427,7 @@ static void parse_and_print_nmea(char *buffer, uint32_t len)
     // Print a concise summary, but reduce frequency to avoid log spam
     g_log_counter++;
 
+#if LC76G_ENABLE_NMEA_LOGS
     // Print summary every 5th read (every 25 seconds with 5s intervals) or when we have a fix
     if ((g_log_counter % 5 == 0) || has_fix_data || g_state.satellites_in_use > 0) {
         PR_INFO("NMEA: %d sentences, %d fails, fix=%s, sats=%d, status=%s, signal=%d/5", sentences_parsed,
@@ -434,6 +436,7 @@ static void parse_and_print_nmea(char *buffer, uint32_t len)
     } else {
         PR_DEBUG("NMEA: %d sentences processed (searching satellites...)", sentences_parsed);
     }
+#endif
 }
 
 OPERATE_RET lc76g_pair_062(lc76g_dev_t *dev, uint8_t type, uint8_t output_rate)
@@ -672,6 +675,13 @@ static OPERATE_RET lc76g_get_data_uart(lc76g_dev_t *dev)
 
     // Try a single bulk read first
     int total_bytes = dev_uart_read(dev->config.uart.port, buffer, UART_BUFFER_SIZE - 1, UART_READ_TIMEOUT_MS);
+
+    // for test
+#if 1
+    strncpy((char *)buffer, "$GNRMC,075546.000,A,3018.160614,N,12003.807444,E,0.94,292.56,151025,,,A,V*0F\r\n",
+            UART_BUFFER_SIZE - 1);
+    total_bytes = (int)strlen((char *)buffer);
+#endif
 
 #if LC76G_ENABLE_NMEA_LOGS
     PR_NOTICE("Initial read returned: %d bytes", total_bytes);
