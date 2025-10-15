@@ -513,12 +513,12 @@ __attribute__((unused)) static void __gps_task(void *param)
         PR_INFO("Position: %.6f, %.6f", s->latitude_deg, s->longitude_deg);
         PR_INFO("Altitude: %.1fm | Satellites: %d | Signal: %d/5 | Speed: %.1fkm/h", s->altitude_m,
                 s->satellites_in_use, s->signal_level_5, s->speed_kmh);
-#endif
-
-        TUYA_CALL_ERR_LOG(app_gps_position_upload(g_sensor_data.latitude_deg, g_sensor_data.longitude_deg));
-
         // Log success and sleep for 5 seconds
         PR_INFO("[GPS] Success #%d - sleeping for 5 seconds", success_count);
+#endif
+
+        app_gps_position_upload(g_sensor_data.latitude_deg, g_sensor_data.longitude_deg);
+
         tal_system_sleep(5000); // Sleep for 5 seconds on success
     }
 }
