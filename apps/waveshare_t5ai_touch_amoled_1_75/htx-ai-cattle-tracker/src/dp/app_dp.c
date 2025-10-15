@@ -12,6 +12,8 @@
 #include "ai_audio.h"
 #include "netmgr.h"
 
+#include "app_sos.h"
+
 #if defined(ENABLE_BATTERY) && (ENABLE_BATTERY == 1)
 #include "app_battery.h"
 #endif
@@ -232,6 +234,9 @@ void app_dp_process(uint8_t id, dp_prop_tp_t type, dp_value_t value)
     } break;
     case APP_DPID_START_TRACKING: {
         s_tracking_id = value.dp_value;
+    } break;
+    case APP_DPID_SOS_STATUS: {
+        app_sos_set(value.dp_bool);
     } break;
     default:
         PR_WARN("Unhandled DP ID: %d", id);

@@ -98,10 +98,19 @@ static void __get_cattle_location_work_queue_cb(void *data)
              tuya_iot_devid_get(tuya_iot_client_get()), cattle_id, timestamp);
 
     PR_DEBUG("cattle location post data: %s", post_data);
+#if defined(ENABLE_DEBUG_VIRTUAL_SIMULATION) && (ENABLE_DEBUG_VIRTUAL_SIMULATION == 1)
+    char *cattle_virtual_data[] = {
+        "{\"accuracy\":0,\"cattleId\":\"6c1694304986b00e8eabfs\",\"direction\":0,\"lat\":\"31.300437\","
+        "\"locationTime\":1760180386499,\"lon\":\"121.068184\",\"speed\":0}"};
 
+    api_result = cJSON_Parse(cattle_virtual_data[0]);
+
+    sg_cloud_api_ctx.api_rt = rt;
+#else
     rt = atop_service_comm_post_simple(CATTLE_LOCATION_QUERY_API, CATTLE_LOCATION_QUERY_VER, post_data, NULL,
                                        &api_result);
     sg_cloud_api_ctx.api_rt = rt;
+#endif
 
     if (rt != OPRT_OK) {
         PR_ERR("get cattle location api failed, rt: %d", rt);

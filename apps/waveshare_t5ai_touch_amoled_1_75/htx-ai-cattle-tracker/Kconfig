@@ -203,5 +203,12 @@ config ENABLE_BATTERY
         Enable battery voltage monitoring and status reporting functionality.
         This includes battery level detection, charging status, and low battery warnings.
 
+config ENABLE_DEBUG_VIRTUAL_SIMULATION
+    bool "enable debug virtual simulation mode"
+    default n
+    help
+        Enable virtual simulation mode for debugging and testing purposes.
+        Note: This should be disabled in production builds.
+
 endmenu
 

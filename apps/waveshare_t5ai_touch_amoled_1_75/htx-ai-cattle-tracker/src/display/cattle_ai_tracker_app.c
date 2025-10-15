@@ -21,6 +21,7 @@
  #include "resources/icons/mic_red_icon.c"
 
 #include "ai_audio.h"
+#include "tuya_lvgl.h"
 
  /*********************
   *      DEFINES
@@ -583,6 +584,17 @@ void lv_demo_cattle_ai_tracker(void)
     
     /* Set default bottom text with typewriter animation */
     update_idle_bottom_text("你好，今天怎么帮你找牛？");
+}
+
+void set_sos_visible(bool visible)
+{
+    tuya_lvgl_mutex_lock();
+    if (visible) {
+        show_sos_alert();
+    } else {
+        hide_sos_alert();
+    }
+    tuya_lvgl_mutex_unlock();
 }
 
  /**********************

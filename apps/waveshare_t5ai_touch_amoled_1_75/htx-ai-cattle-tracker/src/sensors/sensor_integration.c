@@ -45,7 +45,9 @@
 
 #include "app_dp.h"
 
+#if defined(ENABLE_CLOUD_API) && (ENABLE_CLOUD_API == 1)
 #include "cloud_api.h"
+#endif
 
 #include "tal_log.h"
 #include "tal_thread.h"

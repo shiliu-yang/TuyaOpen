@@ -24,6 +24,8 @@
 #include "ai_audio.h"
 #include "app_chat_bot.h"
 #include "media_src_zh.h"
+#include "app_sos.h"
+
 /***********************************************************
 ************************macro define************************
 ***********************************************************/
@@ -363,6 +365,9 @@ static void __app_button_function_cb(char *name, TDL_BUTTON_TOUCH_EVENT_E event,
         }
         PR_DEBUG("button single click");
     } break;
+    case TDL_BUTTON_LONG_PRESS_START: {
+        app_sos_set(!app_sos_get());
+    } break;
     default:
         break;
     }
@@ -373,7 +378,7 @@ static OPERATE_RET __app_open_button(void)
     OPERATE_RET rt = OPRT_OK;
 
     TDL_BUTTON_CFG_T button_cfg = {.long_start_valid_time = 3000,
-                                   .long_keep_timer = 1000,
+                                   .long_keep_timer = 0,
                                    .button_debounce_time = 50,
                                    .button_repeat_valid_count = 2,
                                    .button_repeat_valid_time = 500};
@@ -383,6 +388,7 @@ static OPERATE_RET __app_open_button(void)
     tdl_button_event_register(sg_button_hdl, TDL_BUTTON_PRESS_UP, __app_button_function_cb);
     tdl_button_event_register(sg_button_hdl, TDL_BUTTON_PRESS_SINGLE_CLICK, __app_button_function_cb);
     tdl_button_event_register(sg_button_hdl, TDL_BUTTON_PRESS_DOUBLE_CLICK, __app_button_function_cb);
+    tdl_button_event_register(sg_button_hdl, TDL_BUTTON_LONG_PRESS_START, __app_button_function_cb);
 
     return rt;
 }
@@ -443,45 +449,50 @@ OPERATE_RET ai_audio_player_play_alert(AI_AUDIO_ALERT_TYPE_E type)
         rt = ai_audio_player_data_write(alert_id, (uint8_t *)media_src_prologue_zh, sizeof(media_src_prologue_zh), 1);
     } break;
     case AI_AUDIO_ALERT_NOT_ACTIVE: {
-        rt = ai_audio_player_data_write(alert_id, (uint8_t *)media_src_network_conn_zh, sizeof(media_src_network_conn_zh), 1);
+        rt = ai_audio_player_data_write(alert_id, (uint8_t *)media_src_network_conn_zh,
+                                        sizeof(media_src_network_conn_zh), 1);
     } break;
     case AI_AUDIO_ALERT_NETWORK_CFG: {
-        rt = ai_audio_player_data_write(alert_id, (uint8_t *)media_src_network_config_zh, sizeof(media_src_network_config_zh), 1);
+        rt = ai_audio_player_data_write(alert_id, (uint8_t *)media_src_network_config_zh,
+                                        sizeof(media_src_network_config_zh), 1);
     } break;
     case AI_AUDIO_ALERT_NETWORK_CONNECTED: {
         rt = ai_audio_player_data_write(alert_id, (uint8_t *)media_src_network_conn_success_zh,
                                         sizeof(media_src_network_conn_success_zh), 1);
     } break;
     case AI_AUDIO_ALERT_NETWORK_FAIL: {
-        rt = ai_audio_player_data_write(alert_id, (uint8_t *)media_src_network_conn_failed_zh, sizeof(media_src_network_conn_failed_zh), 1);
+        rt = ai_audio_player_data_write(alert_id, (uint8_t *)media_src_network_conn_failed_zh,
+                                        sizeof(media_src_network_conn_failed_zh), 1);
     } break;
     case AI_AUDIO_ALERT_NETWORK_DISCONNECT: {
         rt = ai_audio_player_data_write(alert_id, (uint8_t *)media_src_network_reconfigure_zh,
                                         sizeof(media_src_network_reconfigure_zh), 1);
     } break;
     case AI_AUDIO_ALERT_BATTERY_LOW: {
-        rt = ai_audio_player_data_write(alert_id, (uint8_t *)media_src_low_battery_zh, sizeof(media_src_low_battery_zh), 1);
+        rt = ai_audio_player_data_write(alert_id, (uint8_t *)media_src_low_battery_zh, sizeof(media_src_low_battery_zh),
+                                        1);
     } break;
     case AI_AUDIO_ALERT_PLEASE_AGAIN: {
-        rt = ai_audio_player_data_write(alert_id, (uint8_t *)media_src_please_again_zh, sizeof(media_src_please_again_zh), 1);
+        rt = ai_audio_player_data_write(alert_id, (uint8_t *)media_src_please_again_zh,
+                                        sizeof(media_src_please_again_zh), 1);
     } break;
     case AI_AUDIO_ALERT_WAKEUP: {
         rt = ai_audio_player_data_write(alert_id, (uint8_t *)media_src_ai_zh, sizeof(media_src_ai_zh), 1);
     } break;
     case AI_AUDIO_ALERT_LONG_KEY_TALK: {
-        rt = ai_audio_player_data_write(alert_id, (uint8_t *)media_src_long_press_zh,
-                                        sizeof(media_src_long_press_zh), 1);
+        rt = ai_audio_player_data_write(alert_id, (uint8_t *)media_src_long_press_zh, sizeof(media_src_long_press_zh),
+                                        1);
     } break;
     case AI_AUDIO_ALERT_KEY_TALK: {
-        rt = ai_audio_player_data_write(alert_id, (uint8_t *)media_src_press_talk_zh, sizeof(media_src_press_talk_zh), 1);
+        rt = ai_audio_player_data_write(alert_id, (uint8_t *)media_src_press_talk_zh, sizeof(media_src_press_talk_zh),
+                                        1);
     } break;
     case AI_AUDIO_ALERT_WAKEUP_TALK: {
         rt = ai_audio_player_data_write(alert_id, (uint8_t *)media_src_wakeup_chat_zh, sizeof(media_src_wakeup_chat_zh),
                                         1);
     } break;
     case AI_AUDIO_ALERT_FREE_TALK: {
-        rt = ai_audio_player_data_write(alert_id, (uint8_t *)media_src_free_chat_zh, sizeof(media_src_free_chat_zh),
-                                        1);
+        rt = ai_audio_player_data_write(alert_id, (uint8_t *)media_src_free_chat_zh, sizeof(media_src_free_chat_zh), 1);
     } break;
 
     default:

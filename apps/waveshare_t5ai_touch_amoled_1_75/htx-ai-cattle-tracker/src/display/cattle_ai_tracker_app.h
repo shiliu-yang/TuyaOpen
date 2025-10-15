@@ -237,6 +237,9 @@ void animate_distance_scale(int target_scale);
 void tracker_set_distance_scale(int scale_meters);
 int tracker_get_distance_scale(void);
 
+// sos
+void set_sos_visible(bool visible);
+
 #ifdef __cplusplus
 }
 #endif
