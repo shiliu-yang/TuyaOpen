@@ -1,6 +1,19 @@
 /**
  * @file cloud_api.h
- * @brief cloud_api module is used to
+ * @brief Cloud API module for cattle location tracking
+ * 
+ * This module provides cloud API functionality for querying cattle location data
+ * from the Tuya IoT platform. The functionality can be enabled/disabled through
+ * the ENABLE_CLOUD_API configuration option.
+ * 
+ * When ENABLE_CLOUD_API is enabled:
+ * - Provides real-time cattle location queries from cloud
+ * - Includes full API implementation with authentication and data parsing
+ * 
+ * When ENABLE_CLOUD_API is disabled:
+ * - Provides stub implementations that return mock data
+ * - Reduces binary size and removes cloud dependencies
+ * 
  * @version 0.1
  * @copyright Copyright (c) 2021-2025 Tuya Inc. All Rights Reserved.
  */

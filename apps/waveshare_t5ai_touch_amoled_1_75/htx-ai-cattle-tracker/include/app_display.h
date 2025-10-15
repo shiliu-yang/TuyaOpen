@@ -43,6 +43,12 @@ typedef uint8_t UI_WIFI_STATUS_E;
 #define EMOJI_DISAPPOINTED "DISAPPOINTED"
 #define EMOJI_ANNOYED      "ANNOYED"
 
+// battery status
+typedef struct {
+    uint8_t level;
+    uint8_t charging; // 1: charging, 0: not charging
+} UI_BATTERY_STATUS_S;
+
 /***********************************************************
 ***********************typedef define***********************
 ***********************************************************/
@@ -63,10 +69,13 @@ typedef enum {
     TY_DISPLAY_TP_NOTIFICATION,
     TY_DISPLAY_TP_NETWORK,
     TY_DISPLAY_TP_CHAT_MODE,
-    
+
     // recording indicators
     TY_DISPLAY_TP_RECORDING_START,
     TY_DISPLAY_TP_RECORDING_STOP,
+
+    // battery
+    TY_DISPLAY_TP_BATTERY,
 
     TY_DISPLAY_TP_MAX
 } TY_DISPLAY_TYPE_E;
@@ -91,6 +100,15 @@ OPERATE_RET app_display_init(void);
  * @return OPERATE_RET Result of sending the message, OPRT_OK indicates success
  */
 OPERATE_RET app_display_send_msg(TY_DISPLAY_TYPE_E tp, uint8_t *data, int len);
+
+/**
+ * @brief Update battery status on the display
+ *
+ * @param level Battery level (0-100)
+ * @param charging Charging status (1: charging, 0: not charging)
+ * @return OPERATE_RET Result of the update operation, OPRT_OK indicates success
+ */
+OPERATE_RET app_display_battery_status_update(uint8_t percentage, uint8_t charging);
 
 #ifdef __cplusplus
 }

@@ -1,6 +1,11 @@
 /**
  * @file cloud_api.c
- * @brief cloud_api module is used to
+ * @brief Cloud API implementation for cattle location tracking
+ * 
+ * This file implements cloud API functionality with conditional compilation support.
+ * Set ENABLE_CLOUD_API=1 to enable full cloud functionality, or ENABLE_CLOUD_API=0
+ * to use stub implementations for testing without cloud dependencies.
+ * 
  * @version 0.1
  * @copyright Copyright (c) 2021-2025 Tuya Inc. All Rights Reserved.
  */
@@ -13,8 +18,8 @@
 /***********************************************************
 ************************macro define************************
 ***********************************************************/
-#define CLOUD_API_MALLOC tal_malloc
-#define CLOUD_API_FREE   tal_free
+#define CLOUD_API_MALLOC tal_psram_malloc
+#define CLOUD_API_FREE   tal_psram_free
 
 // #define CATTLE_LOCATION_QUERY_API "m.outdoors.cattle.location.query"
 #define CATTLE_LOCATION_QUERY_API "thing.cattle.location.query"

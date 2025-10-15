@@ -49,6 +49,10 @@
 #include "app_system_info.h"
 #include "app_dp.h"
 
+#if defined(ENABLE_CLOUD_API) && (ENABLE_CLOUD_API == 1)
+#include "cloud_api.h"
+#endif
+
 #if defined(ENABLE_BATTERY) && (ENABLE_BATTERY == 1)
 #include "app_battery.h"
 #endif
@@ -505,6 +509,10 @@ void user_main(void)
         PR_INFO("Sensor tasks started successfully");
         PR_INFO("BMM150 and GPS readings will be printed to console");
     }
+#endif
+
+#if defined(ENABLE_CLOUD_API) && (ENABLE_CLOUD_API == 1)
+    cloud_api_init();
 #endif
 
 #if defined(ENABLE_BATTERY) && (ENABLE_BATTERY == 1)

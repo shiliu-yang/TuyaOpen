@@ -188,6 +188,14 @@ config ENABLE_CELLULAR_SUPPORT
         Enable app hardware capability configuration including cellular network functionality.
         This enables 4G/LTE connectivity. Disable this if you only need WiFi connectivity.
 
+config ENABLE_CLOUD_API
+    bool "enable cloud API for cattle location query"
+    default y
+    help
+        Enable cloud API functionality for querying cattle location data from Tuya IoT platform.
+        This allows the tracker to fetch real-time cattle position information from the cloud.
+        Disable this if you only need local GPS tracking without cloud integration.
+
 config ENABLE_BATTERY
     bool "enable battery"
     default y
