@@ -38,6 +38,11 @@ OPERATE_RET app_volume_upload(uint8_t volume);
 
 OPERATE_RET app_dp_battery_upload(uint8_t is_charging, uint8_t battery_percentage);
 
+// gps
+OPERATE_RET app_gps_position_upload(double latitude, double longitude);
+
+uint8_t app_get_current_tracking_id(void);
+
 #ifdef __cplusplus
 }
 #endif

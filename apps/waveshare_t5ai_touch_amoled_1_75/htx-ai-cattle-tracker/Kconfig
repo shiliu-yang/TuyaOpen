@@ -60,6 +60,81 @@ config ENABLE_GPS_LC76G
     help
         Enable LC76G GPS module for location tracking
 
+if ENABLE_GPS_LC76G
+    choice GPS_INTERFACE_TYPE
+        prompt "GPS Interface Type"
+        default CONFIG_USE_GPS_I2C
+        help
+            Select the communication interface for GPS module
+
+        config CONFIG_USE_GPS_I2C
+            bool "I2C Interface"
+            help
+                Use I2C interface for GPS communication (default)
+
+        config CONFIG_USE_GPS_UART
+            bool "UART Interface"
+            help
+                Use UART interface for GPS communication
+    endchoice
+
+    config GPS_I2C_SCL_PIN
+        int "GPS I2C SCL pin"
+        default 20
+        range 0 63
+        depends on CONFIG_USE_GPS_I2C
+        help
+            GPIO pin for GPS I2C SCL (shared with touch display)
+
+    config GPS_I2C_SDA_PIN
+        int "GPS I2C SDA pin"
+        default 21
+        range 0 63
+        depends on CONFIG_USE_GPS_I2C
+        help
+            GPIO pin for GPS I2C SDA (shared with touch display)
+
+    config GPS_UART_PORT
+        int "GPS UART Port Number (0-5)"
+        default 2
+        range 0 5
+        depends on CONFIG_USE_GPS_UART
+        help
+            Select UART port number for GPS module
+
+    config GPS_UART_TX_PIN
+        int "GPS UART TX pin"
+        default 41
+        range 0 63
+        depends on CONFIG_USE_GPS_UART
+        help
+            GPIO pin for UART TX (P41 for UART2_TX)
+
+    config GPS_UART_RX_PIN
+        int "GPS UART RX pin"
+        default 40
+        range 0 63
+        depends on CONFIG_USE_GPS_UART
+        help
+            GPIO pin for UART RX (P40 for UART2_RX)
+
+    config GPS_UART_BAUDRATE
+        int "GPS UART Baudrate"
+        default 115200
+        depends on CONFIG_USE_GPS_UART
+        help
+            Baudrate for UART communication with GPS module (LC76G default: 115200)
+
+    config LC76G_ENABLE_NMEA_LOGS
+        bool "Enable detailed NMEA sentence parsing logs"
+        default n
+        help
+            Enable detailed NMEA sentence parsing logs for debugging GPS communication.
+            When enabled, shows individual field values from each NMEA sentence type
+            including GGA, RMC, VTG, GSA, and GSV sentences. This generates verbose
+            log output useful for GPS troubleshooting and development.
+endif
+
 config ENABLE_ENCODER_INPUT
     bool "enable rotary encoder input"
     default y
