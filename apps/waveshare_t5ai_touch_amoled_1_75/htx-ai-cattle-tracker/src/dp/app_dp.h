@@ -43,6 +43,8 @@ OPERATE_RET app_gps_position_upload(double latitude, double longitude);
 
 uint8_t app_get_current_tracking_id(void);
 
+OPERATE_RET app_dp_sos_set(bool sos_status);
+
 #ifdef __cplusplus
 }
 #endif

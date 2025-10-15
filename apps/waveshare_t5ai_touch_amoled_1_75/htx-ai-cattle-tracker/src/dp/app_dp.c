@@ -23,6 +23,8 @@
 #define APP_DPID_VOLUME             3
 #define APP_DPID_CHARGE_STATUS      5
 
+#define APP_DPID_SOS_STATUS 102
+
 #define APP_DPID_GPS_POSITION 105
 
 // start_tracking_id
@@ -189,6 +191,26 @@ OPERATE_RET app_volume_set(uint8_t volume)
     app_volume_upload(volume);
 
     return rt;
+}
+
+OPERATE_RET app_dp_sos_set(bool sos_status)
+{
+    if (!app_check_network_ready()) {
+        PR_WARN("network not ready, skip sos status upload");
+        return OPRT_COM_ERROR;
+    }
+
+    tuya_iot_client_t *client = tuya_iot_client_get();
+
+    dp_obj_t dp_obj = {0};
+
+    dp_obj.id = APP_DPID_SOS_STATUS;
+    dp_obj.type = PROP_BOOL;
+    dp_obj.value.dp_bool = sos_status;
+
+    PR_DEBUG("DP upload sos status:%d", sos_status);
+
+    return tuya_iot_dp_obj_report(client, client->activate.devid, &dp_obj, 1, DP_REPT_NO_FILTER_FLAG);
 }
 
 void app_dp_update_all(void)
