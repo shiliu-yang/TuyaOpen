@@ -528,7 +528,7 @@ OPERATE_RET lc76g_init_i2c(lc76g_dev_t *dev, uint8_t i2c_addr_wr, uint8_t i2c_ad
 }
 
 // UART interface configuration (following Waveshare demo)
-#define UART_BUFFER_SIZE     4096 // Match demo code buffer size
+#define UART_BUFFER_SIZE     2048 // Match demo code buffer size
 #define UART_READ_TIMEOUT_MS 1000 // Total timeout for reading
 
 OPERATE_RET lc76g_init_uart(lc76g_dev_t *dev, TUYA_UART_NUM_E port, uint32_t baudrate)
