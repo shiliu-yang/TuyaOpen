@@ -193,6 +193,7 @@ static void __app_ai_audio_evt_inform_cb(AI_AUDIO_EVENT_E event, uint8_t *data, 
 #else
         app_display_send_msg(TY_DISPLAY_TP_ASSISTANT_MSG, p_ai_text, ai_text_len);
         ai_text_len = 0;
+        memset(p_ai_text, 0, AI_AUDIO_TEXT_BUFF_LEN);
 #endif
 #endif
     } break;
