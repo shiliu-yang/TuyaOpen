@@ -263,6 +263,20 @@ static int tuya_protocol_message_parse_process(tuya_mqtt_context_t *context, con
     event.root_json = root;
     event.data = cJSON_GetObjectItem(root, "data");
 
+    // CloudEvent start
+    cJSON *bizType = cJSON_GetObjectItem(event.data, "bizType");
+    PR_DEBUG("bizType: %s", bizType ? bizType->valuestring : "NULL");
+    if (bizType && strcmp(bizType->valuestring, "CloudEvent") == 0) {
+        PR_DEBUG("CloudEvent come");
+        extern OPERATE_RET __parse_cloud_event(char *scode, cJSON *root);
+        cJSON *node = cJSON_GetObjectItem(event.data, "data");
+        if (node) {
+            PR_DEBUG("call __parse_cloud_event");
+            __parse_cloud_event("", node);
+        }
+    }
+    // CloudEvent start
+
     /* LOCK */
     tuya_protocol_handle_t *target = context->protocol_list;
     for (; target; target = target->next) {
