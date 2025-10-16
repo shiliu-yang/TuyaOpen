@@ -20,6 +20,10 @@
  #include "resources/closing_nav_cow_icon.c"
  #include "resources/icons/mic_red_icon.c"
 
+#include "ai_audio.h"
+#include "tuya_lvgl.h"
+#include "tal_api.h"
+
  /*********************
   *      DEFINES
   *********************/
@@ -445,7 +449,7 @@ static void on_volume_slider_changed(lv_event_t *e)
         g.volume_change_callback(volume);
     }
     
-    printf("Volume changed to: %d%%\n", volume);
+    // printf("Volume changed to: %d%%\n", volume);
 }
 
 /**
@@ -512,7 +516,13 @@ void set_gps_satellite_count(int count)
 
 void lv_demo_cattle_ai_tracker(void)
  {
+     /* Save the volume callback before memset clears it */
+     void (*saved_callback)(int volume) = g.volume_change_callback;
+     
      memset(&g, 0, sizeof(g));
+     
+     /* Restore the volume callback */
+     g.volume_change_callback = saved_callback;
 
      /* Dummy data */
      g.gps_sat_count = 7;
@@ -575,6 +585,17 @@ void lv_demo_cattle_ai_tracker(void)
     
     /* Set default bottom text with typewriter animation */
     update_idle_bottom_text("你好，今天怎么帮你找牛？");
+}
+
+void set_sos_visible(bool visible)
+{
+    tuya_lvgl_mutex_lock();
+    if (visible) {
+        show_sos_alert();
+    } else {
+        hide_sos_alert();
+    }
+    tuya_lvgl_mutex_unlock();
 }
 
  /**********************
@@ -1203,7 +1224,7 @@ static void eye_look_timer_cb(lv_timer_t *timer)
 
          /* If dragged left significantly, close the tracking screen */
          if (new_x < CATTLE_SCREEN_WIDTH / 3) {
-             printf("Drag left - closing tracking\n");
+             // printf("Drag left - closing tracking\n");
              slide_tracking(false);
              drag_started = false;
          }
@@ -1211,7 +1232,7 @@ static void eye_look_timer_cb(lv_timer_t *timer)
          if (drag_started) {
              /* Snap back to original position if not closed */
              if (current_x < CATTLE_SCREEN_WIDTH * 2 / 3) {
-                 printf("Drag released - snapping back\n");
+                 // printf("Drag released - snapping back\n");
                  lv_obj_set_x(g.tracking_screen, 0);
              }
 
@@ -1516,14 +1537,14 @@ static void eye_look_timer_cb(lv_timer_t *timer)
                  lv_obj_del(g.interval_lines[i]);
              }
          }
-         free(g.interval_lines);
+         tal_free(g.interval_lines);
          g.interval_lines = NULL;
          g.interval_lines_count = 0;
      }
 
      /* Allocate space for interval lines (fixed size for efficiency) */
      g.interval_lines_count = 12;
-     g.interval_lines = malloc(g.interval_lines_count * sizeof(lv_obj_t *));
+     g.interval_lines = tal_malloc(g.interval_lines_count * sizeof(lv_obj_t *));
 
      if (!g.interval_lines) {
          g.interval_lines_count = 0;
@@ -2152,8 +2173,8 @@ static void eye_look_timer_cb(lv_timer_t *timer)
     lv_obj_set_height(g.settings_volume_slider, 10);
     lv_obj_align(g.settings_volume_slider, LV_ALIGN_BOTTOM_MID, 0, -105);  /* Moved up by 15px */
     lv_slider_set_range(g.settings_volume_slider, 0, 100);
-    lv_slider_set_value(g.settings_volume_slider, 60, LV_ANIM_OFF);
-    g.current_volume = 60;  /* Initialize volume to 60% */
+    g.current_volume = ai_audio_get_volume();
+    lv_slider_set_value(g.settings_volume_slider, g.current_volume, LV_ANIM_OFF);
 
     /* Style for the main track (background/unfilled part) */
     lv_obj_set_style_bg_opa(g.settings_volume_slider, LV_OPA_COVER, LV_PART_MAIN);
@@ -2362,7 +2383,7 @@ static void eye_look_timer_cb(lv_timer_t *timer)
 
          /* If dragged down significantly, close the panel */
          if (new_y > SETTINGS_PANEL_HEIGHT / 3) {
-             printf("Drag down - closing settings\n");
+             // printf("Drag down - closing settings\n");
              slide_settings(false);
              drag_started = false;
          }
@@ -2370,7 +2391,7 @@ static void eye_look_timer_cb(lv_timer_t *timer)
          if (drag_started) {
              /* Snap back to original position if not closed */
              if (current_y > -SETTINGS_PANEL_HEIGHT / 3) {
-                 printf("Drag released - snapping back\n");
+                 // printf("Drag released - snapping back\n");
                  lv_obj_set_y(g.settings_panel, 0);
              }
              drag_started = false;
@@ -2393,13 +2414,13 @@ static void eye_look_timer_cb(lv_timer_t *timer)
          switch (dir) {
          case LV_DIR_TOP: // Swipe up - close settings
             if (settings_visible) {
-                 printf("Swipe up - closing settings with animation\n");
+                 // printf("Swipe up - closing settings with animation\n");
                  slide_settings(false);
              }
              break;
          case LV_DIR_BOTTOM: // Swipe down - open settings
             if (!settings_visible) {
-                 printf("Swipe down - opening settings\n");
+                 // printf("Swipe down - opening settings\n");
                  slide_settings(true);
              }
              break;
@@ -2407,28 +2428,28 @@ static void eye_look_timer_cb(lv_timer_t *timer)
             /* Disable left/right swipes when settings panel is visible to avoid
              * interfering with volume slider */
             if (settings_visible) {
-                printf("Swipe left - ignored, settings panel is open\n");
+                // printf("Swipe left - ignored, settings panel is open\n");
                 break;
             }
              if (lv_obj_has_flag(g.tracking_screen, LV_OBJ_FLAG_HIDDEN)) {
-                 printf("Swipe left - showing tracking\n");
+                 // printf("Swipe left - showing tracking\n");
                  slide_tracking(true);
              } else {
-                 printf("Swipe left - tracking already visible, ignoring\n");
+                 // printf("Swipe left - tracking already visible, ignoring\n");
              }
              break;
          case LV_DIR_RIGHT: // Swipe right - idle screen
             /* Disable left/right swipes when settings panel is visible to avoid
              * interfering with volume slider */
             if (settings_visible) {
-                printf("Swipe right - ignored, settings panel is open\n");
+                // printf("Swipe right - ignored, settings panel is open\n");
                 break;
             }
              if (lv_obj_has_flag(g.idle_screen, LV_OBJ_FLAG_HIDDEN)) {
-                 printf("Swipe right - showing idle\n");
+                 // printf("Swipe right - showing idle\n");
                  show_idle();
              } else {
-                 printf("Swipe right - idle already visible, ignoring\n");
+                 // printf("Swipe right - idle already visible, ignoring\n");
              }
              break;
          default:
@@ -2446,30 +2467,30 @@ static void eye_look_timer_cb(lv_timer_t *timer)
  static void on_keyboard(lv_event_t *e)
  {
      uint32_t key = lv_event_get_key(e);
-     printf("Key pressed: %d (char: %c)\n", key, (char)key);
+     // printf("Key pressed: %d (char: %c)\n", key, (char)key);
 
      switch (key) {
      case 'i':
      case 'I': // Idle screen
          if (lv_obj_has_flag(g.idle_screen, LV_OBJ_FLAG_HIDDEN)) {
-             printf("Key I - showing idle\n");
+             // printf("Key I - showing idle\n");
              show_idle();
          } else {
-             printf("Key I - idle already visible, ignoring\n");
+             // printf("Key I - idle already visible, ignoring\n");
          }
          break;
      case 't':
      case 'T': // Tracking screen
          if (lv_obj_has_flag(g.tracking_screen, LV_OBJ_FLAG_HIDDEN)) {
-             printf("Key T - showing tracking\n");
+             // printf("Key T - showing tracking\n");
              slide_tracking(true);
          } else {
-             printf("Key T - tracking already visible, ignoring\n");
+             // printf("Key T - tracking already visible, ignoring\n");
          }
          break;
      case 's':
      case 'S': // Settings
-         printf("Key S - toggling settings\n");
+         // printf("Key S - toggling settings\n");
          if (lv_obj_has_flag(g.settings_panel, LV_OBJ_FLAG_HIDDEN)) {
              slide_settings(true);
          } else {
@@ -2478,95 +2499,95 @@ static void eye_look_timer_cb(lv_timer_t *timer)
          break;
      case 'x':
      case 'X': // Cancel SOS
-         printf("Key X - canceling SOS\n");
+         // printf("Key X - canceling SOS\n");
          if (g.sos_active) {
              hide_sos_alert();
          }
          break;
      case ' ': // Space for SOS
-         printf("Space - triggering SOS\n");
+         // printf("Space - triggering SOS\n");
          if (!g.sos_active) {
              show_sos_alert();
          }
          break;
      case '0': // 50m scale
-         printf("Key 0 - animating to 50m scale\n");
+         // printf("Key 0 - animating to 50m scale\n");
          animate_distance_scale(50);
          break;
      case '1': // 100m scale
-         printf("Key 1 - animating to 100m scale\n");
+         // printf("Key 1 - animating to 100m scale\n");
          animate_distance_scale(100);
          break;
      case '2': // 200m scale
-         printf("Key 2 - animating to 200m scale\n");
+         // printf("Key 2 - animating to 200m scale\n");
          animate_distance_scale(200);
          break;
      case '3': // 500m scale
-         printf("Key 3 - animating to 500m scale\n");
+         // printf("Key 3 - animating to 500m scale\n");
          animate_distance_scale(500);
          break;
      case '4': // 1km scale
-         printf("Key 4 - animating to 1km scale\n");
+         // printf("Key 4 - animating to 1km scale\n");
          animate_distance_scale(1000);
          break;
      case '5': // 3km scale
-         printf("Key 5 - animating to 3km scale\n");
+         // printf("Key 5 - animating to 3km scale\n");
          animate_distance_scale(3000);
          break;
      case '6': // 5km scale
-         printf("Key 6 - animating to 5km scale\n");
+         // printf("Key 6 - animating to 5km scale\n");
          animate_distance_scale(5000);
          break;
 
     /* Eye animation controls */
     case 'n':
     case 'N': // Normal/Idle eyes
-        printf("Key N - resetting to idle eyes\n");
+        // printf("Key N - resetting to idle eyes\n");
         set_idle_eye_state(0);  // 0 = idle state
         break;
     case 'h':
     case 'H': // Happy eyes
-        printf("Key H - triggering happy eyes\n");
+        // printf("Key H - triggering happy eyes\n");
         set_idle_eye_state(2);  // 2 = happy state
         break;
     case 'b':
     case 'B': // Manual blink
-        printf("Key B - triggering manual blink\n");
+        // printf("Key B - triggering manual blink\n");
         set_idle_eye_state(1);  // 1 = blinking state
         break;
     case 'l':
     case 'L': // Look left
-        printf("Key L - looking left\n");
+        // printf("Key L - looking left\n");
         g.target_pupil_x = -18;
         g.target_pupil_y = 0;
         break;
     case 'r':
     case 'R': // Look right
-        printf("Key R - looking right\n");
+        // printf("Key R - looking right\n");
         g.target_pupil_x = 18;
         g.target_pupil_y = 0;
         break;
     case 'u':
     case 'U': // Look up
-        printf("Key U - looking up\n");
+        // printf("Key U - looking up\n");
         g.target_pupil_x = 0;
         g.target_pupil_y = -18;
         break;
     case 'd':
     case 'D': // Look down
-        printf("Key D - looking down\n");
+        // printf("Key D - looking down\n");
         g.target_pupil_x = 0;
         g.target_pupil_y = 18;
         break;
     case 'c':
     case 'C': // Look center
-        printf("Key C - looking center\n");
+        // printf("Key C - looking center\n");
         g.target_pupil_x = 0;
         g.target_pupil_y = 0;
         break;
     case 'e':
     case 'E': // Random eye movement
-        printf("Key E - random eye movement\n");
+        // printf("Key E - random eye movement\n");
         {
             int direction = rand() % 8;
             if (direction == 0) {
@@ -2598,34 +2619,34 @@ static void eye_look_timer_cb(lv_timer_t *timer)
         break;
     case 'o':
     case 'O': // Surprised expression
-        printf("Key O - surprised expression\n");
+        // printf("Key O - surprised expression\n");
         set_idle_eye_state(3);  // 3 = surprised
         g.target_pupil_size = 110;  // Dilated pupils
         break;
     case 'z':
     case 'Z': // Sleepy expression
-        printf("Key Z - sleepy expression\n");
+        // printf("Key Z - sleepy expression\n");
         set_idle_eye_state(4);  // 4 = sleepy
         g.target_pupil_size = 85;  // Smaller pupils
         break;
     case 'w':
     case 'W': // Wink
-        printf("Key W - wink\n");
+        // printf("Key W - wink\n");
         set_idle_eye_state(5);  // 5 = wink
         break;
     case 'a':
     case 'A': // Angry expression
-        printf("Key A - angry expression\n");
+        // printf("Key A - angry expression\n");
         set_idle_eye_state(6);  // 6 = angry
         break;
     case 'y':
     case 'Y': // Toggle red ring indicator
-        printf("Key Y - toggle red ring indicator\n");
+        // printf("Key Y - toggle red ring indicator\n");
         toggle_idle_red_ring();
         break;
 
     default:
-         printf("Unhandled key: %d\n", key);
+         // printf("Unhandled key: %d\n", key);
          break;
      }
  }
@@ -2766,7 +2787,7 @@ static void eye_look_timer_cb(lv_timer_t *timer)
  //     (void)e; /* Suppress unused parameter warning */
 
  //     /* Placeholder for pinch gesture - would need multi-touch support */
- //     printf("Pinch gesture detected (placeholder)\n");
+ //     // printf("Pinch gesture detected (placeholder)\n");
  // }
 
  // static void apply_zoom_to_compass(void)
@@ -2800,7 +2821,7 @@ static void eye_look_timer_cb(lv_timer_t *timer)
      (void)e; /* Suppress unused parameter warning */
 
      /* Placeholder for pinch gesture detection */
-     printf("Pinch gesture event (placeholder)\n");
+     // printf("Pinch gesture event (placeholder)\n");
  }
 
  /* Smooth rotation animation functions */
@@ -3063,6 +3084,7 @@ static void update_idle_bottom_text_static(const char *text)
 }
 
 /* Typewriter animation timer callback */
+// TODO: DEBUG typewriter_full_text need locking?
 static void typewriter_timer_cb(lv_timer_t *timer)
 {
     if (!g.typewriter_active || !g.typewriter_full_text) {
@@ -3188,7 +3210,7 @@ static void typewriter_timer_cb(lv_timer_t *timer)
     }
 
     if (g.typewriter_full_text) {
-        free(g.typewriter_full_text);
+        tal_psram_free(g.typewriter_full_text);
         g.typewriter_full_text = NULL;
     }
 
@@ -3201,7 +3223,13 @@ static void typewriter_timer_cb(lv_timer_t *timer)
     }
 
     /* Store the full text */
-    g.typewriter_full_text = strdup(text);
+    g.typewriter_full_text = tal_psram_malloc(strlen(text) + 1);
+    if (g.typewriter_full_text == NULL) {
+        g.typewriter_active = false;
+        return; // Memory allocation failed
+    }
+    memset(g.typewriter_full_text, 0, strlen(text) + 1);
+    strncpy(g.typewriter_full_text, text, strlen(text) + 1);
     g.typewriter_char_index = 0;
     g.typewriter_window_start = 0;
     g.typewriter_active = true;
@@ -3239,11 +3267,13 @@ void set_idle_eye_state(int state)
 
  void gps_set_tracker_position(float lat, float lon)
  {
+    tuya_lvgl_mutex_lock();
      g.self_lat = lat;
      g.self_lon = lon;
 
      /* Dynamically update all target positions and distances */
      update_target_positions_for_new_origin();
+     tuya_lvgl_mutex_unlock();
  }
 
  int gps_get_target_count(void)

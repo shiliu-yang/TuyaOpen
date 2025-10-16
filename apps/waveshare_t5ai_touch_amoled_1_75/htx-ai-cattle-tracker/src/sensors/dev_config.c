@@ -1,16 +1,15 @@
 /*****************************************************************************
-* | File      	:   dev_config.c
-* | Author      :   Waveshare team
-* | Function    :   Hardware underlying interface
-* | Info        :
-*----------------
-* |	This version:   V1.0
-* | Date        :   2025-08-29
-* | Info        :   Basic version
-*
-******************************************************************************/
+ * | File      	:   dev_config.c
+ * | Author      :   Waveshare team
+ * | Function    :   Hardware underlying interface
+ * | Info        :
+ *----------------
+ * |	This version:   V1.0
+ * | Date        :   2025-08-29
+ * | Info        :   Basic version
+ *
+ ******************************************************************************/
 #include "dev_config.h"
-#include "sensor_integration.h"
 
 TDL_BUTTON_HANDLE button_hdl = NULL;
 
@@ -34,7 +33,7 @@ static void __button_function_cb(char *name, TDL_BUTTON_TOUCH_EVENT_E event, voi
 OPERATE_RET dev_gpio_init(uint8_t pin, uint8_t mode)
 {
     TUYA_GPIO_BASE_CFG_T pin_cfg;
-    if(mode == 0 || mode == TUYA_GPIO_INPUT) {
+    if (mode == 0 || mode == TUYA_GPIO_INPUT) {
         pin_cfg.mode = TUYA_GPIO_PULLUP;
         pin_cfg.direct = TUYA_GPIO_INPUT;
     } else {
@@ -67,19 +66,17 @@ OPERATE_RET dev_button_init(uint8_t pin)
     };
 
     TUYA_CALL_ERR_RETURN(tdd_gpio_button_register(EXAMPLE_PWR_BUTTON_NAME, &button_hw_cfg));
-    
+
     // button create
     TDL_BUTTON_CFG_T button_cfg = {.long_start_valid_time = 3000,
                                    .long_keep_timer = 1000,
                                    .button_debounce_time = 50,
                                    .button_repeat_valid_count = 2,
                                    .button_repeat_valid_time = 500};
-    
 
     TUYA_CALL_ERR_RETURN(tdl_button_create(EXAMPLE_PWR_BUTTON_NAME, &button_cfg, &button_hdl));
 
     return rt;
-
 }
 
 void dev_button_event_register(TDL_BUTTON_TOUCH_EVENT_E event, TDL_BUTTON_EVENT_CB cb)
@@ -89,7 +86,7 @@ void dev_button_event_register(TDL_BUTTON_TOUCH_EVENT_E event, TDL_BUTTON_EVENT_
 
 OPERATE_RET dev_sys_init()
 {
-    //上电时，自动使能供电引脚
+    // 上电时，自动使能供电引脚
     OPERATE_RET rt = dev_gpio_init(EXAMPLE_SYS_EN_PIN, TUYA_GPIO_OUTPUT);
     if (rt != OPRT_OK) {
         PR_ERR("Failed to initialize GPIO (error: %d)", rt);
@@ -102,7 +99,7 @@ OPERATE_RET dev_sys_init()
         return rt;
     }
 
-    //配置长按关机按键
+    // 配置长按关机按键
     rt = dev_button_init(EXAMPLE_SYS_PWR_PIN);
     if (rt != OPRT_OK) {
         PR_ERR("Failed to init pwr button (error: %d)", rt);
@@ -175,7 +172,7 @@ OPERATE_RET bmm150_i2c_port_init()
     TUYA_IIC_BASE_CFG_T cfg = {
         .role = TUYA_IIC_MODE_MASTER,
         .addr_width = TUYA_IIC_ADDRESS_7BIT,
-        .speed = TUYA_IIC_BUS_SPEED_100K  // BMM150 supports up to 400kHz
+        .speed = TUYA_IIC_BUS_SPEED_100K // BMM150 supports up to 400kHz
     };
 
     ret = tkl_i2c_init(TUYA_I2C_NUM_2, &cfg);
@@ -203,13 +200,90 @@ OPERATE_RET bmm150_i2c_write_reg(uint8_t addr, uint8_t reg, uint8_t value)
 OPERATE_RET bmm150_i2c_read_reg(uint8_t addr, uint8_t reg, uint8_t *buffer, uint8_t length)
 {
     OPERATE_RET ret = OPRT_OK;
-    
+
     // Send register address
     ret = tkl_i2c_master_send(TUYA_I2C_NUM_2, addr, &reg, 1, FALSE);
     if (ret != OPRT_OK) {
         return ret;
     }
-    
+
     // Read data
     return tkl_i2c_master_receive(TUYA_I2C_NUM_2, addr, buffer, length, TRUE);
+}
+
+OPERATE_RET dev_uart_init(TUYA_UART_NUM_E port, uint32_t baudrate)
+{
+    OPERATE_RET ret;
+
+    TUYA_UART_BASE_CFG_T cfg = {0};
+    cfg.baudrate = baudrate;
+    cfg.databits = TUYA_UART_DATA_LEN_8BIT;
+    cfg.parity = TUYA_UART_PARITY_TYPE_NONE;
+    cfg.stopbits = TUYA_UART_STOP_LEN_1BIT;
+    cfg.flowctrl = TUYA_UART_FLOWCTRL_NONE;
+
+    ret = tkl_uart_init(port, &cfg);
+    if (OPRT_OK != ret) {
+        PR_ERR("UART init fail, err<%d>!", ret);
+    } else {
+        PR_INFO("UART port %d initialized at baudrate %d", port, baudrate);
+    }
+
+    return ret;
+}
+
+OPERATE_RET dev_uart_deinit(TUYA_UART_NUM_E port)
+{
+    return tkl_uart_deinit(port);
+}
+
+int dev_uart_write(TUYA_UART_NUM_E port, const uint8_t *data, uint16_t len)
+{
+    if (!data || len == 0) {
+        return -1;
+    }
+    return tkl_uart_write(port, (void *)data, len);
+}
+
+int dev_uart_read(TUYA_UART_NUM_E port, uint8_t *data, uint16_t len, uint32_t timeout_ms)
+{
+    int total_read = 0;
+
+    if (!data || len == 0) {
+        return -1;
+    }
+
+    uint32_t start_time = tal_system_get_millisecond();
+    uint32_t last_fifo_len = 0;
+    last_fifo_len = tkl_uart_get_rxfifo_len(port);
+
+    // wait data recv finish, fifo len no change in 50ms
+    while (1) {
+        uint32_t current_fifo_len = tkl_uart_get_rxfifo_len(port);
+        if (current_fifo_len != last_fifo_len) {
+            last_fifo_len = current_fifo_len;
+            start_time = tal_system_get_millisecond();
+        } else {
+            if ((tal_system_get_millisecond() - start_time) > 50) {
+                break;
+            }
+        }
+
+        if ((tal_system_get_millisecond() - start_time) > timeout_ms) {
+            PR_WARN("timeout not get data");
+            break;
+        }
+        tal_system_sleep(10);
+    }
+
+    // Read available data
+    uint32_t to_read_len = ((last_fifo_len > len) ? len : last_fifo_len);
+    int bytes = tkl_uart_read(port, data, to_read_len);
+    if (bytes < 0) {
+        total_read = 0;
+    } else {
+        total_read = bytes;
+    }
+
+    return total_read;
 }

@@ -1,46 +1,86 @@
+/**
+ * @file lc76g.c
+ * @brief LC76G GPS Module Driver - Supports both I2C and UART interfaces
+ *
+ * Debug/Logging Controls:
+ * -----------------------
+ * LC76G_ENABLE_NMEA_LOGS - Controlled by Kconfig
+ *   - Enable via: CONFIG_LC76G_ENABLE_NMEA_LOGS=y in Kconfig
+ *   - Shows detailed NMEA sentence parsing logs
+ *   - Configure via menuconfig: Application config → Enable detailed NMEA sentence parsing logs
+ */
+
 #include "lc76g.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <stdio.h>
 
 uint8_t readData[4];
 
-#ifndef LC76G_ENABLE_NMEA_LOGS
-#define LC76G_ENABLE_NMEA_LOGS 0
-#endif
+static lc76g_state_t g_state = {.utc_hour = 0,
+                                .utc_minute = 0,
+                                .utc_second = 0,
+                                .utc_millisecond = 0,
+                                .latitude_deg = 0.0,
+                                .longitude_deg = 0.0,
+                                .altitude_m = 0.0,
+                                .date_ddmmyy = {0},
+                                .fix_quality = 0,
+                                .satellites_in_use = 0,
+                                .connect_state = 0,
+                                .signal_level_5 = 0,
+                                .speed_kmh = 0.0,
+                                .course_deg = 0.0,
+                                .last_status = false};
 
-static lc76g_state_t g_state = {
-    .utc_hour = 0,
-    .utc_minute = 0,
-    .utc_second = 0,
-    .utc_millisecond = 0,
-    .latitude_deg = 0.0,
-    .longitude_deg = 0.0,
-    .altitude_m = 0.0,
-    .date_ddmmyy = {0},
-    .fix_quality = 0,
-    .satellites_in_use = 0,
-    .connect_state = 0,
-    .signal_level_5 = 0,
-    .speed_kmh = 0.0,
-    .course_deg = 0.0,
-    .last_status = '-'
-};
+// Status logging control (reduce frequency)
+static uint32_t g_log_counter = 0;
 
 // ----------------------
 // NMEA parsing utilities
 // ----------------------
 
+static uint8_t nmea_checksum_calculate(const char *message)
+{
+    if (message == NULL) {
+        return -1;
+    }
+
+    // 查找起始符'$'
+    const char *start = strchr(message, '$');
+    if (start == NULL) {
+        return -1; // 没有找到起始符
+    }
+
+    // 查找结束符'*'，如果没有则计算到字符串末尾
+    const char *end = strchr(start, '*');
+    if (end == NULL) {
+        end = start + strlen(start);
+    }
+
+    // 计算校验和 (跳过$符号，从下一个字符开始)
+    uint8_t checksum = 0;
+    for (const char *ptr = start + 1; ptr < end; ptr++) {
+        checksum ^= (uint8_t)(*ptr);
+    }
+
+    return checksum;
+}
+
 static bool nmea_validate(const char *line)
 {
     // Expect format: $...*HH[\r][\n]
     const char *start = line;
-    if (!start || start[0] != '$') return false;
+    if (!start || start[0] != '$')
+        return false;
     const char *asterisk = strchr(start, '*');
-    if (!asterisk || (asterisk - start) < 1) return false;
+    if (!asterisk || (asterisk - start) < 1)
+        return false;
 
     // Read hex checksum after '*'
-    if (!asterisk[1] || !asterisk[2]) return false;
+    if (!asterisk[1] || !asterisk[2])
+        return false;
     char hex[3];
     hex[0] = asterisk[1];
     hex[1] = asterisk[2];
@@ -61,7 +101,8 @@ static int split_fields(char *line, char **fields, int max_fields)
     int count = 0;
     char *p = line;
     // Skip leading '$'
-    if (*p == '$') p++;
+    if (*p == '$')
+        p++;
     fields[count++] = p;
     while (*p && *p != '*' && count < max_fields) {
         if (*p == ',') {
@@ -84,19 +125,27 @@ static void parse_hms(const char *utc, int *hh, int *mm, int *ss, int *ms)
 {
     // utc like HHMMSS or HHMMSS.sss
     *hh = *mm = *ss = *ms = 0;
-    if (!utc || utc[0] == '\0') return;
+    if (!utc || utc[0] == '\0')
+        return;
     int len = (int)strlen(utc);
-    if (len < 6) return;
+    if (len < 6)
+        return;
     char buf[4] = {0};
-    memcpy(buf, utc, 2); *hh = atoi(buf);
-    memcpy(buf, utc + 2, 2); *mm = atoi(buf);
-    memcpy(buf, utc + 4, 2); *ss = atoi(buf);
+    memcpy(buf, utc, 2);
+    *hh = atoi(buf);
+    memcpy(buf, utc + 2, 2);
+    *mm = atoi(buf);
+    memcpy(buf, utc + 4, 2);
+    *ss = atoi(buf);
     const char *dot = strchr(utc, '.');
     if (dot && dot[1]) {
         char msbuf[4] = {0};
         // take up to 3 digits
-        int i = 0; dot++;
-        while (i < 3 && *dot && *dot != ',') { msbuf[i++] = *dot++; }
+        int i = 0;
+        dot++;
+        while (i < 3 && *dot && *dot != ',') {
+            msbuf[i++] = *dot++;
+        }
         *ms = atoi(msbuf);
     }
 }
@@ -104,15 +153,18 @@ static void parse_hms(const char *utc, int *hh, int *mm, int *ss, int *ms)
 static double parse_latlon(const char *val, const char *hemi, bool is_lat)
 {
     // val like ddmm.mmmm (lat) or dddmm.mmmm (lon)
-    if (!val || val[0] == '\0') return 0.0;
+    if (!val || val[0] == '\0')
+        return 0.0;
     int deg_len = is_lat ? 2 : 3;
-    if ((int)strlen(val) < deg_len + 2) return 0.0;
+    if ((int)strlen(val) < deg_len + 2)
+        return 0.0;
     char degbuf[4] = {0};
     memcpy(degbuf, val, deg_len);
     int degrees = atoi(degbuf);
     double minutes = atof(val + deg_len);
     double decimal = (double)degrees + (minutes / 60.0);
-    if (hemi && (hemi[0] == 'S' || hemi[0] == 'W')) decimal = -decimal;
+    if (hemi && (hemi[0] == 'S' || hemi[0] == 'W'))
+        decimal = -decimal;
     return decimal;
 }
 
@@ -125,15 +177,14 @@ static void handle_gga(const char *type, char **f, int n)
 {
     // GGA fields (index starting at 0 after talker+type):
     // 0: talker+type (e.g., GNGGA) 1:UTC,2:lat,3:N/S,4:lon,5:E/W,6:fix,7:sats,8:HDOP,9:alt,10:altUnit
-    if (n < 11) return;
-    int hh, mm, ss, ms; parse_hms(f[1], &hh, &mm, &ss, &ms);
+    if (n < 11)
+        return;
+    int hh, mm, ss, ms;
+    parse_hms(f[1], &hh, &mm, &ss, &ms);
     int fix = f[6] && f[6][0] ? atoi(f[6]) : 0;
     int sats = f[7] && f[7][0] ? atoi(f[7]) : 0;
     const char *hdop = (n > 8) ? f[8] : "";
     const char *alt = (n > 9) ? f[9] : "";
-#if LC76G_ENABLE_NMEA_LOGS
-    const char *alt_u = (n > 10) ? f[10] : "";
-#endif
     double lat = parse_latlon(f[2], f[3], true);
     double lon = parse_latlon(f[4], f[5], false);
     // Update state
@@ -168,23 +219,23 @@ static void handle_gga(const char *type, char **f, int n)
     }
     g_state.signal_level_5 = level;
 #if LC76G_ENABLE_NMEA_LOGS
-    PR_NOTICE("[%s]", type ? type : "GGA");
-    PR_NOTICE("  Time (UTC): %02d:%02d:%02d.%03d", hh, mm, ss, ms);
-    PR_NOTICE("  Fix quality: %d (0=invalid,1=GPS,2=DGPS)", fix);
-    PR_NOTICE("  Satellites: %d", sats);
-    PR_NOTICE("  HDOP: %s", safe_str(hdop));
-    PR_NOTICE("  Latitude: %.6f (raw %s %s)", lat, safe_str(f[2]), safe_str(f[3]));
-    PR_NOTICE("  Longitude: %.6f (raw %s %s)", lon, safe_str(f[4]), safe_str(f[5]));
-    PR_NOTICE("  Altitude: %s %s", safe_str(alt), safe_str(alt_u));
+    // Only show GGA details when we have a fix or when specifically debugging
+    if (fix > 0 || g_state.satellites_in_use > 0) {
+        PR_NOTICE("[%s] Fix:%d Sats:%d Pos:%.6f,%.6f Alt:%s", type ? type : "GGA", fix, sats, lat, lon, safe_str(alt));
+    } else {
+        PR_DEBUG("[%s] No fix (searching for satellites...)", type ? type : "GGA");
+    }
 #endif
 }
 
 static void handle_rmc(const char *type, char **f, int n)
 {
     // RMC fields: 1:UTC 2:status(A/V) 3:lat 4:N/S 5:lon 6:E/W 7:speed(knots) 8:course 9:date(ddmmyy)
-    if (n < 10) return;
-    int hh, mm, ss, ms; parse_hms(f[1], &hh, &mm, &ss, &ms);
-    char status = f[2] && f[2][0] ? f[2][0] : 'V';
+    if (n < 10)
+        return;
+    int hh, mm, ss, ms;
+    parse_hms(f[1], &hh, &mm, &ss, &ms);
+    char status_char = f[2] && f[2][0] ? f[2][0] : 'V';
     double lat = parse_latlon(f[3], f[4], true);
     double lon = parse_latlon(f[5], f[6], false);
     double spd_kn = f[7] && f[7][0] ? atof(f[7]) : 0.0;
@@ -200,22 +251,21 @@ static void handle_rmc(const char *type, char **f, int n)
     g_state.longitude_deg = lon;
     g_state.speed_kmh = spd_kmh;
     g_state.course_deg = (course && course[0]) ? atof(course) : 0.0;
-    g_state.last_status = status;
+    g_state.last_status = (status_char == 'A'); // true if valid fix, false otherwise
     if (date && strlen(date) >= 6) {
         // Copy first 6 chars ddmmyy
         memcpy(g_state.date_ddmmyy, date, 6);
         g_state.date_ddmmyy[6] = '\0';
     }
-    g_state.connect_state = (status == 'A') ? 1 : g_state.connect_state;
+    g_state.connect_state = (status_char == 'A') ? 1 : g_state.connect_state;
 #if LC76G_ENABLE_NMEA_LOGS
-    PR_NOTICE("[%s]", type ? type : "RMC");
-    PR_NOTICE("  Time (UTC): %02d:%02d:%02d.%03d", hh, mm, ss, ms);
-    PR_NOTICE("  Status: %c (A=valid, V=void)", status);
-    PR_NOTICE("  Latitude: %.6f (raw %s %s)", lat, safe_str(f[3]), safe_str(f[4]));
-    PR_NOTICE("  Longitude: %.6f (raw %s %s)", lon, safe_str(f[5]), safe_str(f[6]));
-    PR_NOTICE("  Speed: %.2f km/h (%.2f kn, raw kn=%s)", spd_kmh, spd_kn, safe_str(f[7]));
-    PR_NOTICE("  Course over ground: %s", safe_str(course));
-    PR_NOTICE("  Date (ddmmyy): %s", safe_str(date));
+    // Only show RMC details when data is valid or when moving
+    if (status_char == 'A' || spd_kmh > 0.5) {
+        PR_NOTICE("[%s] Status:%c Time:%02d:%02d:%02d Speed:%.1f km/h Course:%.1f°", type ? type : "RMC", status_char,
+                  hh, mm, ss, spd_kmh, g_state.course_deg);
+    } else {
+        PR_DEBUG("[%s] Status:%c (waiting for valid fix)", type ? type : "RMC", status_char);
+    }
 #endif
 }
 
@@ -225,30 +275,23 @@ static void handle_vtg(const char *type, char **f, int n)
     const char *course_t = (n > 1) ? f[1] : "";
     double spd_kn = (n > 5 && f[5] && f[5][0]) ? atof(f[5]) : 0.0;
     double spd_kmh = (n > 7 && f[7] && f[7][0]) ? atof(f[7]) : knots_to_kmh(spd_kn);
-#if LC76G_ENABLE_NMEA_LOGS
-    const char *course_m = (n > 3) ? f[3] : "";
-#endif
     // Update state
     g_state.speed_kmh = spd_kmh;
     g_state.course_deg = (course_t && course_t[0]) ? atof(course_t) : g_state.course_deg;
 #if LC76G_ENABLE_NMEA_LOGS
-    PR_NOTICE("[%s]", type ? type : "VTG");
-    PR_NOTICE("  Course (true): %s deg", safe_str(course_t));
-    PR_NOTICE("  Course (magnetic): %s deg", safe_str(course_m));
-    PR_NOTICE("  Speed: %.2f km/h (%.2f kn, raw kn=%s, raw kmh=%s)", spd_kmh, spd_kn, (n>5?safe_str(f[5]):"-"), (n>7?safe_str(f[7]):"-"));
+    // Only show VTG when moving
+    if (spd_kmh > 0.5) {
+        PR_DEBUG("[%s] Speed:%.1f km/h Course:%.1f°", type ? type : "VTG", spd_kmh, g_state.course_deg);
+    }
 #endif
 }
 
 static void handle_gsa(const char *type, char **f, int n)
 {
     // GSA: mode1(A/M), mode2(1=no fix,2=2D,3=3D), sat IDs (12 fields), PDOP, HDOP, VDOP
-    if (n < 3) return;
+    if (n < 3)
+        return;
     int mode2 = (n > 2 && f[2] && f[2][0]) ? atoi(f[2]) : 0;
-#if LC76G_ENABLE_NMEA_LOGS
-    const char mode1 = (n > 1 && f[1] && f[1][0]) ? f[1][0] : '-';
-    const char *pdop = (n > 15) ? f[15] : "";
-    const char *vdop = (n > 17) ? f[17] : "";
-#endif
     const char *hdop = (n > 16) ? f[16] : "";
     // Update connectivity/quality hints
     if (mode2 >= 2) {
@@ -273,59 +316,75 @@ static void handle_gsa(const char *type, char **f, int n)
             level = 1;
         }
         g_state.signal_level_5 = level;
-    }
+
 #if LC76G_ENABLE_NMEA_LOGS
-    PR_NOTICE("[%s]", type ? type : "GSA");
-    PR_NOTICE("  Mode: %c, Dimensional fix: %d (1=no,2=2D,3=3D)", mode1, mode2);
-    PR_NOTICE("  PDOP: %s  HDOP: %s  VDOP: %s", safe_str(pdop), safe_str(hdop), safe_str(vdop));
+        // Only show GSA when we have dilution data
+        if (mode2 >= 2) {
+            PR_DEBUG("[%s] Mode:%d HDOP:%s Signal level:%d", type ? type : "GSA", mode2, safe_str(hdop), level);
+        }
 #endif
+    }
 }
 
 static void handle_gsv(const char *type, char **f, int n)
 {
     // GSV: totalMsgs,msgNum,svInView, then 4-sat blocks (satPRN, elev, azim, SNR)
-    if (n < 4) return;
+    if (n < 4)
+        return;
 #if LC76G_ENABLE_NMEA_LOGS
     int total = atoi(f[1]);
     int num = atoi(f[2]);
     int in_view = atoi(f[3]);
 #endif
 #if LC76G_ENABLE_NMEA_LOGS
-    PR_NOTICE("[%s]", type ? type : "GSV");
-    PR_NOTICE("  Message %d/%d, Satellites in view: %d", num, total, in_view);
-    // Print up to the first 4 satellites in this sentence
-    for (int i = 4, idx = 0; i + 3 < n && idx < 4; i += 4, ++idx) {
-        PR_NOTICE("  Sat%u: PRN=%s elev=%s azim=%s SNR=%s", (unsigned)(idx + 1), safe_str(f[i]), safe_str(f[i+1]), safe_str(f[i+2]), safe_str(f[i+3]));
+    // Only show GSV when satellites are visible
+    if (in_view > 0) {
+        PR_DEBUG("[%s] Message %d/%d, Satellites in view: %d", type ? type : "GSV", num, total, in_view);
     }
 #endif
 }
 
 static void parse_and_print_nmea(char *buffer, uint32_t len)
 {
+    int sentences_parsed = 0;
+    int checksum_failures = 0;
+    bool has_fix_data = false;
+    (void)has_fix_data;
+
     // Iterate lines split by \n or \r\n
     char *p = buffer;
     char *end = buffer + len;
     while (p < end) {
         // Find start '$'
         char *dollar = memchr(p, '$', (size_t)(end - p));
-        if (!dollar) break;
+        if (!dollar)
+            break;
         // Find line end
         char *line_end = memchr(dollar, '\n', (size_t)(end - dollar));
-        if (!line_end) line_end = end; // possibly last line without EOL
+        if (!line_end)
+            line_end = end; // possibly last line without EOL
 
         // Create a working copy of the line
         size_t line_len = (size_t)(line_end - dollar);
-        if (line_len < 6) { p = line_end + (line_end < end ? 1 : 0); continue; }
-        char *line = (char *)malloc(line_len + 1);
-        if (!line) return;
+        if (line_len < 6) {
+            p = line_end + (line_end < end ? 1 : 0);
+            continue;
+        }
+        char *line = (char *)tal_malloc(line_len + 1);
+        if (!line) {
+            PR_ERR("Memory allocation failed for NMEA line");
+            return;
+        }
         memcpy(line, dollar, line_len);
         line[line_len] = '\0';
 
         // Trim trailing \r
         size_t L = line_len;
-        if (L > 0 && line[L - 1] == '\r') line[L - 1] = '\0';
+        if (L > 0 && line[L - 1] == '\r')
+            line[L - 1] = '\0';
 
         if (nmea_validate(line)) {
+            sentences_parsed++;
             // Split fields
             char *fields[32] = {0};
             int n = split_fields(line, fields, 32);
@@ -333,8 +392,12 @@ static void parse_and_print_nmea(char *buffer, uint32_t len)
                 const char *type = fields[0];
                 if (strstr(type, "GGA")) {
                     handle_gga(type, fields, n);
+                    if (g_state.fix_quality > 0)
+                        has_fix_data = true;
                 } else if (strstr(type, "RMC")) {
                     handle_rmc(type, fields, n);
+                    if (g_state.last_status)
+                        has_fix_data = true;
                 } else if (strstr(type, "VTG")) {
                     handle_vtg(type, fields, n);
                 } else if (strstr(type, "GSA")) {
@@ -344,55 +407,213 @@ static void parse_and_print_nmea(char *buffer, uint32_t len)
                 } else {
 #if LC76G_ENABLE_NMEA_LOGS
                     // For other sentences, print a compact line once validated
-                    PR_INFO("NMEA %s", type);
+                    PR_DEBUG("NMEA %s", type);
 #endif
                 }
             }
         } else {
+            checksum_failures++;
 #if LC76G_ENABLE_NMEA_LOGS
-            PR_DEBUG("NMEA checksum fail: %s", line);
+            if (checksum_failures <= 3) { // Only show first few failures to avoid spam
+                PR_DEBUG("NMEA checksum fail: %s", line);
+            }
 #endif
         }
 
-        free(line);
+        tal_free(line);
         p = line_end + (line_end < end ? 1 : 0);
     }
+
+    // Print a concise summary, but reduce frequency to avoid log spam
+    g_log_counter++;
+
+#if LC76G_ENABLE_NMEA_LOGS
+    // Print summary every 5th read (every 25 seconds with 5s intervals) or when we have a fix
+    if ((g_log_counter % 5 == 0) || has_fix_data || g_state.satellites_in_use > 0) {
+        PR_INFO("NMEA: %d sentences, %d fails, fix=%s, sats=%d, status=%s, signal=%d/5", sentences_parsed,
+                checksum_failures, has_fix_data ? "YES" : "NO", g_state.satellites_in_use,
+                g_state.last_status ? "VALID" : "INVALID", g_state.signal_level_5);
+    } else {
+        PR_DEBUG("NMEA: %d sentences processed (searching satellites...)", sentences_parsed);
+    }
+#endif
 }
 
-OPERATE_RET lc76g_init(lc76g_dev_t *dev, uint8_t i2c_addr_wr, uint8_t i2c_addr_r) {
-    if (!dev) return OPRT_COM_ERROR;
-    
-    dev->i2c_addr_wr = i2c_addr_wr;
-    dev->i2c_addr_r = i2c_addr_r;
+OPERATE_RET lc76g_pair_062(lc76g_dev_t *dev, uint8_t type, uint8_t output_rate)
+{
+    // Type of standard NMEA sentence. -1 = Reset the output rates of all types of sentences to default values.
+    // 0 = NMEA_SEN_GGA
+    // 1 = NMEA_SEN_GLL
+    // 2 = NMEA_SEN_GSA
+    // 3 = NMEA_SEN_GSV
+    // 4 = NMEA_SEN_RMC
+    // 5 = NMEA_SEN_VTG
+    // 8 = NMEA_SEN_GST
 
-    //拉高复位引脚
+    // Output rate setting.
+    // 0 = Disabled or not supported
+    // N = Output once every N position fix(es)
+    // Range of N: 0–20. Default value: 1.
+
+    // $PAIR062,<type>,<output_rate>*hh<CR><LF>
+    OPERATE_RET rt = OPRT_OK;
+
+    uint8_t send_data[40] = {0};
+    int len = snprintf((char *)send_data, sizeof(send_data), "$PAIR062,%d,%d*", type, output_rate);
+
+    // Calculate checksum
+    uint8_t checksum = nmea_checksum_calculate((const char *)send_data);
+    len += snprintf((char *)send_data + len, sizeof(send_data) - (size_t)len, "%02X\r\n", checksum);
+
+    PR_DEBUG("PAIR062 command len: %d, data: %.*s", len, (int)len, send_data);
+
+    dev_uart_write(dev->config.uart.port, send_data, len);
+
+    // Read response (expecting $PAIR062,OK*hh or $PAIR062,ERR*hh)
+    uint8_t recv_buffer[32] = {0};
+    int read_len = dev_uart_read(dev->config.uart.port, recv_buffer, sizeof(recv_buffer), 3000);
+    if (read_len == 0) {
+        PR_ERR("No response to PAIR062 command");
+        return OPRT_COM_ERROR;
+    }
+    PR_DEBUG("PAIR062 response len: %d, data: %.*s", read_len, read_len, recv_buffer);
+
+    // Simple validation
+    if (nmea_validate((const char *)recv_buffer) == false) {
+        PR_ERR("Invalid NMEA response to PAIR062");
+        return OPRT_COM_ERROR;
+    }
+
+    // Parse response
+    // $PAIR001,<CommandID>,<Result>*<Checksum><CR><LF>
+    // $PAIR001,062,0*3F
+
+    int command_id = -1;
+    int result = -1;
+
+    char *fields[8] = {0};
+    int n = split_fields((char *)recv_buffer, fields, 8);
+    if (n >= 3) {
+        command_id = atoi(fields[1]);
+        result = atoi(fields[2]);
+    }
+
+    if (command_id != 62) {
+        PR_ERR("Unexpected command ID in PAIR062 response: %d", command_id);
+        return OPRT_COM_ERROR;
+    }
+
+    if (result != 0) {
+        PR_ERR("PAIR062 command failed with result code: %d", result);
+        return OPRT_COM_ERROR;
+    }
+
+    return rt;
+}
+
+OPERATE_RET lc76g_init_i2c(lc76g_dev_t *dev, uint8_t i2c_addr_wr, uint8_t i2c_addr_r)
+{
+    if (!dev)
+        return OPRT_COM_ERROR;
+
+    dev->interface = LC76G_INTERFACE_I2C;
+    dev->config.i2c.addr_wr = i2c_addr_wr;
+    dev->config.i2c.addr_r = i2c_addr_r;
+
+    // 拉高复位引脚
     dev_gpio_init(EXAMPLE_GPS_RESET_PIN, TUYA_GPIO_OUTPUT);
     dev_digital_write(EXAMPLE_GPS_RESET_PIN, 0);
     tal_system_sleep(50);
     dev_digital_write(EXAMPLE_GPS_RESET_PIN, 1);
     tal_system_sleep(500);
-    PR_INFO("LC76G initialized successfully");
+    PR_INFO("LC76G initialized successfully with I2C interface");
     return OPRT_OK;
 }
 
-uint8_t data[] = { 0x08, 0x00, 0x51, 0xAA, 0x04, 0x00, 0x00, 0x00 };
+// UART interface configuration (following Waveshare demo)
+#define UART_BUFFER_SIZE     2048 // Match demo code buffer size
+#define UART_READ_TIMEOUT_MS 1000 // Total timeout for reading
 
-OPERATE_RET lc76g_get_data(lc76g_dev_t *dev)
+OPERATE_RET lc76g_init_uart(lc76g_dev_t *dev, TUYA_UART_NUM_E port, uint32_t baudrate)
 {
-    if (!dev ) return OPRT_COM_ERROR;
+    if (!dev)
+        return OPRT_COM_ERROR;
+
+    dev->interface = LC76G_INTERFACE_UART;
+    dev->config.uart.port = port;
+    dev->config.uart.baudrate = baudrate;
+
+    // LC76G Hardware Reset Sequence (per Waveshare documentation)
+    // GPS_RST is active LOW: 0=RESET, 1=NORMAL
+    PR_NOTICE("========================================");
+    PR_NOTICE("LC76G GPS Module Initialization");
+    PR_NOTICE("========================================");
+    PR_NOTICE("Resetting GPS module on pin %d...", EXAMPLE_GPS_RESET_PIN);
+
+    dev_gpio_init(EXAMPLE_GPS_RESET_PIN, TUYA_GPIO_OUTPUT);
+
+    // Assert reset (active low)
+    dev_digital_write(EXAMPLE_GPS_RESET_PIN, 0);
+    PR_NOTICE("GPS in RESET state (pin LOW)");
+    tal_system_sleep(200); // Hold reset for 200ms
+
+    // Release reset - GPS module starts
+    dev_digital_write(EXAMPLE_GPS_RESET_PIN, 1);
+    PR_NOTICE("GPS RESET released (pin HIGH)");
+    PR_NOTICE("GPS module starting...");
+    PR_NOTICE("Waiting for GPS to boot and start transmitting NMEA...");
+    tal_system_sleep(2000); // Wait 2s for GPS to fully boot and start transmitting
+
+    // LC76G default baudrate is 115200 (per PAIR864 documentation)
+    // It automatically outputs NMEA - no commands needed!
+    PR_NOTICE("Using GPS UART interface");
+    dev_uart_init(port, baudrate);
+
+    PR_NOTICE("LC76G Configuration:");
+    PR_NOTICE("  Interface: UART (continuous read mode)");
+    PR_NOTICE("  Port: UART%d", port);
+    PR_NOTICE("  Baudrate: %d", baudrate);
+    PR_NOTICE("  TX Pin: P41 (MCU transmits to GPS RX)");
+    PR_NOTICE("  RX Pin: P40 (MCU receives from GPS TX)");
+    PR_NOTICE("  Buffer: %d bytes", UART_BUFFER_SIZE);
+    PR_NOTICE("========================================");
+    PR_NOTICE("NOTE: LC76G streams NMEA continuously");
+    PR_NOTICE("      Cold start takes ~26 seconds for first fix");
+    PR_NOTICE("========================================");
+
+    // only enable RMC
+    // RMC update once every 3s
+    lc76g_pair_062(dev, 0, 0);
+    lc76g_pair_062(dev, 1, 0);
+    lc76g_pair_062(dev, 2, 0);
+    lc76g_pair_062(dev, 3, 0);
+    lc76g_pair_062(dev, 4, 5);
+    lc76g_pair_062(dev, 5, 0);
+
+    return OPRT_OK;
+}
+
+// Backward compatibility wrapper
+OPERATE_RET lc76g_init(lc76g_dev_t *dev, uint8_t i2c_addr_wr, uint8_t i2c_addr_r)
+{
+    return lc76g_init_i2c(dev, i2c_addr_wr, i2c_addr_r);
+}
+
+uint8_t data[] = {0x08, 0x00, 0x51, 0xAA, 0x04, 0x00, 0x00, 0x00};
+
+static OPERATE_RET lc76g_get_data_i2c(lc76g_dev_t *dev)
+{
     OPERATE_RET ret;
 
-    ret = dev_i2c_write_nbytes(dev->i2c_addr_wr, data, sizeof(data));
-    if (ret != OPRT_OK)
-    {
+    ret = dev_i2c_write_nbytes(dev->config.i2c.addr_wr, data, sizeof(data));
+    if (ret != OPRT_OK) {
         PR_ERR("Failed to write data from device");
         return ret;
     }
     tal_system_sleep(100);
-    
-    ret = dev_i2c_read_only_nbytes(dev->i2c_addr_r, readData, sizeof(readData));
-    if (ret != OPRT_OK)
-    {
+
+    ret = dev_i2c_read_only_nbytes(dev->config.i2c.addr_r, readData, sizeof(readData));
+    if (ret != OPRT_OK) {
         PR_ERR("Failed to read data from device");
         return ret;
     }
@@ -404,42 +625,121 @@ OPERATE_RET lc76g_get_data(lc76g_dev_t *dev)
         return OPRT_COM_ERROR;
     }
 
-    uint8_t data2[] = { 0x00, 0x20, 0x51, 0xAA };
+    uint8_t data2[] = {0x00, 0x20, 0x51, 0xAA};
     uint8_t dataToSend[sizeof(data2) + sizeof(readData)];
     memcpy(dataToSend, data2, sizeof(data2));
     memcpy(dataToSend + sizeof(data2), readData, sizeof(readData));
     tal_system_sleep(100);
 
-    ret = dev_i2c_write_nbytes(dev->i2c_addr_wr, dataToSend, sizeof(dataToSend));
-    if (ret != OPRT_OK)
-    {
+    ret = dev_i2c_write_nbytes(dev->config.i2c.addr_wr, dataToSend, sizeof(dataToSend));
+    if (ret != OPRT_OK) {
         PR_ERR("Failed to write concatenated data");
         return ret;
     }
 
-    // PR_INFO("I2C read data (%d bytes): ", dataLength);
-
-    uint8_t *dynamicReadData = (uint8_t *)malloc(dataLength + 1);
+    uint8_t *dynamicReadData = (uint8_t *)tal_malloc(dataLength + 1);
     if (!dynamicReadData) {
         PR_ERR("Memory allocation failed");
         return OPRT_COM_ERROR;
     }
-    // memset(dynamicReadData, 0, dataLength);
     tal_system_sleep(10 + dataLength / 100);
 
-    ret = dev_i2c_read_only_nbytes(dev->i2c_addr_r, dynamicReadData, dataLength);
-    if (ret != OPRT_OK)
-    {
+    ret = dev_i2c_read_only_nbytes(dev->config.i2c.addr_r, dynamicReadData, dataLength);
+    if (ret != OPRT_OK) {
         PR_ERR("Failed to read dynamic data");
-        free(dynamicReadData);
+        tal_free(dynamicReadData);
         return ret;
     }
     dynamicReadData[dataLength] = '\0';
     // Parse NMEA sentences and print human readable summaries
     parse_and_print_nmea((char *)dynamicReadData, dataLength);
 
-    free(dynamicReadData);
-	return ret;
+    tal_free(dynamicReadData);
+    return ret;
+}
+
+static OPERATE_RET lc76g_get_data_uart(lc76g_dev_t *dev)
+{
+    // Allocate buffer (like demo code: 1600 bytes)
+    uint8_t *buffer = (uint8_t *)tal_malloc(UART_BUFFER_SIZE);
+    if (!buffer) {
+        PR_ERR("Memory allocation failed for UART buffer");
+        return OPRT_COM_ERROR;
+    }
+    memset(buffer, 0, UART_BUFFER_SIZE);
+
+#if LC76G_ENABLE_NMEA_LOGS
+    // Simplified read: try to read a larger chunk at once
+    PR_NOTICE("Attempting to read GPS data from UART...");
+#endif
+
+    // Try a single bulk read first
+    int total_bytes = dev_uart_read(dev->config.uart.port, buffer, UART_BUFFER_SIZE - 1, UART_READ_TIMEOUT_MS);
+
+#if defined(ENABLE_DEBUG_VIRTUAL_SIMULATION) && (ENABLE_DEBUG_VIRTUAL_SIMULATION == 1)
+    strncpy((char *)buffer, "$GNRMC,075546.000,A,3018.160614,N,12003.807444,E,0.94,292.56,151025,,,A,V*0F\r\n",
+            UART_BUFFER_SIZE - 1);
+    total_bytes = (int)strlen((char *)buffer);
+#endif
+
+#if LC76G_ENABLE_NMEA_LOGS
+    PR_NOTICE("Initial read returned: %d bytes", total_bytes);
+#endif
+
+    if (total_bytes < 0) {
+        PR_ERR("UART read error: %d", total_bytes);
+        tal_free(buffer);
+        return OPRT_COM_ERROR;
+    }
+
+    if (total_bytes == 0) {
+        PR_NOTICE("No data on first read, waiting 500ms and retrying...");
+        tal_system_sleep(500);
+
+        total_bytes = dev_uart_read(dev->config.uart.port, buffer, UART_BUFFER_SIZE - 1, UART_READ_TIMEOUT_MS);
+        PR_NOTICE("Second read returned: %d bytes", total_bytes);
+
+        if (total_bytes <= 0) {
+            PR_WARN("Still no GPS data after retry");
+            tal_free(buffer);
+            return OPRT_OK;
+        }
+    }
+
+    buffer[total_bytes] = '\0';
+
+// Only print full raw data if explicitly enabled for debugging
+#if LC76G_ENABLE_NMEA_LOGS // Set to 1 to enable full NMEA raw dump
+    PR_NOTICE("GPS: Received %d bytes from UART", total_bytes);
+    // Print raw NMEA data summary (only show size to reduce log spam)
+    PR_DEBUG("LC76G: Received %d bytes of NMEA data", total_bytes);
+
+    PR_DEBUG("========================================");
+    PR_DEBUG("LC76G NMEA RAW DATA:");
+    PR_DEBUG("%s", buffer);
+    PR_DEBUG("========================================");
+#endif
+
+    // Parse NMEA sentences
+    parse_and_print_nmea((char *)buffer, total_bytes);
+
+    tal_free(buffer);
+    return OPRT_OK;
+}
+
+OPERATE_RET lc76g_get_data(lc76g_dev_t *dev)
+{
+    if (!dev)
+        return OPRT_COM_ERROR;
+
+    if (dev->interface == LC76G_INTERFACE_I2C) {
+        return lc76g_get_data_i2c(dev);
+    } else if (dev->interface == LC76G_INTERFACE_UART) {
+        return lc76g_get_data_uart(dev);
+    }
+
+    PR_ERR("Unknown interface type");
+    return OPRT_COM_ERROR;
 }
 
 /* Getter implementations */
@@ -450,17 +750,24 @@ const lc76g_state_t *lc76g_get_state(void)
 
 void lc76g_get_utc(int *hh, int *mm, int *ss, int *ms)
 {
-    if (hh) *hh = g_state.utc_hour;
-    if (mm) *mm = g_state.utc_minute;
-    if (ss) *ss = g_state.utc_second;
-    if (ms) *ms = g_state.utc_millisecond;
+    if (hh)
+        *hh = g_state.utc_hour;
+    if (mm)
+        *mm = g_state.utc_minute;
+    if (ss)
+        *ss = g_state.utc_second;
+    if (ms)
+        *ms = g_state.utc_millisecond;
 }
 
-void lc76g_get_position(float *lat_deg, float *lon_deg, float *alt_m)
+void lc76g_get_position(double *lat_deg, double *lon_deg, double *alt_m)
 {
-    if (lat_deg) *lat_deg = g_state.latitude_deg;
-    if (lon_deg) *lon_deg = g_state.longitude_deg;
-    if (alt_m) *alt_m = g_state.altitude_m;
+    if (lat_deg)
+        *lat_deg = g_state.latitude_deg;
+    if (lon_deg)
+        *lon_deg = g_state.longitude_deg;
+    if (alt_m)
+        *alt_m = g_state.altitude_m;
 }
 
 void lc76g_get_data_ddmmyy(char out[7])
@@ -491,17 +798,17 @@ int lc76g_get_signal_level5(void)
     return g_state.signal_level_5;
 }
 
-float lc76g_get_speed_kmh(void)
+double lc76g_get_speed_kmh(void)
 {
     return g_state.speed_kmh;
 }
 
-float lc76g_get_course_deg(void)
+double lc76g_get_course_deg(void)
 {
     return g_state.course_deg;
 }
 
-char lc76g_get_status_char(void)
+bool lc76g_get_fix_status(void)
 {
     return g_state.last_status;
 }

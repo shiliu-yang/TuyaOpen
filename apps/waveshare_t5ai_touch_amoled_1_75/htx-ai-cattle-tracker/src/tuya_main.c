@@ -39,6 +39,7 @@
 #if defined(ENABLE_CHAT_DISPLAY) && (ENABLE_CHAT_DISPLAY == 1)
 #include "app_display.h"
 #include "ui_display.h"
+#include "tuya_lvgl.h"
 #endif
 
 #include "board_com_api.h"
@@ -48,6 +49,10 @@
 #include "reset_netcfg.h"
 #include "app_system_info.h"
 #include "app_dp.h"
+
+#if defined(ENABLE_CLOUD_API) && (ENABLE_CLOUD_API == 1)
+#include "cloud_api.h"
+#endif
 
 #if defined(ENABLE_BATTERY) && (ENABLE_BATTERY == 1)
 #include "app_battery.h"
@@ -276,11 +281,13 @@ void user_event_handler_on(tuya_iot_client_t *client, tuya_event_msg_t *event)
             POSIX_TM_S tm_time;
             OPERATE_RET ret = tal_time_get_local_time_custom(posix_time, &tm_time);
             if (ret == OPRT_OK) {
+                tuya_lvgl_mutex_lock();
                 /* Update time (HH:MM) */
                 ui_set_settings_time(tm_time.tm_hour, tm_time.tm_min);
 
                 /* Update date (YYYY/MM/DD) */
                 ui_set_settings_date(tm_time.tm_year + 1900, tm_time.tm_mon + 1, tm_time.tm_mday);
+                tuya_lvgl_mutex_unlock();
 
                 PR_INFO("UI time updated (local): %04d/%02d/%02d %02d:%02d", tm_time.tm_year + 1900, tm_time.tm_mon + 1,
                         tm_time.tm_mday, tm_time.tm_hour, tm_time.tm_min);
@@ -505,6 +512,10 @@ void user_main(void)
         PR_INFO("Sensor tasks started successfully");
         PR_INFO("BMM150 and GPS readings will be printed to console");
     }
+#endif
+
+#if defined(ENABLE_CLOUD_API) && (ENABLE_CLOUD_API == 1)
+    cloud_api_init();
 #endif
 
 #if defined(ENABLE_BATTERY) && (ENABLE_BATTERY == 1)

@@ -226,6 +226,12 @@ static void __app_display_msg_handle(DISPLAY_MSG_T *msg_data)
         char *wifi_icon = __ui_wifi_icon_get(status);
         ui_set_network(wifi_icon);
     } break;
+    case TY_DISPLAY_TP_BATTERY: {
+        UI_BATTERY_STATUS_S *battery_status = (UI_BATTERY_STATUS_S *)msg_data->data;
+        if (battery_status) {
+            set_battery_icon(battery_status->level, battery_status->charging);
+        }
+    } break;
     case TY_DISPLAY_TP_CHAT_MODE: {
         ui_set_chat_mode(msg_data->data);
     } break;
@@ -251,10 +257,10 @@ static void __chat_bot_ui_task(void *args)
     (void)args;
 
     tuya_lvgl_mutex_lock();
-    
+
     // Initialize the display font
     TUYA_CALL_ERR_LOG(__get_ui_font(&sg_display.ui_font));
-    
+
 #if defined(ENABLE_CATTLE_TRACKER_UI) && (ENABLE_CATTLE_TRACKER_UI == 1)
     // Initialize Cattle AI Tracker UI instead of chat UI
     PR_INFO("Initializing Cattle AI Tracker UI...");
@@ -344,4 +350,23 @@ OPERATE_RET app_display_send_msg(TY_DISPLAY_TYPE_E tp, uint8_t *data, int len)
     tal_queue_post(sg_display.queue_hdl, &msg_data, 0xFFFFFFFF);
 
     return OPRT_OK;
+}
+
+OPERATE_RET app_display_battery_status_update(uint8_t percentage, uint8_t charging)
+{
+    UI_BATTERY_STATUS_S battery_status = {0};
+
+    if (percentage < 20) {
+        battery_status.level = 0;
+    } else if (percentage < 50) {
+        battery_status.level = 1;
+    } else if (percentage < 80) {
+        battery_status.level = 2;
+    } else {
+        battery_status.level = 3;
+    }
+
+    battery_status.charging = charging;
+
+    return app_display_send_msg(TY_DISPLAY_TP_BATTERY, (uint8_t *)&battery_status, sizeof(UI_BATTERY_STATUS_S));
 }

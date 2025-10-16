@@ -14,6 +14,11 @@
 
 #include "app_dp.h"
 
+#if (defined(ENABLE_CHAT_DISPLAY) && (ENABLE_CHAT_DISPLAY == 1)) &&                                                    \
+    (defined(ENABLE_GUI_TRACKER) && (ENABLE_GUI_TRACKER == 1))
+#include "app_display.h"
+#endif
+
 /***********************************************************
 ************************macro define************************
 ***********************************************************/
@@ -98,7 +103,10 @@ static void __battery_status_process(void)
 
     if (sg_is_charging) {
         PR_INFO("battery is charging");
-        // TODO:
+#if (defined(ENABLE_CHAT_DISPLAY) && (ENABLE_CHAT_DISPLAY == 1)) &&                                                    \
+    (defined(ENABLE_GUI_TRACKER) && (ENABLE_GUI_TRACKER == 1))
+        app_display_battery_status_update(sg_battery_percentage, sg_is_charging);
+#endif
         app_dp_battery_upload(sg_is_charging, sg_battery_percentage);
         return;
     }
@@ -122,6 +130,11 @@ static void __battery_status_process(void)
             sg_battery_percentage = i * 10;
         }
     }
+
+#if (defined(ENABLE_CHAT_DISPLAY) && (ENABLE_CHAT_DISPLAY == 1)) &&                                                    \
+    (defined(ENABLE_GUI_TRACKER) && (ENABLE_GUI_TRACKER == 1))
+    app_display_battery_status_update(sg_battery_percentage, sg_is_charging);
+#endif
 
     // update dp
     app_dp_battery_upload(sg_is_charging, sg_battery_percentage);

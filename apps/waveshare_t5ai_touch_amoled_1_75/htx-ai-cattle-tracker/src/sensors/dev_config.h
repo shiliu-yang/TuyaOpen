@@ -1,14 +1,14 @@
 /*****************************************************************************
-* | File      	:   dev_config.h
-* | Author      :   Waveshare team
-* | Function    :   Hardware underlying interface
-* | Info        :
-*----------------
-* |	This version:   V1.0
-* | Date        :   2025-08-29
-* | Info        :   Basic version
-*
-******************************************************************************/
+ * | File      	:   dev_config.h
+ * | Author      :   Waveshare team
+ * | Function    :   Hardware underlying interface
+ * | Info        :
+ *----------------
+ * |	This version:   V1.0
+ * | Date        :   2025-08-29
+ * | Info        :   Basic version
+ *
+ ******************************************************************************/
 #ifndef _DEV_CONFIG_H_
 #define _DEV_CONFIG_H_
 
@@ -17,13 +17,13 @@
 #include "tkl_output.h"
 #include "tkl_gpio.h"
 #include "tkl_i2c.h"
+#include "tkl_uart.h"
 #include "tkl_pinmux.h"
 
 #include "tdd_button_gpio.h"
 #include "tdl_button_manage.h"
 
 #define EXAMPLE_PWR_BUTTON_NAME "btn_pwr"
-
 
 // Power Button GPIO
 #ifndef EXAMPLE_SYS_PWR_PIN
@@ -51,6 +51,14 @@
 #define BMM150_I2C_SDA_PIN_NUM TUYA_GPIO_NUM_15
 #endif
 
+// GPS UART Pins (UART Port 2 - GPIO 40/41) - Alternative to I2C
+#ifndef GPS_UART_TX_PIN
+#define GPS_UART_TX_PIN TUYA_GPIO_NUM_41 // P41 for UART2_TX
+#endif
+#ifndef GPS_UART_RX_PIN
+#define GPS_UART_RX_PIN TUYA_GPIO_NUM_40 // P40 for UART2_RX
+#endif
+
 // Legacy compatibility - defaults to GPS pins
 #ifndef EXAMPLE_I2C_SCL_PIN
 #define EXAMPLE_I2C_SCL_PIN GPS_I2C_SCL_PIN
@@ -58,7 +66,6 @@
 #ifndef EXAMPLE_I2C_SDA_PIN
 #define EXAMPLE_I2C_SDA_PIN GPS_I2C_SDA_PIN
 #endif
-
 
 OPERATE_RET dev_gpio_init(uint8_t pin, uint8_t mode);
 OPERATE_RET dev_sys_init();
@@ -77,5 +84,11 @@ OPERATE_RET dev_i2c_read_only_nbytes(uint8_t addr, uint8_t *pdata, uint32_t len)
 OPERATE_RET bmm150_i2c_port_init();
 OPERATE_RET bmm150_i2c_write_reg(uint8_t addr, uint8_t reg, uint8_t value);
 OPERATE_RET bmm150_i2c_read_reg(uint8_t addr, uint8_t reg, uint8_t *buffer, uint8_t length);
+
+// GPS UART functions (for UART interface mode)
+OPERATE_RET dev_uart_init(TUYA_UART_NUM_E port, uint32_t baudrate);
+OPERATE_RET dev_uart_deinit(TUYA_UART_NUM_E port);
+int dev_uart_write(TUYA_UART_NUM_E port, const uint8_t *data, uint16_t len);
+int dev_uart_read(TUYA_UART_NUM_E port, uint8_t *data, uint16_t len, uint32_t timeout_ms);
 
 #endif

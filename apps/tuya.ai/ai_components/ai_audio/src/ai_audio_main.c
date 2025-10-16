@@ -294,6 +294,13 @@ OPERATE_RET ai_audio_init(AI_AUDIO_CONFIG_T *cfg)
     return OPRT_OK;
 }
 
+#if (defined(ENABLE_CHAT_DISPLAY) && (ENABLE_CHAT_DISPLAY == 1)) &&                                                    \
+    (defined(ENABLE_GUI_TRACKER) && (ENABLE_GUI_TRACKER == 1))
+#include "ui_display.h"
+#include "tuya_lvgl.h"
+#include "cattle_ai_tracker_app.h"
+#endif
+
 /**
  * @brief Sets the volume for the audio module.
  * @param volume The volume level to set.
@@ -310,6 +317,13 @@ OPERATE_RET ai_audio_set_volume(uint8_t volume)
     TUYA_CALL_ERR_RETURN(tdl_audio_find(AUDIO_CODEC_NAME, &audio_hdl));
     TUYA_CALL_ERR_LOG(tdl_audio_volume_set(audio_hdl, volume));
 
+#if (defined(ENABLE_CHAT_DISPLAY) && (ENABLE_CHAT_DISPLAY == 1)) &&                                                    \
+    (defined(ENABLE_GUI_TRACKER) && (ENABLE_GUI_TRACKER == 1))
+    tuya_lvgl_mutex_lock();
+    set_volume(volume);
+    tuya_lvgl_mutex_unlock();
+
+#endif
     return rt;
 }
 
