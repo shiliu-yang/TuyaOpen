@@ -5,9 +5,9 @@
 #include "tal_api.h"
 #include "dev_config.h"
 
-// Software I2C Pin Definitions - using P20 and P21
-#define BMM150_I2C_SCL_PIN      EXAMPLE_I2C_SCL_PIN
-#define BMM150_I2C_SDA_PIN      EXAMPLE_I2C_SDA_PIN
+// Software I2C Pin Definitions - using P14 and P15
+#define BMM150_I2C_SCL_PIN      TUYA_GPIO_NUM_14
+#define BMM150_I2C_SDA_PIN      TUYA_GPIO_NUM_15
 
 // Software I2C Timing Constants
 #define BMM150_I2C_DELAY_US     10

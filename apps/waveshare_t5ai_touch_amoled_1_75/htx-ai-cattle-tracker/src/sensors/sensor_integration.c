@@ -38,9 +38,11 @@
 
 #ifdef ENABLE_ENCODER_INPUT
 #include "drv_encoder.h"
-#ifdef ENABLE_GUI_TRACKER
-#include "cattle_ai_tracker_app.h"
 #endif
+
+#if defined(ENABLE_GUI_TRACKER) && (ENABLE_GUI_TRACKER == 1)
+#include "cattle_ai_tracker_app.h"
+#include "ui_display.h"
 #endif
 
 #include "app_dp.h"
@@ -82,6 +84,14 @@
 #ifdef ENABLE_BMM150_SENSOR
 static THREAD_HANDLE sg_bmm150_handle = NULL;
 static bmm150_dev_t g_bmm150_dev;
+static compass_recalibration_cb_t sg_recalibration_callback = NULL;
+
+// Heading deviation tracking for recalibration detection
+#define HEADING_DEVIATION_THRESHOLD 15.0f  // 15 degrees threshold
+#define HEADING_DEVIATION_WINDOW 10        // Check over 10 readings
+static float sg_heading_history[HEADING_DEVIATION_WINDOW] = {0};
+static int sg_heading_index = 0;
+static bool sg_heading_initialized = false;
 #endif
 
 #ifdef ENABLE_GPS_LC76G
@@ -156,8 +166,37 @@ MUTEX_HANDLE g_i2c_bus_mutex = NULL;
 // }
 
 #ifdef ENABLE_BMM150_SENSOR
+
 /**
- * @brief BMM150 sensor reading task
+ * @brief Calculate heading deviation from recent history
+ */
+static float __calculate_heading_deviation(float current_heading)
+{
+    if (!sg_heading_initialized) {
+        return 0.0f;
+    }
+
+    float max_heading = sg_heading_history[0];
+    float min_heading = sg_heading_history[0];
+
+    for (int i = 1; i < HEADING_DEVIATION_WINDOW; i++) {
+        if (sg_heading_history[i] > max_heading)
+            max_heading = sg_heading_history[i];
+        if (sg_heading_history[i] < min_heading)
+            min_heading = sg_heading_history[i];
+    }
+
+    // Handle 360-degree wrap-around
+    float deviation = max_heading - min_heading;
+    if (deviation > 180.0f) {
+        deviation = 360.0f - deviation;
+    }
+
+    return deviation;
+}
+
+/**
+ * @brief BMM150 sensor reading task with live calibration
  */
 static void __bmm150_task(void *param)
 {
@@ -186,37 +225,37 @@ static void __bmm150_task(void *param)
 
     PR_INFO("[BMM150] Initialized successfully!");
 
-// Set default calibration offsets (from BMM150 app)
-#define DEFAULT_X_OFFSET -80
-#define DEFAULT_Y_OFFSET -190
-#define DEFAULT_Z_OFFSET -7029
-
-    g_bmm150_dev.calibration.x_offset = DEFAULT_X_OFFSET;
-    g_bmm150_dev.calibration.y_offset = DEFAULT_Y_OFFSET;
-    g_bmm150_dev.calibration.z_offset = DEFAULT_Z_OFFSET;
-    g_bmm150_dev.calibration.calibrated = true;
-    g_bmm150_dev.calibration.calibration_time = tal_system_get_millisecond();
-
-    PR_INFO("[BMM150] Using default calibration: X=%d, Y=%d, Z=%d", DEFAULT_X_OFFSET, DEFAULT_Y_OFFSET,
-            DEFAULT_Z_OFFSET);
+    // Initialize live calibration system (dynamic compensation)
+    rt = bmm150_live_cal_init(&g_bmm150_dev);
+    if (rt != OPRT_OK) {
+        PR_ERR("[BMM150] Failed to initialize live calibration (error: %d)", rt);
+        tal_thread_delete(NULL);
+        return;
+    }
+    PR_INFO("[BMM150] Live calibration system initialized");
 
     // Update sensor status
     tal_mutex_lock(g_sensor_mutex);
     g_sensor_data.bmm150_ready = true;
+    g_sensor_data.bmm150_cal_needed = false;
     tal_mutex_unlock(g_sensor_mutex);
 
-    // Main reading loop
+    // Main reading loop with live calibration
+    uint32_t calibration_check_counter = 0;
     while (1) {
+        // Read raw magnetometer data
+        // Note: bmm150_read_mag_data() already applies hardware compensation using factory trim values
         rt = bmm150_read_mag_data(&g_bmm150_dev);
         if (rt == OPRT_OK) {
-            // Apply calibration
-            bmm150_mag_data_t value;
-            value.x = g_bmm150_dev.raw_mag_data.raw_datax - g_bmm150_dev.calibration.x_offset;
-            value.y = g_bmm150_dev.raw_mag_data.raw_datay - g_bmm150_dev.calibration.y_offset;
-            value.z = g_bmm150_dev.raw_mag_data.raw_dataz - g_bmm150_dev.calibration.z_offset;
+            // Update live calibration with current reading (tracks min/max for offset calculation)
+            bmm150_live_cal_update(&g_bmm150_dev);
 
-            // Calculate heading
-            float xyHeading = atan2(value.x, value.y);
+            // Apply live calibration offsets on top of hardware compensation
+            bmm150_mag_data_t calibrated_value;
+            bmm150_live_cal_apply_offsets(&g_bmm150_dev, &calibrated_value);
+
+            // Calculate heading from calibrated data
+            float xyHeading = atan2(calibrated_value.x, calibrated_value.y);
             float heading = xyHeading;
 
             // Normalize to 0-360 range
@@ -226,25 +265,59 @@ static void __bmm150_task(void *param)
                 heading -= 2 * M_PI;
             float heading_degrees = heading * 180.0f / M_PI;
 
-            // Update global sensor data
+            // Update heading history for deviation tracking
+            sg_heading_history[sg_heading_index] = heading_degrees;
+            sg_heading_index = (sg_heading_index + 1) % HEADING_DEVIATION_WINDOW;
+            if (sg_heading_index == 0) {
+                sg_heading_initialized = true;
+            }
+
+            // Calculate heading deviation
+            float heading_deviation = __calculate_heading_deviation(heading_degrees);
+
+            // Check for turbulence and calibration needs (every 10 readings)
+            calibration_check_counter++;
+            if (calibration_check_counter >= 10) {
+                calibration_check_counter = 0;
+
+                bool turbulence = bmm150_live_cal_detect_turbulence(&g_bmm150_dev);
+                uint8_t cal_status = bmm150_live_cal_get_status(&g_bmm150_dev);
+                bool cal_needed = (cal_status != 0) || (heading_deviation > HEADING_DEVIATION_THRESHOLD);
+
+                // Update calibration status
+                tal_mutex_lock(g_sensor_mutex);
+                g_sensor_data.bmm150_cal_needed = cal_needed;
+                tal_mutex_unlock(g_sensor_mutex);
+
+                // Trigger callback if recalibration is needed
+                if (cal_needed && sg_recalibration_callback != NULL) {
+                    sg_recalibration_callback(heading_deviation, turbulence);
+                    if (turbulence) {
+                        PR_WARN("[BMM150] Magnetic turbulence detected! Deviation: %.1f°", heading_deviation);
+                    } else if (heading_deviation > HEADING_DEVIATION_THRESHOLD) {
+                        PR_WARN("[BMM150] Large heading deviation detected! Deviation: %.1f°", heading_deviation);
+                    }
+                }
+            }
+
+            // Update global sensor data with calibrated values
             tal_mutex_lock(g_sensor_mutex);
             g_sensor_data.heading_degrees = heading_degrees;
-            g_sensor_data.mag_x = value.x;
-            g_sensor_data.mag_y = value.y;
-            g_sensor_data.mag_z = value.z;
+            g_sensor_data.mag_x = calibrated_value.x;
+            g_sensor_data.mag_y = calibrated_value.y;
+            g_sensor_data.mag_z = calibrated_value.z;
             tal_mutex_unlock(g_sensor_mutex);
 
-            // Print to console
-            // printf("BMM150_DATA,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%.1f\n",
-            //        g_bmm150_dev.raw_mag_data.raw_datax,
-            //        g_bmm150_dev.raw_mag_data.raw_datay,
-            //        g_bmm150_dev.raw_mag_data.raw_dataz,
-            //        g_bmm150_dev.raw_mag_data.raw_data_r,
-            //        value.x, value.y, value.z,
-            //        g_bmm150_dev.calibration.x_offset,
-            //        g_bmm150_dev.calibration.y_offset,
-            //        g_bmm150_dev.calibration.z_offset,
-            //        heading_degrees);
+#if defined(ENABLE_GUI_TRACKER) && (ENABLE_GUI_TRACKER == 1)
+            // Update tracker compass with real BMM150 heading data
+            tracker_update_compass_heading(heading_degrees);
+#endif
+
+            // Debug output (uncommented for testing)
+            // PR_DEBUG("[BMM150] Heading: %.1f°, Deviation: %.1f°, Cal: %s",
+            //          heading_degrees, heading_deviation,
+            //          g_sensor_data.bmm150_cal_needed ? "NEEDED" : "OK");
+
         } else {
             PR_ERR("[BMM150] Failed to read data (error: %d)", rt);
         }
@@ -523,19 +596,25 @@ __attribute__((unused)) static void __gps_task(void *param)
 
         app_gps_position_upload(g_sensor_data.latitude_deg, g_sensor_data.longitude_deg);
 
+#if defined(ENABLE_GUI_TRACKER) && (ENABLE_GUI_TRACKER == 1)
+        // Update UI with new GPS self position
+        if (s->fix_quality > 0) {
+            ui_update_self_gps_position(s->latitude_deg, s->longitude_deg, s->satellites_in_use);
+        }
+#endif
+
 #if defined(ENABLE_CLOUD_API) && (ENABLE_CLOUD_API == 1)
         // get cloud cattle position
         cattle_location_t loc = {0};
-        rt = cloud_api_get_cattle_location(&loc);
-        if (OPRT_OK == rt) {
-            static double last_lat = 0, last_lon = 0;
-            if (last_lat != loc.lat || last_lon != loc.lon) {
-                last_lat = loc.lat;
-                last_lon = loc.lon;
-                PR_INFO("[CLOUD] Cattle position updated: %.6f, %.6f", loc.lat, loc.lon);
-                gps_clear_all_targets();
-                gps_add_target(loc.lat, loc.lon, TARGET_COLOR_COW);
-            }
+        OPERATE_RET cloud_ret = cloud_api_get_cattle_location(&loc);
+        
+        // Update UI with cattle location if successful
+        if (cloud_ret == OPRT_OK && (loc.lat != 0.0 || loc.lon != 0.0)) {
+#if defined(ENABLE_GUI_TRACKER) && (ENABLE_GUI_TRACKER == 1)
+            ui_add_cattle_marker(loc.lat, loc.lon, loc.cattleId);
+#endif
+            PR_INFO("[CATTLE] Location received: lat=%.6f, lon=%.6f, id=%s", 
+                    loc.lat, loc.lon, loc.cattleId);
         }
 #endif
         // ui
@@ -717,8 +796,8 @@ void sensor_print_readings(void)
         PR_INFO("=== Sensor Readings ===");
 
 #ifdef ENABLE_BMM150_SENSOR
-        PR_INFO("BMM150: heading=%.1f° mag_x=%d mag_y=%d mag_z=%d ready=%d", data.heading_degrees, data.mag_x,
-                data.mag_y, data.mag_z, data.bmm150_ready);
+        PR_INFO("BMM150: heading=%.1f° mag_x=%d mag_y=%d mag_z=%d ready=%d cal_needed=%d", data.heading_degrees,
+                data.mag_x, data.mag_y, data.mag_z, data.bmm150_ready, data.bmm150_cal_needed);
 #endif
 
 #ifdef ENABLE_GPS_LC76G
@@ -731,4 +810,19 @@ void sensor_print_readings(void)
                 data.encoder_button ? "PRESSED" : "released", data.encoder_ready);
 #endif
     }
+}
+
+/**
+ * @brief Register a callback for compass recalibration notifications
+ */
+OPERATE_RET sensor_bmm150_register_recalibration_cb(compass_recalibration_cb_t callback)
+{
+#ifdef ENABLE_BMM150_SENSOR
+    sg_recalibration_callback = callback;
+    PR_INFO("[SENSOR] Compass recalibration callback %s", callback ? "registered" : "unregistered");
+    return OPRT_OK;
+#else
+    PR_ERR("[SENSOR] BMM150 sensor not enabled");
+    return OPRT_NOT_SUPPORTED;
+#endif
 }

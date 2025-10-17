@@ -28,6 +28,18 @@ extern "C" {
 /***********************************************************
 ***********************typedef define***********************
 ***********************************************************/
+/**
+ * @brief Callback function type for compass recalibration notification
+ * 
+ * This callback is triggered when the BMM150 sensor detects:
+ * - Magnetic turbulence (field strength deviation > threshold)
+ * - Large heading deviation (potential magnetic interference)
+ * 
+ * @param deviation_degrees Heading deviation in degrees (0-180)
+ * @param turbulence_detected True if magnetic turbulence was detected
+ */
+typedef void (*compass_recalibration_cb_t)(float deviation_degrees, bool turbulence_detected);
+
 typedef struct {
     // BMM150 magnetometer data
     float heading_degrees;     /* Compass heading in degrees (0-360) */
@@ -35,6 +47,7 @@ typedef struct {
     int16_t mag_y;            /* Magnetometer Y-axis (calibrated) */
     int16_t mag_z;            /* Magnetometer Z-axis (calibrated) */
     bool bmm150_ready;        /* BMM150 sensor initialized and ready */
+    bool bmm150_cal_needed;   /* BMM150 calibration needed flag */
     
     // GPS data
     float latitude_deg;       /* GPS latitude in degrees */
@@ -99,6 +112,17 @@ OPERATE_RET sensor_get_data(sensor_data_t *data);
  * This prints BMM150 and GPS readings to the console in a formatted way.
  */
 void sensor_print_readings(void);
+
+/**
+ * @brief Register a callback for compass recalibration notifications
+ *
+ * This callback will be triggered when the BMM150 sensor detects magnetic
+ * interference or turbulence that requires recalibration.
+ *
+ * @param callback Callback function pointer (NULL to unregister)
+ * @return OPERATE_RET Operation result, OPRT_OK indicates success
+ */
+OPERATE_RET sensor_bmm150_register_recalibration_cb(compass_recalibration_cb_t callback);
 
 #ifdef __cplusplus
 }

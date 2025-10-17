@@ -10,8 +10,6 @@ OPERATE_RET bmm150_i2c_init(void) {
         PR_ERR("Failed to initialize BMM150 I2C Port 1");
         return ret;
     }
-    
-    PR_INFO("BMM150 I2C initialized successfully on Port 1 (GPIO24/25)");
     return OPRT_OK;
 }
 
