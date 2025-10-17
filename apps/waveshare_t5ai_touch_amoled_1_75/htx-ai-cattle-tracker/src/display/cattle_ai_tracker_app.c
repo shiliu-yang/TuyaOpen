@@ -1603,7 +1603,7 @@ static void eye_look_timer_cb(lv_timer_t *timer)
      render_target_markers();
  }
 
- static void add_target_at_distance(float distance_meters, float bearing_degrees, uint32_t color)
+ static void __attribute__((unused)) add_target_at_distance(float distance_meters, float bearing_degrees, uint32_t color)
  {
      if (g.target_count >= MAX_TARGETS)
          return;

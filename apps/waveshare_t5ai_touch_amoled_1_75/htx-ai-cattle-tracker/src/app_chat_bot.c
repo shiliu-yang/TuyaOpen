@@ -340,6 +340,13 @@ static void __app_button_function_cb(char *name, TDL_BUTTON_TOUCH_EVENT_E event,
 #if defined(ENABLE_LED) && (ENABLE_LED == 1)
             tdl_led_set_status(sg_led_hdl, TDL_LED_ON);
 #endif
+
+#if defined(ENABLE_CHAT_DISPLAY) && (ENABLE_CHAT_DISPLAY == 1)
+            // app_display_send_msg(TY_DISPLAY_TP_STATUS, (uint8_t *)LISTENING, strlen(LISTENING));
+            /* Show red ring when recording/listening */
+            app_display_send_msg(TY_DISPLAY_TP_RECORDING_START, NULL, 0);
+#endif
+
             ai_audio_manual_start_single_talk();
         }
     } break;
@@ -349,6 +356,13 @@ static void __app_button_function_cb(char *name, TDL_BUTTON_TOUCH_EVENT_E event,
 #if defined(ENABLE_LED) && (ENABLE_LED == 1)
             tdl_led_set_status(sg_led_hdl, TDL_LED_OFF);
 #endif
+
+#if defined(ENABLE_CHAT_DISPLAY) && (ENABLE_CHAT_DISPLAY == 1)
+            // app_display_send_msg(TY_DISPLAY_TP_STATUS, (uint8_t *)SPEAKING, strlen(SPEAKING));
+            /* Hide red ring when AI is speaking */
+            app_display_send_msg(TY_DISPLAY_TP_RECORDING_STOP, NULL, 0);
+#endif
+
             ai_audio_manual_stop_single_talk();
         }
     } break;
@@ -365,9 +379,6 @@ static void __app_button_function_cb(char *name, TDL_BUTTON_TOUCH_EVENT_E event,
             __app_chat_bot_enable(true);
         }
         PR_DEBUG("button single click");
-    } break;
-    case TDL_BUTTON_LONG_PRESS_START: {
-        app_sos_set(!app_sos_get());
     } break;
     default:
         break;
@@ -387,9 +398,9 @@ static OPERATE_RET __app_open_button(void)
 
     tdl_button_event_register(sg_button_hdl, TDL_BUTTON_PRESS_DOWN, __app_button_function_cb);
     tdl_button_event_register(sg_button_hdl, TDL_BUTTON_PRESS_UP, __app_button_function_cb);
-    tdl_button_event_register(sg_button_hdl, TDL_BUTTON_PRESS_SINGLE_CLICK, __app_button_function_cb);
-    tdl_button_event_register(sg_button_hdl, TDL_BUTTON_PRESS_DOUBLE_CLICK, __app_button_function_cb);
-    tdl_button_event_register(sg_button_hdl, TDL_BUTTON_LONG_PRESS_START, __app_button_function_cb);
+    // tdl_button_event_register(sg_button_hdl, TDL_BUTTON_PRESS_SINGLE_CLICK, __app_button_function_cb);
+    // tdl_button_event_register(sg_button_hdl, TDL_BUTTON_PRESS_DOUBLE_CLICK, __app_button_function_cb);
+    // tdl_button_event_register(sg_button_hdl, TDL_BUTTON_LONG_PRESS_START, __app_button_function_cb);
 
     return rt;
 }
