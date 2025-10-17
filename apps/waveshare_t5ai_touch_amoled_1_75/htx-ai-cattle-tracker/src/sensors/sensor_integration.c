@@ -46,6 +46,7 @@
 #endif
 
 #include "app_dp.h"
+#include "app_sos.h"
 
 #if defined(ENABLE_CLOUD_API) && (ENABLE_CLOUD_API == 1)
 #include "cloud_api.h"
@@ -61,9 +62,9 @@
 /***********************************************************
 ************************macro define************************
 ***********************************************************/
-#define TASK_BMM150_PRIORITY     THREAD_PRIO_2
+#define TASK_BMM150_PRIORITY     THREAD_PRIO_3
 #define TASK_BMM150_SIZE         4096
-#define TASK_GPS_PRIORITY        THREAD_PRIO_2
+#define TASK_GPS_PRIORITY        THREAD_PRIO_3
 #define TASK_GPS_SIZE            4096
 #define TASK_ENCODER_PRIORITY    THREAD_PRIO_2
 #define TASK_ENCODER_SIZE        2048
@@ -87,8 +88,8 @@ static bmm150_dev_t g_bmm150_dev;
 static compass_recalibration_cb_t sg_recalibration_callback = NULL;
 
 // Heading deviation tracking for recalibration detection
-#define HEADING_DEVIATION_THRESHOLD 15.0f  // 15 degrees threshold
-#define HEADING_DEVIATION_WINDOW 10        // Check over 10 readings
+#define HEADING_DEVIATION_THRESHOLD 15.0f // 15 degrees threshold
+#define HEADING_DEVIATION_WINDOW    10    // Check over 10 readings
 static float sg_heading_history[HEADING_DEVIATION_WINDOW] = {0};
 static int sg_heading_index = 0;
 static bool sg_heading_initialized = false;
@@ -337,6 +338,10 @@ static void __encoder_task(void *param)
     int32_t last_angle = 0;
     uint8_t last_button_state = 0;
 
+    uint8_t is_sos_upload = 0;
+    SYS_TIME_T encoder_start_time = 0;
+    SYS_TIME_T encoder_end_time = 0;
+
     PR_INFO("[ENCODER] Task started - initializing encoder...");
     PR_INFO("[ENCODER] GPIO Configuration:");
     PR_INFO("[ENCODER] - Input A Pin (clockwise):        GPIO %d", DECODER_INPUT_A);
@@ -445,6 +450,7 @@ static void __encoder_task(void *param)
             animate_distance_scale(ZOOM_LEVELS[sg_current_zoom_index]);
             PR_INFO("[ENCODER] Button pressed - reset to default zoom: %dm", ZOOM_LEVELS[sg_current_zoom_index]);
 #endif
+            encoder_start_time = tal_system_get_millisecond();
 
             last_button_state = 1;
         } else if (!button_pressed && last_button_state) {
@@ -454,6 +460,21 @@ static void __encoder_task(void *param)
 
             PR_INFO("[ENCODER] Button released");
             last_button_state = 0;
+
+            // Reset long press tracking
+            encoder_start_time = 0;
+            encoder_end_time = 0;
+            is_sos_upload = 0;
+        }
+
+        // long press detection (3 seconds)
+        if (button_pressed && last_button_state) {
+            encoder_end_time = tal_system_get_millisecond();
+            if ((encoder_end_time - encoder_start_time) >= 3 * 1000 && is_sos_upload == 0) {
+                PR_INFO("[ENCODER] Button long-pressed (3 seconds)");
+                app_sos_set(app_sos_get() ? false : true);
+                is_sos_upload = 1;
+            }
         }
 
         // Sleep for polling interval
@@ -596,25 +617,19 @@ __attribute__((unused)) static void __gps_task(void *param)
 
         app_gps_position_upload(g_sensor_data.latitude_deg, g_sensor_data.longitude_deg);
 
-#if defined(ENABLE_GUI_TRACKER) && (ENABLE_GUI_TRACKER == 1)
-        // Update UI with new GPS self position
-        if (s->fix_quality > 0) {
-            ui_update_self_gps_position(s->latitude_deg, s->longitude_deg, s->satellites_in_use);
-        }
-#endif
-
 #if defined(ENABLE_CLOUD_API) && (ENABLE_CLOUD_API == 1)
         // get cloud cattle position
         cattle_location_t loc = {0};
-        OPERATE_RET cloud_ret = cloud_api_get_cattle_location(&loc);
-        
-        // Update UI with cattle location if successful
-        if (cloud_ret == OPRT_OK && (loc.lat != 0.0 || loc.lon != 0.0)) {
-#if defined(ENABLE_GUI_TRACKER) && (ENABLE_GUI_TRACKER == 1)
-            ui_add_cattle_marker(loc.lat, loc.lon, loc.cattleId);
-#endif
-            PR_INFO("[CATTLE] Location received: lat=%.6f, lon=%.6f, id=%s", 
-                    loc.lat, loc.lon, loc.cattleId);
+        rt = cloud_api_get_cattle_location(&loc);
+        if (OPRT_OK == rt) {
+            static double last_lat = 0, last_lon = 0;
+            if (last_lat != loc.lat || last_lon != loc.lon) {
+                last_lat = loc.lat;
+                last_lon = loc.lon;
+                PR_INFO("[CLOUD] Cattle position updated: %.6f, %.6f", loc.lat, loc.lon);
+                gps_clear_all_targets();
+                gps_add_target(loc.lat, loc.lon, TARGET_COLOR_COW);
+            }
         }
 #endif
         // ui
@@ -737,7 +752,7 @@ OPERATE_RET sensor_tasks_start(void)
 // Start GPS task
 #ifdef ENABLE_GPS_LC76G
     if (sg_gps_handle == NULL) {
-        static THREAD_CFG_T gps_param = {.priority = TASK_GPS_PRIORITY - 3, // Much higher priority than touch display
+        static THREAD_CFG_T gps_param = {.priority = TASK_GPS_PRIORITY, // Much higher priority than touch display
                                          .stackDepth = TASK_GPS_SIZE,
                                          .thrdname = "gps"};
         ret = tal_thread_create_and_start(&sg_gps_handle, NULL, NULL, __gps_task, NULL, &gps_param);
