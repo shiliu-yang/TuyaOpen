@@ -89,9 +89,9 @@ static SYS_TIME_T __get_current_request_interval(void)
     }
 
     SYS_TIME_T interval = sg_request_interval_ms[error_count];
-    PR_DEBUG("get_interval: error_count=%d, max_index=%d, interval=%u ms", 
-             error_count, max_index, (uint32_t)interval);
-    
+    // PR_DEBUG("get_interval: error_count=%d, max_index=%d, interval=%u ms", error_count, max_index,
+    // (uint32_t)interval);
+
     return interval;
 }
 
@@ -146,20 +146,44 @@ __EXIT:
     return rt;
 }
 
-static void __get_cattle_location_work_queue_cb(void *data)
-{
-    cattle_location_t *loc = (cattle_location_t *)data;
-    memset(loc, 0, sizeof(cattle_location_t));
+#if defined(ENABLE_DEBUG_VIRTUAL_SIMULATION) && (ENABLE_DEBUG_VIRTUAL_SIMULATION == 1)
+static const char *cattle_virtual_data[] = {
+    "{\"accuracy\":0,\"cattleId\":\"6c1694304986b00e8eabfs\",\"direction\":0,\"lat\":\"30.304574\","
+    "\"locationTime\":1760180386499,\"lon\":\"120.059163\",\"speed\":0}",
+    "{\"accuracy\":0,\"cattleId\":\"6c1694304986b00e8eabfs\",\"direction\":0,\"lat\":\"30.304852\","
+    "\"locationTime\":1760180386499,\"lon\":\"120.067508\",\"speed\":0}",
+    "{\"accuracy\":0,\"cattleId\":\"6c1694304986b00eabfs\",\"direction\":0,\"lat\":\"30.304557\","
+    "\"locationTime\":1760180386499,\"lon\":\"120.072992\",\"speed\":0}",
+    "{\"accuracy\":0,\"cattleId\":\"6c1694304986b00e8eabfs\",\"direction\":0,\"lat\":\"30.301117\","
+    "\"locationTime\":1760180386499,\"lon\":\"120.074899\",\"speed\":0}",
+    "{\"accuracy\":0,\"cattleId\":\"6c1694304986b00e8eabfs\",\"direction\":0,\"lat\":\"30.298440\","
+    "\"locationTime\":1760180386499,\"lon\":\"120.073929\",\"speed\":0}",
+    "{\"accuracy\":0,\"cattleId\":\"6c1694304986b00e8eabfs\",\"direction\":0,\"lat\":\"30.296779\","
+    "\"locationTime\":1760180386499,\"lon\":\"120.067661\",\"speed\":0}",
+    "{\"accuracy\":0,\"cattleId\":\"6c1694304986b00e8eabfs\",\"direction\":0,\"lat\":\"30.295926\","
+    "\"locationTime\":1760180386499,\"lon\":\"120.059691\",\"speed\":0}",
+    "{\"accuracy\":0,\"cattleId\":\"6c1694304986b00e8eabfs\",\"direction\":0,\"lat\":\"30.300073\","
+    "\"locationTime\":1760180386499,\"lon\":\"120.059776\",\"speed\":0}",
+    "{\"accuracy\":0,\"cattleId\":\"6c1694304986b00e8eabfs\",\"direction\":0,\"lat\":\"30.301587\","
+    "\"locationTime\":1760180386499,\"lon\":\"120.057681\",\"speed\":0}",
+};
+#endif
 
+static void __attribute__((unused)) __get_cattle_location_work_queue_cb(void *data)
+{
     OPERATE_RET rt = OPRT_OK;
     cJSON *api_result = NULL;
+    char *post_data = NULL;
+
+    cattle_location_t *loc = (cattle_location_t *)data;
+    memset(loc, 0, sizeof(cattle_location_t));
 
     // {\"compassDeviceId\":\"xxxx\",\"cattleId\":\"xxxx\"}
     int post_data_len = strlen("{\"compassDeviceId\":\"\",\"cattleId\":\"\",\"t\":}") + MAX_LENGTH_DEVICE_ID +
                         CATTLE_ID_LEN + 20 + 1; // 20 for timestamp, 1 for '\0'
 
     PR_DEBUG("post_data_len %d", post_data_len);
-    char *post_data = CLOUD_API_MALLOC(post_data_len);
+    post_data = CLOUD_API_MALLOC(post_data_len);
     if (post_data == NULL) {
         PR_ERR("malloc failed");
         sg_cloud_api_ctx.api_rt = OPRT_MALLOC_FAILED;
@@ -176,18 +200,19 @@ static void __get_cattle_location_work_queue_cb(void *data)
 
     PR_DEBUG("cattle location post data: %s", post_data);
 #if defined(ENABLE_DEBUG_VIRTUAL_SIMULATION) && (ENABLE_DEBUG_VIRTUAL_SIMULATION == 1)
-    char *cattle_virtual_data[] = {
-        "{\"accuracy\":0,\"cattleId\":\"6c1694304986b00e8eabfs\",\"direction\":0,\"lat\":\"31.300437\","
-        "\"locationTime\":1760180386499,\"lon\":\"121.068184\",\"speed\":0}"};
+    static int idx = 0;
+    api_result = cJSON_Parse(cattle_virtual_data[idx]);
+    PR_DEBUG("Using virtual simulation data: index %d", idx);
+    idx = (idx + 1) % (sizeof(cattle_virtual_data) / sizeof(cattle_virtual_data[0]));
 
-    api_result = cJSON_Parse(cattle_virtual_data[0]);
-
-    sg_cloud_api_ctx.api_rt = rt;
+    sg_cloud_api_ctx.api_rt = OPRT_OK;
 #else
     rt = atop_service_comm_post_simple(CATTLE_LOCATION_QUERY_API, CATTLE_LOCATION_QUERY_VER, post_data, NULL,
                                        &api_result);
     sg_cloud_api_ctx.api_rt = rt;
 #endif
+    CLOUD_API_FREE(post_data);
+    post_data = NULL;
 
     if (rt != OPRT_OK) {
         PR_ERR("get cattle location api failed, rt: %d", rt);
@@ -200,7 +225,7 @@ static void __get_cattle_location_work_queue_cb(void *data)
         goto __EXIT;
     }
 
-    //{"accuracy":0,"cattleId":"6c1694304986b00e8eabfs","direction":0,"lat":"31.300437","locationTime":1760180386499,"lon":"121.068184","speed":0}
+    //{"accuracy":0,"cattleId":"6c1694304986b00exxxx","direction":0,"lat":"31.300437","locationTime":1760180386499,"lon":"121.068184","speed":0}
     // Check and parse accuracy
     cJSON *accuracy_item = cJSON_GetObjectItem(api_result, "accuracy");
     if (accuracy_item && cJSON_IsNumber(accuracy_item)) {
@@ -294,7 +319,7 @@ __EXIT:
     }
 
     if (api_result) {
-        cJSON_free(api_result);
+        cJSON_Delete(api_result);
         api_result = NULL;
     }
 
@@ -331,8 +356,8 @@ OPERATE_RET cloud_api_get_cattle_location(cattle_location_t *location)
     SYS_TIME_T current_interval = __get_current_request_interval();
 
     if (now - sg_cloud_api_ctx.last_query_time < current_interval) {
-        PR_WARN("query too frequently, current interval: %u ms, time since last: %u ms", (uint32_t)current_interval,
-                (uint32_t)(now - sg_cloud_api_ctx.last_query_time));
+        // PR_WARN("query too frequently, current interval: %u ms, time since last: %u ms", (uint32_t)current_interval,
+        //         (uint32_t)(now - sg_cloud_api_ctx.last_query_time));
         return OPRT_COM_ERROR;
     }
 

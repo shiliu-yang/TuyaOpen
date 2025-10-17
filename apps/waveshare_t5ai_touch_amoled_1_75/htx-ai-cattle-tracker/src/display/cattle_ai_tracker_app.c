@@ -579,7 +579,8 @@ void lv_demo_cattle_ai_tracker(void)
      lv_obj_add_event_cb(g.screen, on_pinch_gesture, LV_EVENT_GESTURE, NULL);
 
     /* Timer-based animation - 5 second intervals, 45 degrees per rotation */
-    g.tick_timer = lv_timer_create(on_tick, 5000, NULL); /* 5000ms = 5 seconds */
+    // TODO: for test 
+    // g.tick_timer = lv_timer_create(on_tick, 5000, NULL); /* 5000ms = 5 seconds */
 
     set_gps_satellite_count(0);
     
@@ -2025,9 +2026,10 @@ static void eye_look_timer_cb(lv_timer_t *timer)
      g.map_scale = 1.0f;
 
      /* Add dummy targets from data structure using actual GPS coordinates */
-     for (int i = 0; i < (int)DUMMY_TARGET_COUNT; i++) {
-         add_target_coord(DUMMY_TARGETS[i].lat, DUMMY_TARGETS[i].lon, DUMMY_TARGETS[i].color);
-     }
+    // TODO: test
+    //  for (int i = 0; i < (int)DUMMY_TARGET_COUNT; i++) {
+    //      add_target_coord(DUMMY_TARGETS[i].lat, DUMMY_TARGETS[i].lon, DUMMY_TARGETS[i].color);
+    //  }
 
      /* Initialize map scale - targets will be rendered after distance scale is set */
      update_map_scale();
@@ -2874,7 +2876,7 @@ static void eye_look_timer_cb(lv_timer_t *timer)
      compass_update(g.yaw_deg);
  }
 
- static void on_tick(lv_timer_t *t)
+ static void __attribute__((unused)) on_tick(lv_timer_t *t)
  {
      (void)t;
      /* Timer-based animation - 45 degrees every 5 seconds with smooth rotation */
@@ -3247,7 +3249,9 @@ void set_idle_eye_state(int state)
  /* Public GPS API Functions */
  void gps_add_target(float lat, float lon, uint32_t color)
  {
+    tuya_lvgl_mutex_lock();
      add_target_coord(lat, lon, color);
+     tuya_lvgl_mutex_unlock();
  }
 
  void gps_add_target_at_distance(float distance_meters, float bearing_degrees, uint32_t color)
@@ -3257,12 +3261,16 @@ void set_idle_eye_state(int state)
 
  void gps_remove_target(int index)
  {
+     tuya_lvgl_mutex_lock();
      remove_target_coord(index);
+     tuya_lvgl_mutex_unlock();
  }
 
  void gps_clear_all_targets(void)
  {
+     tuya_lvgl_mutex_lock();
      clear_all_targets();
+     tuya_lvgl_mutex_unlock();
  }
 
  void gps_set_tracker_position(float lat, float lon)

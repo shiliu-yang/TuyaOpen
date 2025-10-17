@@ -370,7 +370,7 @@ static void parse_and_print_nmea(char *buffer, uint32_t len)
             p = line_end + (line_end < end ? 1 : 0);
             continue;
         }
-        char *line = (char *)tal_malloc(line_len + 1);
+        char *line = (char *)tal_psram_malloc(line_len + 1);
         if (!line) {
             PR_ERR("Memory allocation failed for NMEA line");
             return;
@@ -421,6 +421,7 @@ static void parse_and_print_nmea(char *buffer, uint32_t len)
         }
 
         tal_free(line);
+        line = NULL;
         p = line_end + (line_end < end ? 1 : 0);
     }
 
@@ -637,7 +638,7 @@ static OPERATE_RET lc76g_get_data_i2c(lc76g_dev_t *dev)
         return ret;
     }
 
-    uint8_t *dynamicReadData = (uint8_t *)tal_malloc(dataLength + 1);
+    uint8_t *dynamicReadData = (uint8_t *)tal_psram_malloc(dataLength + 1);
     if (!dynamicReadData) {
         PR_ERR("Memory allocation failed");
         return OPRT_COM_ERROR;
@@ -654,14 +655,15 @@ static OPERATE_RET lc76g_get_data_i2c(lc76g_dev_t *dev)
     // Parse NMEA sentences and print human readable summaries
     parse_and_print_nmea((char *)dynamicReadData, dataLength);
 
-    tal_free(dynamicReadData);
+    tal_psram_free(dynamicReadData);
+    dynamicReadData = NULL;
     return ret;
 }
 
 static OPERATE_RET lc76g_get_data_uart(lc76g_dev_t *dev)
 {
     // Allocate buffer (like demo code: 1600 bytes)
-    uint8_t *buffer = (uint8_t *)tal_malloc(UART_BUFFER_SIZE);
+    uint8_t *buffer = (uint8_t *)tal_psram_malloc(UART_BUFFER_SIZE);
     if (!buffer) {
         PR_ERR("Memory allocation failed for UART buffer");
         return OPRT_COM_ERROR;
@@ -677,7 +679,7 @@ static OPERATE_RET lc76g_get_data_uart(lc76g_dev_t *dev)
     int total_bytes = dev_uart_read(dev->config.uart.port, buffer, UART_BUFFER_SIZE - 1, UART_READ_TIMEOUT_MS);
 
 #if defined(ENABLE_DEBUG_VIRTUAL_SIMULATION) && (ENABLE_DEBUG_VIRTUAL_SIMULATION == 1)
-    strncpy((char *)buffer, "$GNRMC,075546.000,A,3018.160614,N,12003.807444,E,0.94,292.56,151025,,,A,V*0F\r\n",
+    strncpy((char *)buffer, "$GNRMC,075546.000,A,3018.024840,N,12004.092300,E,0.94,292.56,151025,,,A,V*05\r\n",
             UART_BUFFER_SIZE - 1);
     total_bytes = (int)strlen((char *)buffer);
 #endif
@@ -688,7 +690,8 @@ static OPERATE_RET lc76g_get_data_uart(lc76g_dev_t *dev)
 
     if (total_bytes < 0) {
         PR_ERR("UART read error: %d", total_bytes);
-        tal_free(buffer);
+        tal_psram_free(buffer);
+        buffer = NULL;
         return OPRT_COM_ERROR;
     }
 
@@ -701,7 +704,8 @@ static OPERATE_RET lc76g_get_data_uart(lc76g_dev_t *dev)
 
         if (total_bytes <= 0) {
             PR_WARN("Still no GPS data after retry");
-            tal_free(buffer);
+            tal_psram_free(buffer);
+            buffer = NULL;
             return OPRT_OK;
         }
     }
@@ -723,7 +727,8 @@ static OPERATE_RET lc76g_get_data_uart(lc76g_dev_t *dev)
     // Parse NMEA sentences
     parse_and_print_nmea((char *)buffer, total_bytes);
 
-    tal_free(buffer);
+    tal_psram_free(buffer);
+    buffer = NULL;
     return OPRT_OK;
 }
 
