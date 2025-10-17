@@ -99,10 +99,15 @@ char gps_buffer[32] = {0};
 
 OPERATE_RET app_gps_position_upload(double latitude, double longitude)
 {
-
     if (!app_check_network_ready()) {
         PR_WARN("network not ready, skip gps position upload");
         return OPRT_COM_ERROR;
+    }
+
+    if (latitude == 0.0 && longitude == 0.0) {
+        // Not get any gps position
+        PR_WARN("gps position invalid, skip upload");
+        return OPRT_OK;
     }
 
     // Report under the following conditions:
@@ -110,11 +115,6 @@ OPERATE_RET app_gps_position_upload(double latitude, double longitude)
     // Longitude change: ≥0.00004°
     // Force report every 5 minutes
     SYS_TIME_T now = tal_time_get_posix_ms();
-    if (latitude == 0.0 && longitude == 0.0) {
-        // Not get any gps position
-        PR_WARN("gps position invalid, skip upload");
-        return OPRT_OK;
-    }
 
     double lat_diff = latitude > s_last_latitude ? (latitude - s_last_latitude) : (s_last_latitude - latitude);
     double lon_diff = longitude > s_last_longitude ? (longitude - s_last_longitude) : (s_last_longitude - longitude);

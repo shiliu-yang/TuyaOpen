@@ -493,6 +493,14 @@ void user_main(void)
     }
 #endif
 
+#if defined(ENABLE_DEBUG_VIRTUAL_SIMULATION) && (ENABLE_DEBUG_VIRTUAL_SIMULATION == 1)
+    PR_WARN("\r\n-------------------------------------------------");
+    PR_WARN("-------------------------------------------------");
+    PR_WARN("Virtual simulation mode enabled");
+    PR_WARN("-------------------------------------------------");
+    PR_WARN("-------------------------------------------------\r\n");
+#endif
+
 #if defined(ENABLE_GPS_LC76G) && (ENABLE_GPS_LC76G == 1)
     PR_INFO("Initializing GPS module...");
     ret = sensor_gps_init();

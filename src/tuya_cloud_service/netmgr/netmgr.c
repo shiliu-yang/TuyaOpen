@@ -32,6 +32,7 @@
 #include "tuya_cloud_com_defs.h"
 #include "tuya_error_code.h"
 #include "tuya_lan.h"
+#include "tkl_network.h"
 
 #ifdef ENABLE_WIFI
 #include "netconn_wifi.h"
@@ -179,6 +180,15 @@ static OPERATE_RET __get_netmgr_status(netmgr_type_e type, netmgr_status_e *stat
     return rt;
 }
 
+static void __netmgr_set_default_netif(netmgr_type_e netmgr_type)
+{
+    // update default netif
+    NW_IP_S ip_info_t = {0};
+    netmgr_conn_get(netmgr_type, NETCONN_CMD_IP, &ip_info_t);
+    PR_DEBUG("Set default netif[%s] by ip: %s", NETMGR_TYPE_TO_STR(netmgr_type), ip_info_t.ip);
+    tkl_net_set_default_netif_by_ip(tkl_net_str2addr(ip_info_t.ip));
+}
+
 /**
  * @brief connection event callback, called when connection event happed
  *
@@ -193,6 +203,8 @@ static void __netmgr_event_cb(netmgr_type_e type, netmgr_status_e status)
         netmgr_status_e active_status = NETMGR_LINK_DOWN;
         netmgr_type_e active_conn = __get_active_conn();
         __get_netmgr_status(active_conn, &active_status);
+
+        __netmgr_set_default_netif(active_conn);
 
         // both changed
         if (active_status != s_netmgr.status && active_conn != s_netmgr.active) {

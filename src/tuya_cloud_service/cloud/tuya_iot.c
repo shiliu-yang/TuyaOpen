@@ -29,6 +29,7 @@
 #include "tuya_tls.h"
 #include "netmgr.h"
 #include "tuya_health.h"
+
 typedef enum {
     STATE_IDLE,
     STATE_START,
@@ -497,7 +498,7 @@ static int run_state_mqtt_connect_start(tuya_iot_client_t *client)
     tuya_mqtt_protocol_register(&client->mqctx, PRO_UPGD_REQ, mqtt_service_upgrade_notify_on, client);
     tuya_mqtt_protocol_register(&client->mqctx, PRO_MQ_DPCACHE_NOTIFY, mqtt_atop_dp_cache_notify_cb, client);
     tuya_mqtt_protocol_register(&client->mqctx, PRO_RTC_REQ, mqtt_rtc_req_notify_cb, client);
-    
+
     return rt;
 }
 
@@ -758,8 +759,7 @@ static OPERATE_RET __tuya_iot_link_type_change_cb(void *data)
     netmgr_type_e netmgr_type;
 
     netmgr_type = (netmgr_type_e)data;
-
-    PR_DEBUG("netmgr_type: %s", NETMGR_TYPE_TO_STR(netmgr_type));
+    (void)netmgr_type;
 
     tuya_iot_client_t *p_client = tuya_iot_client_get();
     if (p_client) {
