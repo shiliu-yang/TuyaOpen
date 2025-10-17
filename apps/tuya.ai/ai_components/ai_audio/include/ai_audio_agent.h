@@ -94,6 +94,8 @@ OPERATE_RET ai_audio_agent_upload_stop(void);
  */
 OPERATE_RET ai_audio_agent_chat_intrrupt(void);
 
+OPERATE_RET ai_text_agent_upload(uint8_t *data, uint32_t len, char *event_id);
+
 #ifdef __cplusplus
 }
 #endif
