@@ -3254,10 +3254,52 @@ void set_idle_eye_state(int state)
      tuya_lvgl_mutex_unlock();
  }
 
- void gps_add_target_at_distance(float distance_meters, float bearing_degrees, uint32_t color)
- {
-     add_target_at_distance(distance_meters, bearing_degrees, color);
- }
+
+/**
+ * @brief Update compass heading from external sensor data
+ * @param heading_degrees Compass heading in degrees (0-360)
+ * 
+ * This function updates the compass rotation based on real sensor data
+ * (e.g., BMM150 magnetometer). It uses smooth rotation animation for
+ * natural transitions.
+ */
+void tracker_update_compass_heading(float heading_degrees)
+{
+    /* Normalize heading to 0-360 range */
+    heading_degrees = wrap_deg(heading_degrees);
+    
+    /* Calculate current angle (use g.yaw_deg if not rotating) */
+    float current_angle = g.is_rotating ? g.current_yaw_deg : g.yaw_deg;
+    
+    /* Calculate angle difference to determine if update is needed */
+    float diff = fabsf(heading_degrees - current_angle);
+    if (diff > 180.0f) {
+        diff = 360.0f - diff; /* Handle wrap-around */
+    }
+    
+    /* Only update if change is significant (> 2 degrees) to avoid jitter
+     * This threshold filters out sensor noise and prevents excessive animations
+     * at 10Hz BMM150 update rate */
+    if (diff < 2.0f) {
+        return;
+    }
+    
+    /* Calculate smooth target angle to avoid 360-0 glitch */
+    g.target_yaw_deg = wrap_angle_smooth(current_angle, heading_degrees);
+    g.current_yaw_deg = current_angle;
+    
+    /* Debug: Log significant compass updates */
+    static uint32_t last_log_time = 0;
+    uint32_t now = tal_system_get_millisecond();
+    if (now - last_log_time > 1000) { /* Log once per second max */
+        PR_DEBUG("[COMPASS] Heading update: %.1f° → %.1f° (diff: %.1f°)", 
+                 current_angle, heading_degrees, diff);
+        last_log_time = now;
+    }
+    
+    /* Start smooth rotation animation */
+    start_smooth_rotation();
+}
 
  void gps_remove_target(int index)
  {
