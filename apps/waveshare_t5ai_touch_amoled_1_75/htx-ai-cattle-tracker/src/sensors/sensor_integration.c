@@ -526,8 +526,20 @@ __attribute__((unused)) static void __gps_task(void *param)
 #if defined(ENABLE_CLOUD_API) && (ENABLE_CLOUD_API == 1)
         // get cloud cattle position
         cattle_location_t loc = {0};
-        cloud_api_get_cattle_location(&loc);
+        rt = cloud_api_get_cattle_location(&loc);
+        if (OPRT_OK == rt) {
+            static double last_lat = 0, last_lon = 0;
+            if (last_lat != loc.lat || last_lon != loc.lon) {
+                last_lat = loc.lat;
+                last_lon = loc.lon;
+                PR_INFO("[CLOUD] Cattle position updated: %.6f, %.6f", loc.lat, loc.lon);
+                gps_clear_all_targets();
+                gps_add_target(loc.lat, loc.lon, TARGET_COLOR_COW);
+            }
+        }
 #endif
+        // ui
+        gps_set_tracker_position(g_sensor_data.latitude_deg, g_sensor_data.longitude_deg);
 
         tal_system_sleep(5000); // Sleep for 5 seconds on success
     }
