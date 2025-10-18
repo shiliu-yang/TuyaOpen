@@ -379,6 +379,61 @@ bool user_network_check(void)
     netmgr_conn_get(NETCONN_AUTO, NETCONN_CMD_STATUS, &status);
     return status == NETMGR_LINK_DOWN ? false : true;
 }
+static uint8_t is_sensor_initialized = 0;
+void app_sensor_init(void)
+{
+    int rt = OPRT_OK;
+
+#if defined(ENABLE_BMM150_SENSOR) && (ENABLE_BMM150_SENSOR == 1)
+    PR_INFO("Initializing BMM150 sensor...");
+    ret = sensor_bmm150_init();
+    if (ret != OPRT_OK) {
+        PR_ERR("BMM150 initialization failed: %d", ret);
+    } else {
+        PR_INFO("BMM150 sensor initialized successfully");
+    }
+#endif
+
+#if defined(ENABLE_DEBUG_VIRTUAL_SIMULATION) && (ENABLE_DEBUG_VIRTUAL_SIMULATION == 1)
+    PR_WARN("\r\n-------------------------------------------------");
+    PR_WARN("-------------------------------------------------");
+    PR_WARN("Virtual simulation mode enabled");
+    PR_WARN("-------------------------------------------------");
+    PR_WARN("-------------------------------------------------\r\n");
+#endif
+
+#if defined(ENABLE_GPS_LC76G) && (ENABLE_GPS_LC76G == 1)
+    PR_INFO("Initializing GPS module...");
+    rt = sensor_gps_init();
+    if (rt != OPRT_OK) {
+        PR_ERR("GPS initialization failed: %d", rt);
+    } else {
+        PR_INFO("GPS module initialized successfully");
+    }
+#endif
+
+#if defined(ENABLE_BMM150_SENSOR) && (ENABLE_BMM150_SENSOR == 1) || defined(ENABLE_GPS_LC76G) && (ENABLE_GPS_LC76G == 1)
+    PR_INFO("Starting sensor tasks...");
+    rt = sensor_tasks_start();
+    if (rt != OPRT_OK) {
+        PR_ERR("Sensor tasks start failed: %d", rt);
+    } else {
+        PR_INFO("Sensor tasks started successfully");
+        PR_INFO("BMM150 and GPS readings will be printed to console");
+    }
+#endif
+
+#if defined(ENABLE_CLOUD_API) && (ENABLE_CLOUD_API == 1)
+    cloud_api_init();
+#endif
+
+#if defined(ENABLE_BATTERY) && (ENABLE_BATTERY == 1)
+    PR_INFO("Battery monitoring initialized");
+    app_battery_init();
+#endif
+
+    return;
+}
 
 void user_main(void)
 {
@@ -483,57 +538,14 @@ void user_main(void)
 
     reset_netconfig_check();
 
-#if defined(ENABLE_BMM150_SENSOR) && (ENABLE_BMM150_SENSOR == 1)
-    PR_INFO("Initializing BMM150 sensor...");
-    ret = sensor_bmm150_init();
-    if (ret != OPRT_OK) {
-        PR_ERR("BMM150 initialization failed: %d", ret);
-    } else {
-        PR_INFO("BMM150 sensor initialized successfully");
-    }
-#endif
-
-#if defined(ENABLE_DEBUG_VIRTUAL_SIMULATION) && (ENABLE_DEBUG_VIRTUAL_SIMULATION == 1)
-    PR_WARN("\r\n-------------------------------------------------");
-    PR_WARN("-------------------------------------------------");
-    PR_WARN("Virtual simulation mode enabled");
-    PR_WARN("-------------------------------------------------");
-    PR_WARN("-------------------------------------------------\r\n");
-#endif
-
-#if defined(ENABLE_GPS_LC76G) && (ENABLE_GPS_LC76G == 1)
-    PR_INFO("Initializing GPS module...");
-    ret = sensor_gps_init();
-    if (ret != OPRT_OK) {
-        PR_ERR("GPS initialization failed: %d", ret);
-    } else {
-        PR_INFO("GPS module initialized successfully");
-    }
-#endif
-
-#if defined(ENABLE_BMM150_SENSOR) && (ENABLE_BMM150_SENSOR == 1) || defined(ENABLE_GPS_LC76G) && (ENABLE_GPS_LC76G == 1)
-    PR_INFO("Starting sensor tasks...");
-    ret = sensor_tasks_start();
-    if (ret != OPRT_OK) {
-        PR_ERR("Sensor tasks start failed: %d", ret);
-    } else {
-        PR_INFO("Sensor tasks started successfully");
-        PR_INFO("BMM150 and GPS readings will be printed to console");
-    }
-#endif
-
-#if defined(ENABLE_CLOUD_API) && (ENABLE_CLOUD_API == 1)
-    cloud_api_init();
-#endif
-
-#if defined(ENABLE_BATTERY) && (ENABLE_BATTERY == 1)
-    PR_INFO("Battery monitoring initialized");
-    app_battery_init();
-#endif
-
     for (;;) {
         /* Loop to receive packets, and handles client keepalive */
         tuya_iot_yield(&ai_client);
+
+        if (is_sensor_initialized == 0 && tal_time_check_time_sync()) {
+            app_sensor_init();
+            is_sensor_initialized = 1;
+        }
     }
 }
 
