@@ -344,6 +344,7 @@ void set_network_icon(bool use_4g, bool is_enabled)
 {
     if (!g.network_icon_img) return;  /* Safety check */
 
+    tuya_lvgl_mutex_lock();
     if (use_4g) {
         if (is_enabled) {
             lv_img_set_src(g.network_icon_img, &_4g_enable);
@@ -354,6 +355,7 @@ void set_network_icon(bool use_4g, bool is_enabled)
         /* WiFi always shows as enabled */
         lv_img_set_src(g.network_icon_img, &wifi_enable);
     }
+    tuya_lvgl_mutex_unlock();
 }
 
 /**
