@@ -214,6 +214,8 @@
 
  static cattle_app_t g;
 
+ extern void bno08x_enable(BOOL_T enable);
+
  /**********************
   *  STATIC PROTOTYPES
   **********************/
@@ -1184,6 +1186,8 @@ static void eye_look_timer_cb(lv_timer_t *timer)
          lv_anim_set_ready_cb(&a, on_tracking_close_anim_ready);
          lv_anim_start(&a);
      }
+
+    bno08x_enable((show) ? TRUE : FALSE);
  }
 
  static void on_tracking_drag(lv_event_t *e)
@@ -1279,9 +1283,6 @@ static void eye_look_timer_cb(lv_timer_t *timer)
  {
      char rotation_str[16];
      int degrees = (int)roundf(yaw_degrees);
-
-     /* Mirror the angle - flip the rotation */
-     degrees = 360 - degrees;
 
      /* Normalize to 0-360 range */
      while (degrees < 0)
@@ -2254,6 +2255,8 @@ static void eye_look_timer_cb(lv_timer_t *timer)
  static void show_idle(void)
  {
      lv_obj_add_flag(g.tracking_screen, LV_OBJ_FLAG_HIDDEN);
+     bno08x_enable(false);  // Disable BNO08x when not tracking
+
      lv_obj_add_flag(g.sos_screen, LV_OBJ_FLAG_HIDDEN);
      lv_obj_add_flag(g.settings_panel, LV_OBJ_FLAG_HIDDEN);
      lv_obj_add_flag(g.settings_backdrop, LV_OBJ_FLAG_HIDDEN);
@@ -2285,6 +2288,8 @@ static void eye_look_timer_cb(lv_timer_t *timer)
      lv_obj_add_flag(g.sos_hold_ring, LV_OBJ_FLAG_HIDDEN);
      lv_obj_add_flag(g.idle_screen, LV_OBJ_FLAG_HIDDEN);
      lv_obj_add_flag(g.tracking_screen, LV_OBJ_FLAG_HIDDEN);
+     bno08x_enable(false);  // Disable BNO08x when not tracking
+
      lv_obj_clear_flag(g.sos_screen, LV_OBJ_FLAG_HIDDEN);
      lv_obj_add_flag(g.settings_panel, LV_OBJ_FLAG_HIDDEN);
      lv_obj_add_flag(g.settings_backdrop, LV_OBJ_FLAG_HIDDEN);
@@ -2829,6 +2834,8 @@ static void eye_look_timer_cb(lv_timer_t *timer)
  /* Smooth rotation animation functions */
  static void start_smooth_rotation(void)
  {
+    tuya_lvgl_mutex_lock();
+
      /* Stop any existing animation */
      if (g.rotation_anim) {
          lv_anim_del(g.rotation_anim, NULL);
@@ -2849,6 +2856,8 @@ static void eye_look_timer_cb(lv_timer_t *timer)
      lv_anim_set_ready_cb(g.rotation_anim, on_rotation_anim_ready);
      lv_anim_set_path_cb(g.rotation_anim, lv_anim_path_ease_out); /* Smooth easing */
      lv_anim_start(g.rotation_anim);
+    
+    tuya_lvgl_mutex_unlock();
  }
 
  static void on_rotation_anim_value(void *var, int32_t value)
@@ -3267,10 +3276,10 @@ void tracker_update_compass_heading(float heading_degrees)
 {
     /* Normalize heading to 0-360 range */
     heading_degrees = wrap_deg(heading_degrees);
-    
+
     /* Calculate current angle (use g.yaw_deg if not rotating) */
     float current_angle = g.is_rotating ? g.current_yaw_deg : g.yaw_deg;
-    
+
     /* Calculate angle difference to determine if update is needed */
     float diff = fabsf(heading_degrees - current_angle);
     if (diff > 180.0f) {

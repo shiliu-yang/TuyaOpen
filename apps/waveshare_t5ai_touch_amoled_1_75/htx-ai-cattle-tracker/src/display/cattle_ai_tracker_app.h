@@ -240,6 +240,8 @@ int tracker_get_distance_scale(void);
 // sos
 void set_sos_visible(bool visible);
 
+void tracker_update_compass_heading(float heading_degrees);
+
 #ifdef __cplusplus
 }
 #endif

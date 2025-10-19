@@ -420,7 +420,7 @@ static void parse_and_print_nmea(char *buffer, uint32_t len)
 #endif
         }
 
-        tal_free(line);
+        tal_psram_free(line);
         line = NULL;
         p = line_end + (line_end < end ? 1 : 0);
     }

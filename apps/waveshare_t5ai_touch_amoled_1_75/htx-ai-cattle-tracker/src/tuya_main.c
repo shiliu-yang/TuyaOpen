@@ -62,6 +62,8 @@
 #include "sensor_integration.h"
 #endif
 
+#include "BNO08x.h"
+
 /* Tuya device handle */
 tuya_iot_client_t ai_client;
 
@@ -460,7 +462,7 @@ void user_main(void)
     tal_sw_timer_init();
     tal_workq_init();
     tal_time_service_init();
-    tal_cli_init();
+    // tal_cli_init();
     tuya_authorize_init();
 
     reset_netconfig_start();
@@ -506,6 +508,8 @@ void user_main(void)
 #if defined(ENABLE_WIFI) && (ENABLE_WIFI == 1)
     netmgr_conn_set(NETCONN_WIFI, NETCONN_CMD_NETCFG, &(netcfg_args_t){.type = NETCFG_TUYA_BLE});
 #endif
+
+    bno08x_init();
 
     PR_DEBUG("tuya_iot_init success");
 
