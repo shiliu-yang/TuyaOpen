@@ -22,6 +22,8 @@
 #include "cloud_api.h"
 #endif
 
+#include "app_display.h"
+
 /***********************************************************
 ************************macro define************************
 ***********************************************************/
@@ -240,6 +242,10 @@ void app_dp_process(uint8_t id, dp_prop_tp_t type, dp_value_t value)
         s_tracking_id = value.dp_value;
 #if defined(ENABLE_CLOUD_API) && (ENABLE_CLOUD_API == 1)
         cloud_api_update_cattle_location_ui(1);
+#endif
+#if defined(ENABLE_CHAT_DISPLAY) && (ENABLE_CHAT_DISPLAY == 1)
+        UI_SCREEN_E screen_index = UI_SCREEN_TRACKING;
+        app_display_send_msg(TY_DISPLAY_TP_SCREEN_CHANGE, (uint8_t *)&screen_index, sizeof(UI_SCREEN_E));
 #endif
     } break;
     case APP_DPID_SOS_STATUS: {

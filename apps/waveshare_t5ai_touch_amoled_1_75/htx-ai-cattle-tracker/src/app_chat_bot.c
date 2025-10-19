@@ -336,6 +336,8 @@ static void __app_button_function_cb(char *name, TDL_BUTTON_TOUCH_EVENT_E event,
     switch (event) {
     case TDL_BUTTON_PRESS_DOWN: {
         if (work_mode == APP_CHAT_MODE_KEY_PRESS_HOLD_SINGLE) {
+            ai_audio_player_stop();
+
             PR_DEBUG("button press down, listen start");
 #if defined(ENABLE_LED) && (ENABLE_LED == 1)
             tdl_led_set_status(sg_led_hdl, TDL_LED_ON);
@@ -344,6 +346,8 @@ static void __app_button_function_cb(char *name, TDL_BUTTON_TOUCH_EVENT_E event,
 #if defined(ENABLE_CHAT_DISPLAY) && (ENABLE_CHAT_DISPLAY == 1)
             // app_display_send_msg(TY_DISPLAY_TP_STATUS, (uint8_t *)LISTENING, strlen(LISTENING));
             /* Show red ring when recording/listening */
+            UI_SCREEN_E screen_index = UI_SCREEN_IDLE;
+            app_display_send_msg(TY_DISPLAY_TP_SCREEN_CHANGE, (uint8_t *)&screen_index, sizeof(UI_SCREEN_E));
             app_display_send_msg(TY_DISPLAY_TP_RECORDING_START, NULL, 0);
 #endif
 

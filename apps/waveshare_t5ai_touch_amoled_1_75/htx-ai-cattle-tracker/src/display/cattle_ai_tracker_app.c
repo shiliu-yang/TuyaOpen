@@ -597,6 +597,7 @@ void set_sos_visible(bool visible)
         show_sos_alert();
     } else {
         hide_sos_alert();
+        app_set_screen(SCREEN_IDLE);
     }
     tuya_lvgl_mutex_unlock();
 }
@@ -2233,7 +2234,8 @@ static void eye_look_timer_cb(lv_timer_t *timer)
      lv_obj_add_flag(g.sos_screen, LV_OBJ_FLAG_HIDDEN);
 
      lv_obj_t *title = lv_label_create(g.sos_screen);
-     lv_label_set_text(title, "SOS Active\n\nPress 'X' to cancel");
+     lv_obj_set_style_text_font(title, &lv_font_montserrat_24, 0);
+     lv_label_set_text(title, "SOS Active\n\nLong press to cancel");
      lv_obj_set_style_text_color(title, lv_color_hex(0xffeaea), 0);
      lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_CENTER, 0);
      lv_obj_center(title);
@@ -2463,6 +2465,23 @@ static void eye_look_timer_cb(lv_timer_t *timer)
              break;
          }
      }
+ }
+
+ /*
+ 0: idle
+ 1: tracking
+ */
+ void app_set_screen(uint8_t screen_index)
+ {
+    if (screen_index == SCREEN_IDLE) {
+        if (lv_obj_has_flag(g.idle_screen, LV_OBJ_FLAG_HIDDEN)) {
+            show_idle();
+        }
+    } else if (screen_index == SCREEN_TRACKING) {
+        if (lv_obj_has_flag(g.tracking_screen, LV_OBJ_FLAG_HIDDEN)) {
+            slide_tracking(true);
+        }
+    }
  }
 
  static void on_settings_backdrop_click(lv_event_t *e)

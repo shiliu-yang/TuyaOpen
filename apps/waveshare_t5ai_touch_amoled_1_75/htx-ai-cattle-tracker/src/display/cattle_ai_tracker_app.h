@@ -242,6 +242,14 @@ void set_sos_visible(bool visible);
 
 void tracker_update_compass_heading(float heading_degrees);
 
+ /*
+ 0: idle
+ 1: tracking
+ */
+#define SCREEN_IDLE      0
+#define SCREEN_TRACKING  1
+ void app_set_screen(uint8_t screen_index); // no tuya lvgl mutex
+
 #ifdef __cplusplus
 }
 #endif
