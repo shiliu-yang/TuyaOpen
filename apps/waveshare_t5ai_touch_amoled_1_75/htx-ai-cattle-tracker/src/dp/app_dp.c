@@ -18,6 +18,10 @@
 #include "app_battery.h"
 #endif
 
+#if defined(ENABLE_CLOUD_API) && (ENABLE_CLOUD_API == 1)
+#include "cloud_api.h"
+#endif
+
 /***********************************************************
 ************************macro define************************
 ***********************************************************/
@@ -234,6 +238,9 @@ void app_dp_process(uint8_t id, dp_prop_tp_t type, dp_value_t value)
     } break;
     case APP_DPID_START_TRACKING: {
         s_tracking_id = value.dp_value;
+#if defined(ENABLE_CLOUD_API) && (ENABLE_CLOUD_API == 1)
+        cloud_api_update_cattle_location_ui(1);
+#endif
     } break;
     case APP_DPID_SOS_STATUS: {
         app_sos_set(value.dp_bool);

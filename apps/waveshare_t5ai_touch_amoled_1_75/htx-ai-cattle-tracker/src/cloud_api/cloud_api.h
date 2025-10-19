@@ -55,8 +55,6 @@ typedef struct {
 
 OPERATE_RET cloud_api_init(void);
 
-OPERATE_RET cloud_api_get_cattle_location(cattle_location_t *location);
-
 /**
  * @brief Get current error count
  * @return Current consecutive error count
@@ -74,6 +72,8 @@ uint32_t cloud_api_get_request_interval(void);
  * @note This can be used to reset the backoff state when network conditions improve
  */
 void cloud_api_reset_error_state(void);
+
+void cloud_api_update_cattle_location_ui(uint8_t force_update);
 
 #ifdef __cplusplus
 }

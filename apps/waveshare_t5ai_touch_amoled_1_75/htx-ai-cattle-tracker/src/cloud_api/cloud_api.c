@@ -17,6 +17,11 @@
 
 #include "app_dp.h"
 
+#if defined(ENABLE_GUI_TRACKER) && (ENABLE_GUI_TRACKER == 1)
+#include "cattle_ai_tracker_app.h"
+#include "ui_display.h"
+#endif
+
 /***********************************************************
 ************************macro define************************
 ***********************************************************/
@@ -27,9 +32,7 @@
 #define CATTLE_LOCATION_QUERY_API "thing.cattle.location.query"
 #define CATTLE_LOCATION_QUERY_VER "1.0"
 
-#define DEFAULT_REQUEST_INTERVAL_MS (30 * 1000)     // default minimum interval between requests in milliseconds
-#define MAX_ERROR_COUNT             5               // maximum consecutive error count before using max interval
-#define MAX_REQUEST_INTERVAL_MS     (5 * 60 * 1000) // maximum interval of 5 minutes
+#define DEFAULT_REQUEST_INTERVAL_MS (30 * 1000) // default minimum interval between requests in milliseconds
 
 /***********************************************************
 ***********************typedef define***********************
@@ -61,12 +64,17 @@ static cloud_api_ctx_t sg_cloud_api_ctx = {
     .request_interval_ms = DEFAULT_REQUEST_INTERVAL_MS, // minimum interval between requests in milliseconds
 };
 
+#define MAX_ERROR_COUNT 8
 static SYS_TIME_T sg_request_interval_ms[] = {
     DEFAULT_REQUEST_INTERVAL_MS, // 30 seconds  - error_count 0
-    50 * 1000,                   // 50 seconds  - error_count 1
-    60 * 1000,                   // 1 minute    - error_count 2
-    3 * 60 * 1000,               // 3 minutes   - error_count 3
-    5 * 60 * 1000,               // 5 minutes   - error_count 4+
+    10 * 1000,                   // 10 seconds  - error_count 1
+    20 * 1000,                   // 20 seconds  - error_count 2
+    30 * 1000,                   // 30 seconds  - error_count 3
+    40 * 1000,                   // 40 seconds  - error_count 4
+    50 * 1000,                   // 50 seconds  - error_count 5
+    60 * 1000,                   // 1 minute    - error_count 6
+    3 * 60 * 1000,               // 3 minutes   - error_count 7
+    5 * 60 * 1000,               // 5 minutes   - error_count 8+
 };
 
 /***********************************************************
@@ -80,12 +88,11 @@ static SYS_TIME_T sg_request_interval_ms[] = {
 static SYS_TIME_T __get_current_request_interval(void)
 {
     uint8_t error_count = sg_cloud_api_ctx.error_count;
-    uint8_t max_index = sizeof(sg_request_interval_ms) / sizeof(sg_request_interval_ms[0]) - 1;
 
-    if (error_count > max_index) {
-        PR_WARN("error_count %d exceeds max_index %d, clamping to max", error_count, max_index);
-        error_count = max_index;
-        sg_cloud_api_ctx.error_count = max_index;
+    if (error_count > MAX_ERROR_COUNT) {
+        PR_WARN("error_count %d exceeds max_index %d, clamping to max", error_count, MAX_ERROR_COUNT);
+        error_count = MAX_ERROR_COUNT;
+        sg_cloud_api_ctx.error_count = MAX_ERROR_COUNT;
     }
 
     SYS_TIME_T interval = sg_request_interval_ms[error_count];
@@ -112,6 +119,8 @@ static void __increment_error_count(void)
 {
     if (sg_cloud_api_ctx.error_count < MAX_ERROR_COUNT) {
         sg_cloud_api_ctx.error_count++;
+    } else {
+        sg_cloud_api_ctx.error_count = MAX_ERROR_COUNT;
     }
 
     sg_cloud_api_ctx.request_interval_ms = __get_current_request_interval();
@@ -328,7 +337,7 @@ __EXIT:
     return;
 }
 
-OPERATE_RET cloud_api_get_cattle_location(cattle_location_t *location)
+OPERATE_RET cloud_api_get_cattle_location(cattle_location_t *location, uint8_t force_update)
 {
     OPERATE_RET rt = OPRT_OK;
 
@@ -355,7 +364,7 @@ OPERATE_RET cloud_api_get_cattle_location(cattle_location_t *location)
     SYS_TIME_T now = tal_time_get_posix_ms();
     SYS_TIME_T current_interval = __get_current_request_interval();
 
-    if (now - sg_cloud_api_ctx.last_query_time < current_interval) {
+    if (now - sg_cloud_api_ctx.last_query_time < current_interval && !force_update) {
         // PR_WARN("query too frequently, current interval: %u ms, time since last: %u ms", (uint32_t)current_interval,
         //         (uint32_t)(now - sg_cloud_api_ctx.last_query_time));
         return OPRT_COM_ERROR;
@@ -394,4 +403,23 @@ void cloud_api_reset_error_state(void)
         __reset_error_state();
         tal_mutex_unlock(sg_cloud_api_ctx.mutex);
     }
+}
+
+void cloud_api_update_cattle_location_ui(uint8_t force_update)
+{
+    OPERATE_RET rt = OPRT_OK;
+    // get cloud cattle position
+    cattle_location_t loc = {0};
+    rt = cloud_api_get_cattle_location(&loc, force_update);
+    if (OPRT_OK == rt) {
+        static double last_lat = 0, last_lon = 0;
+        if (last_lat != loc.lat || last_lon != loc.lon) {
+            last_lat = loc.lat;
+            last_lon = loc.lon;
+            PR_INFO("[CLOUD] Cattle position updated: %.6f, %.6f", loc.lat, loc.lon);
+            gps_clear_all_targets();
+            gps_add_target(loc.lat, loc.lon, TARGET_COLOR_COW);
+        }
+    }
+    return;
 }
