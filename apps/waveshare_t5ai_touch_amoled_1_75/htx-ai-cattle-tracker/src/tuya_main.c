@@ -531,6 +531,8 @@ void user_main(void)
     /* Subscribe to network link type change events for automatic UI updates */
     tal_event_subscribe(EVENT_LINK_TYPE_CHG, "ui_net", __network_link_type_change_cb, SUBSCRIBE_TYPE_NORMAL);
     PR_INFO("Network link type change event subscribed");
+    tal_event_subscribe(EVENT_LINK_STATUS_CHG, "ui_net", __network_link_type_change_cb, SUBSCRIBE_TYPE_NORMAL);
+    PR_INFO("Network link status change event subscribed");
 #endif
 
     app_system_info();
