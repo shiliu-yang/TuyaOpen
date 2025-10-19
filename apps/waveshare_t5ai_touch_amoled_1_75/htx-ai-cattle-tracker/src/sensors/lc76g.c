@@ -582,9 +582,8 @@ OPERATE_RET lc76g_init_uart(lc76g_dev_t *dev, TUYA_UART_NUM_E port, uint32_t bau
     PR_NOTICE("      Cold start takes ~26 seconds for first fix");
     PR_NOTICE("========================================");
 
-    // only enable RMC
-    // RMC update once every 3s
-    lc76g_pair_062(dev, 0, 0);
+    // GAA, RMC update once every 3s
+    lc76g_pair_062(dev, 0, 5);
     lc76g_pair_062(dev, 1, 0);
     lc76g_pair_062(dev, 2, 0);
     lc76g_pair_062(dev, 3, 0);

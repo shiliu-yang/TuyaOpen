@@ -54,6 +54,11 @@ typedef uint8_t UI_SCREEN_E;
 #define UI_SCREEN_IDLE     0
 #define UI_SCREEN_TRACKING 1
 
+// gps count
+typedef struct {
+    uint8_t count;
+} UI_GPS_SATS_COUNT_S;
+
 /***********************************************************
 ***********************typedef define***********************
 ***********************************************************/
@@ -83,6 +88,8 @@ typedef enum {
     TY_DISPLAY_TP_BATTERY,
     // ui screen change
     TY_DISPLAY_TP_SCREEN_CHANGE,
+    // gps set
+    TY_DISPLAY_TP_GPS_SET,
 
     TY_DISPLAY_TP_MAX
 } TY_DISPLAY_TYPE_E;
