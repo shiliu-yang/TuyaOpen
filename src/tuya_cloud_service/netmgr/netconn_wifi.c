@@ -56,7 +56,7 @@ netmgr_conn_wifi_t s_netmgr_wifi = {
     .conn =
         {
             .table_size = NETCONN_WIFI_CONN_TABLE,
-            .table = {1, 3, 5, 10, 15, 20},
+            .table = {1, 3, 5, 10, 15, 180},
         },
 };
 

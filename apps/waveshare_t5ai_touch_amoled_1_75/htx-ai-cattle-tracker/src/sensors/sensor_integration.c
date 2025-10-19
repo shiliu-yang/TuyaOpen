@@ -634,7 +634,6 @@ __attribute__((unused)) static void __gps_task(void *param)
 #endif
         // ui
         gps_set_tracker_position(g_sensor_data.latitude_deg, g_sensor_data.longitude_deg);
-
         tal_system_sleep(5000); // Sleep for 5 seconds on success
     }
 }

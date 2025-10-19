@@ -10,6 +10,7 @@
  *
  ******************************************************************************/
 #include "dev_config.h"
+#include "tal_api.h"
 
 TDL_BUTTON_HANDLE button_hdl = NULL;
 
@@ -211,6 +212,7 @@ OPERATE_RET bmm150_i2c_read_reg(uint8_t addr, uint8_t reg, uint8_t *buffer, uint
     return tkl_i2c_master_receive(TUYA_I2C_NUM_2, addr, buffer, length, TRUE);
 }
 
+#if 1
 OPERATE_RET dev_uart_init(TUYA_UART_NUM_E port, uint32_t baudrate)
 {
     OPERATE_RET ret;
@@ -287,3 +289,73 @@ int dev_uart_read(TUYA_UART_NUM_E port, uint8_t *data, uint16_t len, uint32_t ti
 
     return total_read;
 }
+#else
+OPERATE_RET dev_uart_init(TUYA_UART_NUM_E port, uint32_t baudrate)
+{
+    OPERATE_RET rt;
+
+    // Configure UART parameters using TAL (Tuya Abstraction Layer)
+    TAL_UART_CFG_T cfg = {0};
+    cfg.base_cfg.baudrate = baudrate;
+    cfg.base_cfg.databits = TUYA_UART_DATA_LEN_8BIT;
+    cfg.base_cfg.parity = TUYA_UART_PARITY_TYPE_NONE;
+    cfg.base_cfg.stopbits = TUYA_UART_STOP_LEN_1BIT;
+    cfg.base_cfg.flowctrl = TUYA_UART_FLOWCTRL_NONE;
+    cfg.rx_buffer_size = 1024; // Buffer size for receiving
+    cfg.open_mode = O_BLOCK;   // Blocking mode
+
+    rt = tal_uart_init(port, &cfg);
+    if (OPRT_OK != rt) {
+        PR_ERR("UART init fail, err<%d>!", rt);
+    } else {
+        PR_INFO("UART port %d initialized at baudrate %d", port, baudrate);
+    }
+
+    return rt;
+}
+
+OPERATE_RET dev_uart_deinit(TUYA_UART_NUM_E port)
+{
+    return tal_uart_deinit(port);
+}
+
+int dev_uart_write(TUYA_UART_NUM_E port, const uint8_t *data, uint16_t len)
+{
+    if (!data || len == 0) {
+        return -1;
+    }
+    return tal_uart_write(port, (void *)data, len);
+}
+
+int dev_uart_read(TUYA_UART_NUM_E port, uint8_t *data, uint16_t len, uint32_t timeout_ms)
+{
+    return tal_uart_read(port, data, len);
+    if (!data || len == 0) {
+        return -1;
+    }
+
+    // Use TAL UART read with timeout via polling
+    uint32_t start_time = tal_system_get_millisecond();
+    int total_read = 0;
+
+    while (total_read < len) {
+        int bytes = tal_uart_read(port, data + total_read, len - total_read);
+        if (bytes > 0) {
+            total_read += bytes;
+            // If we got some data, return immediately (non-greedy read)
+            break;
+        }
+
+        // Check timeout
+        uint32_t elapsed = tal_system_get_millisecond() - start_time;
+        if (elapsed >= timeout_ms) {
+            break;
+        }
+
+        // Short delay to avoid busy waiting
+        tal_system_sleep(10);
+    }
+
+    return total_read;
+}
+#endif
