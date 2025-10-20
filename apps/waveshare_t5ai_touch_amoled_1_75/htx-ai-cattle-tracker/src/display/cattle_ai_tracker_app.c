@@ -1718,8 +1718,8 @@ static void eye_look_timer_cb(lv_timer_t *timer)
          float x_meters = delta_lon * lon_factor;
          float y_meters = delta_lat * lat_factor;
 
-         /* Apply compass rotation to target positions (negate angle for correct direction) */
-         float angle_rad = -g.yaw_deg * M_PI / 180.0f;
+         /* Apply compass rotation to target positions */
+         float angle_rad = g.yaw_deg * M_PI / 180.0f;
          float cos_angle = cosf(angle_rad);
          float sin_angle = sinf(angle_rad);
 
@@ -1828,7 +1828,7 @@ static void eye_look_timer_cb(lv_timer_t *timer)
      update_cached_coordinates();
 
      /* Pre-calculate rotation values once for all targets */
-     float angle_rad = -g.yaw_deg * M_PI / 180.0f;
+     float angle_rad = g.yaw_deg * M_PI / 180.0f;
      float cos_angle = cosf(angle_rad);
      float sin_angle = sinf(angle_rad);
 
@@ -2738,7 +2738,8 @@ static void eye_look_timer_cb(lv_timer_t *timer)
      /* Only update if angle change is significant (reduce unnecessary redraws) */
      static int16_t last_angle = -1;
      if (abs(angle_int - last_angle) >= 20) { /* Only update every 2 degrees for better performance */
-         lv_obj_set_style_transform_angle(g.compass_face_ring_img, angle_int, 0);
+        //  lv_obj_set_style_transform_angle(g.compass_face_ring_img, angle_int, 0);
+         lv_obj_set_style_transform_angle(g.compass_face_ring_img, -angle_int, 0);
          last_angle = angle_int;
 
          /* Force a refresh only when needed */

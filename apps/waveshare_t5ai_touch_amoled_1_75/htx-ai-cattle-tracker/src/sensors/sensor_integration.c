@@ -616,10 +616,15 @@ __attribute__((unused)) static void __gps_task(void *param)
 #endif
 
 #if defined(ENABLE_CHAT_DISPLAY) && (ENABLE_CHAT_DISPLAY == 1)
-            UI_GPS_SATS_COUNT_S gps_sats = { .count = s->satellites_in_use };
-            app_display_send_msg(TY_DISPLAY_TP_GPS_SET, (uint8_t *)&gps_sats, sizeof(UI_GPS_SATS_COUNT_S));
+        UI_GPS_SATS_COUNT_S gps_sats = {.count = s->satellites_in_use};
+        app_display_send_msg(TY_DISPLAY_TP_GPS_SET, (uint8_t *)&gps_sats, sizeof(UI_GPS_SATS_COUNT_S));
 #endif
-        app_gps_position_upload(g_sensor_data.latitude_deg, g_sensor_data.longitude_deg);
+        // dp update
+        if (s->connect_state > 0) {
+            app_gps_position_upload(g_sensor_data.latitude_deg, g_sensor_data.longitude_deg);
+            int height = (int)roundf(g_sensor_data.altitude_m);
+            app_gps_height_upload(height);
+        }
 
 #if defined(ENABLE_CLOUD_API) && (ENABLE_CLOUD_API == 1)
         cloud_api_update_cattle_location_ui(0);

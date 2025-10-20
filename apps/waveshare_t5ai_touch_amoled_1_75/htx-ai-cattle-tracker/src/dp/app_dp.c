@@ -33,6 +33,8 @@
 
 #define APP_DPID_SOS_STATUS 102
 
+#define APP_DPID_GPS_HEIGHT   103
+#define APP_DPID_GPS_ACCURACY 104
 #define APP_DPID_GPS_POSITION 105
 
 // start_tracking_id
@@ -57,6 +59,7 @@
 // gps
 static double s_last_latitude = 0.0;
 static double s_last_longitude = 0.0;
+// static int s_last_height_m = 0;
 static SYS_TIME_T s_last_gps_report_time = 0;
 
 // tracking id
@@ -153,6 +156,26 @@ OPERATE_RET app_gps_position_upload(double latitude, double longitude)
     dp_obj.id = APP_DPID_GPS_POSITION;
     dp_obj.type = PROP_STR;
     dp_obj.value.dp_str = gps_buffer;
+
+    return tuya_iot_dp_obj_report(client, client->activate.devid, &dp_obj, 1, 0);
+}
+
+OPERATE_RET app_gps_height_upload(int height_m)
+{
+    if (!app_check_network_ready()) {
+        PR_WARN("network not ready, skip gps height upload");
+        return OPRT_COM_ERROR;
+    }
+
+    PR_DEBUG("DP upload gps height: %d m", height_m);
+
+    tuya_iot_client_t *client = tuya_iot_client_get();
+
+    dp_obj_t dp_obj = {0};
+
+    dp_obj.id = APP_DPID_GPS_HEIGHT;
+    dp_obj.type = PROP_VALUE;
+    dp_obj.value.dp_value = height_m;
 
     return tuya_iot_dp_obj_report(client, client->activate.devid, &dp_obj, 1, 0);
 }

@@ -18,6 +18,8 @@
 ***********************************************************/
 #define BNO08X_ENABLE_PIN TUYA_GPIO_NUM_44
 
+#define BNO08X_OFFSET_YAW (-90)
+
 /***********************************************************
 ***********************typedef define***********************
 ***********************************************************/
@@ -85,8 +87,17 @@ void bno08x_enable(BOOL_T enable)
 
 void bno08x_set_yaw_degree(int yaw_degree)
 {
+    // yaw_degree 0~359
+
+    yaw_degree += BNO08X_OFFSET_YAW;
+    if (yaw_degree < 0) {
+        yaw_degree += 360;
+    } else if (yaw_degree >= 360) {
+        yaw_degree -= 360;
+    }
+
     sg_yaw_degree = (float)yaw_degree;
-    PR_DEBUG("BNO08x : %.2f", sg_yaw_degree);
+    PR_DEBUG("BNO08x : %.2f, input: %d", sg_yaw_degree, yaw_degree);
     return;
 }
 
