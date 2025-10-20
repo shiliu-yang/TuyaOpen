@@ -615,26 +615,22 @@ __attribute__((unused)) static void __gps_task(void *param)
         PR_INFO("[GPS] Success #%d - sleeping for 5 seconds", success_count);
 #endif
 
-        app_gps_position_upload(g_sensor_data.latitude_deg, g_sensor_data.longitude_deg);
+#if defined(ENABLE_CHAT_DISPLAY) && (ENABLE_CHAT_DISPLAY == 1)
+        UI_GPS_SATS_COUNT_S gps_sats = {.count = s->satellites_in_use};
+        app_display_send_msg(TY_DISPLAY_TP_GPS_SET, (uint8_t *)&gps_sats, sizeof(UI_GPS_SATS_COUNT_S));
+#endif
+        // dp update
+        if (s->connect_state > 0) {
+            app_gps_position_upload(g_sensor_data.latitude_deg, g_sensor_data.longitude_deg);
+            int height = (int)roundf(g_sensor_data.altitude_m);
+            app_gps_height_upload(height);
+        }
 
 #if defined(ENABLE_CLOUD_API) && (ENABLE_CLOUD_API == 1)
-        // get cloud cattle position
-        cattle_location_t loc = {0};
-        rt = cloud_api_get_cattle_location(&loc);
-        if (OPRT_OK == rt) {
-            static double last_lat = 0, last_lon = 0;
-            if (last_lat != loc.lat || last_lon != loc.lon) {
-                last_lat = loc.lat;
-                last_lon = loc.lon;
-                PR_INFO("[CLOUD] Cattle position updated: %.6f, %.6f", loc.lat, loc.lon);
-                gps_clear_all_targets();
-                gps_add_target(loc.lat, loc.lon, TARGET_COLOR_COW);
-            }
-        }
+        cloud_api_update_cattle_location_ui(0);
 #endif
         // ui
         gps_set_tracker_position(g_sensor_data.latitude_deg, g_sensor_data.longitude_deg);
-
         tal_system_sleep(5000); // Sleep for 5 seconds on success
     }
 }

@@ -51,6 +51,8 @@ netmgr_conn_cellular_t s_netmgr_cellular = {
         },
 };
 
+static uint8_t s_cellular_initialized = 0;
+
 /***********************************************************
 ***********************function define**********************
 ***********************************************************/
@@ -75,6 +77,31 @@ static void __netconn_cellular_event(CELLULAR_STAT_E event)
     return;
 }
 
+static TIMER_ID s_cellular_timer;
+
+static void __cellular_init(void)
+{
+    s_cellular_initialized = 1;
+    TAL_CELLULAR_BASE_CFG_T cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    strcpy(cfg.apn, "");
+    tal_cellular_init(&cfg);
+}
+
+void __cellular_timer_cb(TIMER_ID timer_id, void *arg)
+{
+    PR_DEBUG("cellular init timer cb, is activated: %d", tuya_iot_client_get()->is_activated);
+    if (tuya_iot_client_get()->is_activated == false) {
+        return;
+    }
+
+    __cellular_init();
+
+    tal_sw_timer_delete(s_cellular_timer);
+
+    return;
+}
+
 OPERATE_RET netconn_cellular_open(void *config)
 {
     OPERATE_RET rt = OPRT_OK;
@@ -84,10 +111,17 @@ OPERATE_RET netconn_cellular_open(void *config)
     // init
     // if device is actived, cellular init
     // else wait for active
-    TAL_CELLULAR_BASE_CFG_T cfg;
-    memset(&cfg, 0, sizeof(cfg));
-    strcpy(cfg.apn, "");
-    tal_cellular_init(&cfg);
+    PR_DEBUG("cellular open, is activated: %d", tuya_iot_client_get()->is_activated);
+    if (tuya_iot_client_get()->is_activated) {
+        __cellular_init();
+    } else {
+        tal_sw_timer_create((TAL_TIMER_CB)__cellular_timer_cb, NULL, &s_cellular_timer);
+        if (s_cellular_timer == NULL) {
+            PR_ERR("cellular timer create failed");
+            return OPRT_COM_ERROR;
+        }
+        tal_sw_timer_start(s_cellular_timer, 3000, TAL_TIMER_CYCLE);
+    }
 
     netmgr_cellular->base.status = NETMGR_LINK_DOWN;
 
@@ -135,9 +169,21 @@ OPERATE_RET netconn_cellular_get(netmgr_conn_config_type_e cmd, void *param)
         *(int *)param = netmgr_cellular->base.pri;
     } break;
     case NETCONN_CMD_STATUS: {
+        // PR_DEBUG("cellular initialized: %d", s_cellular_initialized);
+        // PR_DEBUG("cellular status: %d", netmgr_cellular->base.status);
+        if (!s_cellular_initialized && netmgr_cellular->base.status == NETMGR_LINK_DOWN) {
+            *(netmgr_status_e *)param = NETMGR_LINK_DOWN;
+            return OPRT_OK;
+        }
         *(netmgr_status_e *)param = netmgr_cellular->base.status;
     } break;
     case NETCONN_CMD_IP: {
+        if (!s_cellular_initialized) {
+            NW_IP_S *ip = (NW_IP_S *)param;
+            memset(ip->ip, 0, sizeof(ip->ip));
+            return OPRT_OK;
+        }
+
         TUYA_CALL_ERR_RETURN(tal_cellular_get_ip((NW_IP_S *)param));
     } break;
     case NETCONN_CMD_MAC: {

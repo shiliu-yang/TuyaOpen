@@ -214,6 +214,8 @@
 
  static cattle_app_t g;
 
+ extern void bno08x_enable(BOOL_T enable);
+
  /**********************
   *  STATIC PROTOTYPES
   **********************/
@@ -342,6 +344,7 @@ void set_network_icon(bool use_4g, bool is_enabled)
 {
     if (!g.network_icon_img) return;  /* Safety check */
 
+    tuya_lvgl_mutex_lock();
     if (use_4g) {
         if (is_enabled) {
             lv_img_set_src(g.network_icon_img, &_4g_enable);
@@ -352,6 +355,7 @@ void set_network_icon(bool use_4g, bool is_enabled)
         /* WiFi always shows as enabled */
         lv_img_set_src(g.network_icon_img, &wifi_enable);
     }
+    tuya_lvgl_mutex_unlock();
 }
 
 /**
@@ -595,6 +599,7 @@ void set_sos_visible(bool visible)
         show_sos_alert();
     } else {
         hide_sos_alert();
+        app_set_screen(SCREEN_IDLE);
     }
     tuya_lvgl_mutex_unlock();
 }
@@ -1184,6 +1189,8 @@ static void eye_look_timer_cb(lv_timer_t *timer)
          lv_anim_set_ready_cb(&a, on_tracking_close_anim_ready);
          lv_anim_start(&a);
      }
+
+    bno08x_enable((show) ? TRUE : FALSE);
  }
 
  static void on_tracking_drag(lv_event_t *e)
@@ -1279,9 +1286,6 @@ static void eye_look_timer_cb(lv_timer_t *timer)
  {
      char rotation_str[16];
      int degrees = (int)roundf(yaw_degrees);
-
-     /* Mirror the angle - flip the rotation */
-     degrees = 360 - degrees;
 
      /* Normalize to 0-360 range */
      while (degrees < 0)
@@ -1714,8 +1718,8 @@ static void eye_look_timer_cb(lv_timer_t *timer)
          float x_meters = delta_lon * lon_factor;
          float y_meters = delta_lat * lat_factor;
 
-         /* Apply compass rotation to target positions (negate angle for correct direction) */
-         float angle_rad = -g.yaw_deg * M_PI / 180.0f;
+         /* Apply compass rotation to target positions */
+         float angle_rad = g.yaw_deg * M_PI / 180.0f;
          float cos_angle = cosf(angle_rad);
          float sin_angle = sinf(angle_rad);
 
@@ -1824,7 +1828,7 @@ static void eye_look_timer_cb(lv_timer_t *timer)
      update_cached_coordinates();
 
      /* Pre-calculate rotation values once for all targets */
-     float angle_rad = -g.yaw_deg * M_PI / 180.0f;
+     float angle_rad = g.yaw_deg * M_PI / 180.0f;
      float cos_angle = cosf(angle_rad);
      float sin_angle = sinf(angle_rad);
 
@@ -2232,7 +2236,8 @@ static void eye_look_timer_cb(lv_timer_t *timer)
      lv_obj_add_flag(g.sos_screen, LV_OBJ_FLAG_HIDDEN);
 
      lv_obj_t *title = lv_label_create(g.sos_screen);
-     lv_label_set_text(title, "SOS Active\n\nPress 'X' to cancel");
+     lv_obj_set_style_text_font(title, &lv_font_montserrat_24, 0);
+     lv_label_set_text(title, "SOS Active\n\nLong press to cancel");
      lv_obj_set_style_text_color(title, lv_color_hex(0xffeaea), 0);
      lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_CENTER, 0);
      lv_obj_center(title);
@@ -2254,6 +2259,8 @@ static void eye_look_timer_cb(lv_timer_t *timer)
  static void show_idle(void)
  {
      lv_obj_add_flag(g.tracking_screen, LV_OBJ_FLAG_HIDDEN);
+     bno08x_enable(false);  // Disable BNO08x when not tracking
+
      lv_obj_add_flag(g.sos_screen, LV_OBJ_FLAG_HIDDEN);
      lv_obj_add_flag(g.settings_panel, LV_OBJ_FLAG_HIDDEN);
      lv_obj_add_flag(g.settings_backdrop, LV_OBJ_FLAG_HIDDEN);
@@ -2285,6 +2292,8 @@ static void eye_look_timer_cb(lv_timer_t *timer)
      lv_obj_add_flag(g.sos_hold_ring, LV_OBJ_FLAG_HIDDEN);
      lv_obj_add_flag(g.idle_screen, LV_OBJ_FLAG_HIDDEN);
      lv_obj_add_flag(g.tracking_screen, LV_OBJ_FLAG_HIDDEN);
+     bno08x_enable(false);  // Disable BNO08x when not tracking
+
      lv_obj_clear_flag(g.sos_screen, LV_OBJ_FLAG_HIDDEN);
      lv_obj_add_flag(g.settings_panel, LV_OBJ_FLAG_HIDDEN);
      lv_obj_add_flag(g.settings_backdrop, LV_OBJ_FLAG_HIDDEN);
@@ -2458,6 +2467,23 @@ static void eye_look_timer_cb(lv_timer_t *timer)
              break;
          }
      }
+ }
+
+ /*
+ 0: idle
+ 1: tracking
+ */
+ void app_set_screen(uint8_t screen_index)
+ {
+    if (screen_index == SCREEN_IDLE) {
+        if (lv_obj_has_flag(g.idle_screen, LV_OBJ_FLAG_HIDDEN)) {
+            show_idle();
+        }
+    } else if (screen_index == SCREEN_TRACKING) {
+        if (lv_obj_has_flag(g.tracking_screen, LV_OBJ_FLAG_HIDDEN)) {
+            slide_tracking(true);
+        }
+    }
  }
 
  static void on_settings_backdrop_click(lv_event_t *e)
@@ -2712,7 +2738,8 @@ static void eye_look_timer_cb(lv_timer_t *timer)
      /* Only update if angle change is significant (reduce unnecessary redraws) */
      static int16_t last_angle = -1;
      if (abs(angle_int - last_angle) >= 20) { /* Only update every 2 degrees for better performance */
-         lv_obj_set_style_transform_angle(g.compass_face_ring_img, angle_int, 0);
+        //  lv_obj_set_style_transform_angle(g.compass_face_ring_img, angle_int, 0);
+         lv_obj_set_style_transform_angle(g.compass_face_ring_img, -angle_int, 0);
          last_angle = angle_int;
 
          /* Force a refresh only when needed */
@@ -2829,6 +2856,8 @@ static void eye_look_timer_cb(lv_timer_t *timer)
  /* Smooth rotation animation functions */
  static void start_smooth_rotation(void)
  {
+    tuya_lvgl_mutex_lock();
+
      /* Stop any existing animation */
      if (g.rotation_anim) {
          lv_anim_del(g.rotation_anim, NULL);
@@ -2849,6 +2878,8 @@ static void eye_look_timer_cb(lv_timer_t *timer)
      lv_anim_set_ready_cb(g.rotation_anim, on_rotation_anim_ready);
      lv_anim_set_path_cb(g.rotation_anim, lv_anim_path_ease_out); /* Smooth easing */
      lv_anim_start(g.rotation_anim);
+    
+    tuya_lvgl_mutex_unlock();
  }
 
  static void on_rotation_anim_value(void *var, int32_t value)
@@ -3267,10 +3298,10 @@ void tracker_update_compass_heading(float heading_degrees)
 {
     /* Normalize heading to 0-360 range */
     heading_degrees = wrap_deg(heading_degrees);
-    
+
     /* Calculate current angle (use g.yaw_deg if not rotating) */
     float current_angle = g.is_rotating ? g.current_yaw_deg : g.yaw_deg;
-    
+
     /* Calculate angle difference to determine if update is needed */
     float diff = fabsf(heading_degrees - current_angle);
     if (diff > 180.0f) {

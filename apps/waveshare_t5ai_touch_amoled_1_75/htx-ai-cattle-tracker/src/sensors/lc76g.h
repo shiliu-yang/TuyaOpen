@@ -57,6 +57,8 @@ OPERATE_RET lc76g_init_i2c(lc76g_dev_t *dev, uint8_t i2c_addr_wr, uint8_t i2c_ad
  **/
 OPERATE_RET lc76g_init_uart(lc76g_dev_t *dev, TUYA_UART_NUM_E port, uint32_t baudrate);
 
+OPERATE_RET lc76g_reset(void);
+
 /**
  * Initialize LC76G (legacy function for backward compatibility)
  **/

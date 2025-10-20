@@ -343,34 +343,23 @@ void ui_update_network_status(void)
     bool use_4g = false;
     bool is_enabled = false;
 
-    /* Check WiFi status */
-    netmgr_status_e wifi_status = NETMGR_LINK_DOWN;
-    if (netmgr_conn_get(NETCONN_WIFI, NETCONN_CMD_STATUS, &wifi_status) == OPRT_OK) {
-        if (wifi_status == NETMGR_LINK_UP) {
-            use_4g = false;
-            is_enabled = true;
-            PR_DEBUG("[NETWORK] WiFi is active");
-        }
-    }
+    extern netmgr_type_e __get_active_conn();
+    netmgr_type_e net_type = __get_active_conn();
+    if (net_type == NETCONN_CELLULAR) {
+        use_4g = true;
 
-    /* Check Cellular (4G) status */
-    netmgr_status_e cellular_status = NETMGR_LINK_DOWN;
-    if (netmgr_conn_get(NETCONN_CELLULAR, NETCONN_CMD_STATUS, &cellular_status) == OPRT_OK) {
-        if (cellular_status == NETMGR_LINK_UP) {
-            use_4g = true;
-            is_enabled = true;
-            PR_DEBUG("[NETWORK] Cellular (4G) is active");
+        netmgr_status_e cell_status = NETMGR_LINK_DOWN;
+        if (netmgr_conn_get(NETCONN_CELLULAR, NETCONN_CMD_STATUS, &cell_status) == OPRT_OK) {
+            is_enabled = (cell_status == NETMGR_LINK_UP);
         }
-    }
-
-    /* Check Wired status - treat as WiFi icon */
-    netmgr_status_e wired_status = NETMGR_LINK_DOWN;
-    if (netmgr_conn_get(NETCONN_WIRED, NETCONN_CMD_STATUS, &wired_status) == OPRT_OK) {
-        if (wired_status == NETMGR_LINK_UP) {
-            use_4g = false;
-            is_enabled = true;
-            PR_DEBUG("[NETWORK] Wired connection is active");
-        }
+        PR_DEBUG("[NETWORK] Cellular (4G) is active");
+    } else if (net_type == NETCONN_WIFI || net_type == NETCONN_WIRED) {
+        use_4g = false;
+        is_enabled = true;
+        PR_DEBUG("[NETWORK] WiFi/Wired is active");
+    } else {
+        is_enabled = false;
+        PR_WARN("[NETWORK] No active network connection");
     }
 
     /* Update UI with connection status */

@@ -18,6 +18,12 @@
 #include "app_battery.h"
 #endif
 
+#if defined(ENABLE_CLOUD_API) && (ENABLE_CLOUD_API == 1)
+#include "cloud_api.h"
+#endif
+
+#include "app_display.h"
+
 /***********************************************************
 ************************macro define************************
 ***********************************************************/
@@ -27,6 +33,8 @@
 
 #define APP_DPID_SOS_STATUS 102
 
+#define APP_DPID_GPS_HEIGHT   103
+#define APP_DPID_GPS_ACCURACY 104
 #define APP_DPID_GPS_POSITION 105
 
 // start_tracking_id
@@ -51,6 +59,7 @@
 // gps
 static double s_last_latitude = 0.0;
 static double s_last_longitude = 0.0;
+// static int s_last_height_m = 0;
 static SYS_TIME_T s_last_gps_report_time = 0;
 
 // tracking id
@@ -151,6 +160,26 @@ OPERATE_RET app_gps_position_upload(double latitude, double longitude)
     return tuya_iot_dp_obj_report(client, client->activate.devid, &dp_obj, 1, 0);
 }
 
+OPERATE_RET app_gps_height_upload(int height_m)
+{
+    if (!app_check_network_ready()) {
+        PR_WARN("network not ready, skip gps height upload");
+        return OPRT_COM_ERROR;
+    }
+
+    PR_DEBUG("DP upload gps height: %d m", height_m);
+
+    tuya_iot_client_t *client = tuya_iot_client_get();
+
+    dp_obj_t dp_obj = {0};
+
+    dp_obj.id = APP_DPID_GPS_HEIGHT;
+    dp_obj.type = PROP_VALUE;
+    dp_obj.value.dp_value = height_m;
+
+    return tuya_iot_dp_obj_report(client, client->activate.devid, &dp_obj, 1, 0);
+}
+
 OPERATE_RET app_dp_battery_upload(uint8_t is_charging, uint8_t battery_percentage)
 {
     if (!app_check_network_ready()) {
@@ -234,6 +263,13 @@ void app_dp_process(uint8_t id, dp_prop_tp_t type, dp_value_t value)
     } break;
     case APP_DPID_START_TRACKING: {
         s_tracking_id = value.dp_value;
+#if defined(ENABLE_CLOUD_API) && (ENABLE_CLOUD_API == 1)
+        cloud_api_update_cattle_location_ui(1);
+#endif
+#if defined(ENABLE_CHAT_DISPLAY) && (ENABLE_CHAT_DISPLAY == 1)
+        UI_SCREEN_E screen_index = UI_SCREEN_TRACKING;
+        app_display_send_msg(TY_DISPLAY_TP_SCREEN_CHANGE, (uint8_t *)&screen_index, sizeof(UI_SCREEN_E));
+#endif
     } break;
     case APP_DPID_SOS_STATUS: {
         app_sos_set(value.dp_bool);

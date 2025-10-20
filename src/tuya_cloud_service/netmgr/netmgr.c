@@ -73,7 +73,7 @@ static TIMER_ID sg_lan_init_timer = NULL;
  *
  * @return netconn_type_t: the connection should be used
  */
-static netmgr_type_e __get_active_conn()
+netmgr_type_e __get_active_conn()
 {
     netmgr_type_e active_type = NETCONN_AUTO;
     netmgr_conn_base_t *cur_conn = s_netmgr.conn;
@@ -200,6 +200,9 @@ static void __netmgr_event_cb(netmgr_type_e type, netmgr_status_e status)
     (void)status;
 
     if (s_netmgr.type & type) {
+        PR_DEBUG("netmgr event cb called by [%s]", NETMGR_TYPE_TO_STR(type));
+        PR_DEBUG("netmgr status [%s]", NETMGR_STATUS_TO_STR(status));
+
         netmgr_status_e active_status = NETMGR_LINK_DOWN;
         netmgr_type_e active_conn = __get_active_conn();
         __get_netmgr_status(active_conn, &active_status);

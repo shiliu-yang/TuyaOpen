@@ -232,6 +232,16 @@ static void __app_display_msg_handle(DISPLAY_MSG_T *msg_data)
             set_battery_icon(battery_status->level, battery_status->charging);
         }
     } break;
+    case TY_DISPLAY_TP_SCREEN_CHANGE: {
+        UI_SCREEN_E screen = ((UI_SCREEN_E *)msg_data->data)[0];
+        app_set_screen(screen);
+    } break;
+    case TY_DISPLAY_TP_GPS_SET: {
+        UI_GPS_SATS_COUNT_S *gps_sats = (UI_GPS_SATS_COUNT_S *)msg_data->data;
+        if (gps_sats) {
+            set_gps_satellite_count(gps_sats->count);
+        }
+    } break;
     case TY_DISPLAY_TP_CHAT_MODE: {
         ui_set_chat_mode(msg_data->data);
     } break;

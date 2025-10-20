@@ -50,7 +50,7 @@ config ENABLE_CHAT_DISPLAY
 
 config ENABLE_BMM150_SENSOR
     bool "enable BMM150 magnetometer sensor"
-    default y
+    default n
     help
         Enable BMM150 3-axis magnetometer for compass heading
 
