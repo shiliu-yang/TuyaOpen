@@ -3063,8 +3063,6 @@ static void eye_look_timer_cb(lv_timer_t *timer)
  /* Smooth rotation animation functions */
  static void start_smooth_rotation(void)
  {
-    tuya_lvgl_mutex_lock();
-
      /* Stop any existing animation */
      if (g.rotation_anim) {
          lv_anim_del(g.rotation_anim, NULL);
@@ -3085,8 +3083,6 @@ static void eye_look_timer_cb(lv_timer_t *timer)
      lv_anim_set_ready_cb(g.rotation_anim, on_rotation_anim_ready);
      lv_anim_set_path_cb(g.rotation_anim, lv_anim_path_ease_out); /* Smooth easing */
      lv_anim_start(g.rotation_anim);
-    
-    tuya_lvgl_mutex_unlock();
  }
 
  static void on_rotation_anim_value(void *var, int32_t value)
@@ -3503,6 +3499,8 @@ void set_idle_eye_state(int state)
  */
 void tracker_update_compass_heading(float heading_degrees)
 {
+    tuya_lvgl_mutex_lock();
+
     /* Normalize heading to 0-360 range */
     heading_degrees = wrap_deg(heading_degrees);
 
@@ -3513,13 +3511,6 @@ void tracker_update_compass_heading(float heading_degrees)
     float diff = fabsf(heading_degrees - current_angle);
     if (diff > 180.0f) {
         diff = 360.0f - diff; /* Handle wrap-around */
-    }
-    
-    /* Only update if change is significant (> 2 degrees) to avoid jitter
-     * This threshold filters out sensor noise and prevents excessive animations
-     * at 10Hz BMM150 update rate */
-    if (diff < 2.0f) {
-        return;
     }
     
     /* Calculate smooth target angle to avoid 360-0 glitch */
@@ -3534,9 +3525,17 @@ void tracker_update_compass_heading(float heading_degrees)
                  current_angle, heading_degrees, diff);
         last_log_time = now;
     }
-    
+
+#if 0
     /* Start smooth rotation animation */
     start_smooth_rotation();
+#else
+    /* Immediate update without animation */
+    g.yaw_deg = heading_degrees;
+    compass_update(g.yaw_deg);
+#endif
+
+    tuya_lvgl_mutex_unlock();
 }
 
  void gps_remove_target(int index)
