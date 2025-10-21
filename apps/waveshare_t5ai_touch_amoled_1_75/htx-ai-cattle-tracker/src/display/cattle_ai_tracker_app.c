@@ -56,7 +56,7 @@
  #define SETTINGS_PANEL_HEIGHT CATTLE_SCREEN_HEIGHT // Full screen height
 
  /* Feature flags */
- #define ENABLE_CLOSE_TRACKING 0 // Set to 1 to enable close tracking mode, 0 to disable
+ #define ENABLE_CLOSE_TRACKING 1 // Set to 1 to enable close tracking mode, 0 to disable
 
  /**********************
   *      TYPEDEFS
@@ -125,12 +125,19 @@
      bool map_scale_dirty;       /* Flag to indicate if map scale needs recalculation */
      float cached_screen_radius; /* Cached screen radius calculation */
 
-     /* SOS */
-     lv_obj_t *sos_hold_ring;
-     lv_obj_t *sos_cancel_btn;
-     lv_timer_t *sos_timer;
-     uint32_t sos_pressed_start_ms;
-     bool sos_active;
+    /* SOS */
+    lv_obj_t *sos_hold_ring;
+    lv_obj_t *sos_cancel_btn;
+    lv_obj_t *sos_circles[3];
+    lv_obj_t *sos_title;
+    lv_obj_t *emergency_text;
+    lv_timer_t *sos_timer;
+    lv_timer_t *countdown_timer;
+    lv_obj_t *countdown_text;
+    lv_obj_t *countdown_circle;
+    uint32_t sos_pressed_start_ms;
+    bool sos_active;
+    int countdown_value;
 
      /* Timers */
      lv_timer_t *tick_timer;
@@ -232,6 +239,7 @@ static int utf8_next_char_size(const char *text, int pos);
 static void create_eyes(void);
 static void eye_blink_timer_cb(lv_timer_t *timer);
 static void eye_look_timer_cb(lv_timer_t *timer);
+static void on_countdown_timer(lv_timer_t *timer);
 static void set_eye_state(int state);
 static void update_eye_animation(void);
 static void update_pupil_position(void);
@@ -524,6 +532,10 @@ void lv_demo_cattle_ai_tracker(void)
      void (*saved_callback)(int volume) = g.volume_change_callback;
      
      memset(&g, 0, sizeof(g));
+
+     /* Explicitly initialize SOS state */
+     g.sos_active = false;
+     g.sos_pressed_start_ms = 0;
      
      /* Restore the volume callback */
      g.volume_change_callback = saved_callback;
@@ -670,7 +682,7 @@ static void create_eyes(void)
     lv_obj_set_style_bg_color(g.left_eye, lv_color_black(), 0);
     lv_obj_set_style_bg_opa(g.left_eye, LV_OPA_COVER, 0);
     lv_obj_set_style_clip_corner(g.left_eye, true, 0);  /* Enable clipping for bottom crop effect */
-    lv_obj_align(g.left_eye, LV_ALIGN_CENTER, -EYE_SPACING / 2, 0);
+    lv_obj_align(g.left_eye, LV_ALIGN_CENTER, -EYE_SPACING / 2, -50);
 
     /* Left pupil (white oval) */
     g.left_pupil = lv_obj_create(g.left_eye);
@@ -689,7 +701,7 @@ static void create_eyes(void)
     lv_obj_set_style_bg_color(g.right_eye, lv_color_black(), 0);
     lv_obj_set_style_bg_opa(g.right_eye, LV_OPA_COVER, 0);
     lv_obj_set_style_clip_corner(g.right_eye, true, 0);  /* Enable clipping for bottom crop effect */
-    lv_obj_align(g.right_eye, LV_ALIGN_CENTER, EYE_SPACING / 2, 0);
+    lv_obj_align(g.right_eye, LV_ALIGN_CENTER, EYE_SPACING / 2, -50);
 
     /* Right pupil (white oval) */
     g.right_pupil = lv_obj_create(g.right_eye);
@@ -1293,25 +1305,25 @@ static void eye_look_timer_cb(lv_timer_t *timer)
      while (degrees >= 360)
          degrees -= 360;
 
-     /* Determine cardinal direction */
-     const char *direction;
-     if (degrees >= 337.5f || degrees < 22.5f) {
-         direction = "N";
-     } else if (degrees >= 22.5f && degrees < 67.5f) {
-         direction = "NE";
-     } else if (degrees >= 67.5f && degrees < 112.5f) {
-         direction = "E";
-     } else if (degrees >= 112.5f && degrees < 157.5f) {
-         direction = "SE";
-     } else if (degrees >= 157.5f && degrees < 202.5f) {
-         direction = "S";
-     } else if (degrees >= 202.5f && degrees < 247.5f) {
-         direction = "SW";
-     } else if (degrees >= 247.5f && degrees < 292.5f) {
-         direction = "W";
-     } else {
-         direction = "NW";
-     }
+    /* Determine cardinal direction */
+    const char *direction;
+    if (degrees >= 337.5f || degrees < 22.5f) {
+        direction = "北";
+    } else if (degrees >= 22.5f && degrees < 67.5f) {
+        direction = "东北";
+    } else if (degrees >= 67.5f && degrees < 112.5f) {
+        direction = "东";
+    } else if (degrees >= 112.5f && degrees < 157.5f) {
+        direction = "东南";
+    } else if (degrees >= 157.5f && degrees < 202.5f) {
+        direction = "南";
+    } else if (degrees >= 202.5f && degrees < 247.5f) {
+        direction = "西南";
+    } else if (degrees >= 247.5f && degrees < 292.5f) {
+        direction = "西";
+    } else {
+        direction = "西北";
+    }
 
      snprintf(rotation_str, sizeof(rotation_str), "%d° %s", degrees, direction);
      lv_label_set_text(g.rotation_text, rotation_str);
@@ -2048,7 +2060,7 @@ static void eye_look_timer_cb(lv_timer_t *timer)
      /* Add distance text label under the arrow */
      g.distance_text = lv_label_create(g.tracking_screen);
      lv_obj_set_style_text_color(g.distance_text, lv_color_white(), 0);
-     lv_obj_set_style_text_font(g.distance_text, &lv_font_montserrat_24, 0);
+     lv_obj_set_style_text_font(g.distance_text, &font_puhui_18_2, 0);
      lv_obj_center(g.distance_text);
      lv_obj_set_y(g.distance_text, lv_obj_get_y(g.distance_img) + 18); /* Position under the arrow */
      lv_obj_set_x(g.distance_text, lv_obj_get_x(g.distance_img) + 95); /* Position under the arrow */
@@ -2072,10 +2084,21 @@ static void eye_look_timer_cb(lv_timer_t *timer)
      lv_obj_set_style_pad_all(g.rotation_bg, 6, 0);            /* Reduced padding from 8 to 6 */
      lv_obj_align(g.rotation_bg, LV_ALIGN_BOTTOM_MID, 0, -75); /* Move 35px higher (from -20 to -55) */
 
-     g.rotation_text = lv_label_create(g.rotation_bg);
-     lv_obj_set_style_text_color(g.rotation_text, lv_color_white(), 0);
-     lv_obj_set_style_text_font(g.rotation_text, &lv_font_montserrat_16, 0);
-     lv_obj_center(g.rotation_text);
+    g.rotation_text = lv_label_create(g.rotation_bg);
+    lv_obj_set_style_text_color(g.rotation_text, lv_color_white(), 0);
+    lv_obj_set_style_text_font(g.rotation_text, &font_puhui_18_2, 0);
+    lv_obj_center(g.rotation_text);
+    lv_obj_clear_flag(g.rotation_bg, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag(g.rotation_bg, LV_OBJ_FLAG_SCROLL_ELASTIC);
+    lv_obj_clear_flag(g.rotation_bg, LV_OBJ_FLAG_SCROLL_MOMENTUM);
+    lv_obj_clear_flag(g.rotation_bg, LV_OBJ_FLAG_SCROLL_ONE);
+    lv_obj_clear_flag(g.rotation_bg, LV_OBJ_FLAG_SCROLL_CHAIN);
+
+    lv_obj_clear_flag(g.rotation_text, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag(g.rotation_text, LV_OBJ_FLAG_SCROLL_ELASTIC);
+    lv_obj_clear_flag(g.rotation_text, LV_OBJ_FLAG_SCROLL_MOMENTUM);
+    lv_obj_clear_flag(g.rotation_text, LV_OBJ_FLAG_SCROLL_ONE);
+    lv_obj_clear_flag(g.rotation_text, LV_OBJ_FLAG_SCROLL_CHAIN);
 
      /* Initialize rotation display */
      update_rotation_text(g.yaw_deg);
@@ -2139,7 +2162,7 @@ static void eye_look_timer_cb(lv_timer_t *timer)
     g.settings_date_label = lv_label_create(g.settings_panel);
     lv_label_set_text(g.settings_date_label, "1970 / 01 / 01");
     lv_obj_set_style_text_color(g.settings_date_label, lv_color_white(), 0);
-    lv_obj_set_style_text_font(g.settings_date_label, &lv_font_montserrat_20, 0);  /* Use montserrat_20 instead of 22 */
+    lv_obj_set_style_text_font(g.settings_date_label, &font_puhui_18_2, 0);
     lv_obj_set_style_text_align(g.settings_date_label, LV_TEXT_ALIGN_LEFT, 0);  /* Align to left */
     lv_obj_align(g.settings_date_label, LV_ALIGN_CENTER, -95, -65);  // Move to left by 20px
 
@@ -2223,7 +2246,7 @@ static void eye_look_timer_cb(lv_timer_t *timer)
      g.sos_screen = lv_obj_create(g.screen);
      lv_obj_remove_style_all(g.sos_screen);
      lv_obj_set_size(g.sos_screen, CATTLE_SCREEN_WIDTH, CATTLE_SCREEN_HEIGHT);
-     lv_obj_set_style_bg_color(g.sos_screen, lv_color_hex(0x2a1a1a), 0);
+     lv_obj_set_style_bg_color(g.sos_screen, lv_color_hex(0x000000), 0); // black background
      lv_obj_set_style_bg_opa(g.sos_screen, LV_OPA_COVER, 0);
      lv_obj_clear_flag(g.sos_screen, LV_OBJ_FLAG_SCROLLABLE);
 
@@ -2234,13 +2257,120 @@ static void eye_look_timer_cb(lv_timer_t *timer)
      lv_obj_clear_flag(g.sos_screen, LV_OBJ_FLAG_SCROLL_CHAIN);
 
      lv_obj_add_flag(g.sos_screen, LV_OBJ_FLAG_HIDDEN);
+     
+     /* Enable circular clipping for anti-aliasing */
+     lv_obj_set_style_clip_corner(g.sos_screen, true, 0);
+     lv_obj_set_style_radius(g.sos_screen, LV_RADIUS_CIRCLE, 0);
 
-     lv_obj_t *title = lv_label_create(g.sos_screen);
-     lv_obj_set_style_text_font(title, &lv_font_montserrat_24, 0);
-     lv_label_set_text(title, "SOS Active\n\nLong press to cancel");
-     lv_obj_set_style_text_color(title, lv_color_hex(0xffeaea), 0);
-     lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_CENTER, 0);
-     lv_obj_center(title);
+     /* Countdown UI elements */
+     g.countdown_circle = lv_obj_create(g.sos_screen);
+     lv_obj_set_size(g.countdown_circle, 200, 200);
+     lv_obj_center(g.countdown_circle);
+     lv_obj_set_style_radius(g.countdown_circle, LV_RADIUS_CIRCLE, 0);
+     lv_obj_set_style_bg_color(g.countdown_circle, lv_color_hex(0xFF0000), 0);
+     lv_obj_set_style_bg_opa(g.countdown_circle, LV_OPA_60, 0);
+     lv_obj_set_style_border_width(g.countdown_circle, 0, 0);
+     lv_obj_clear_flag(g.countdown_circle, LV_OBJ_FLAG_SCROLLABLE);
+     lv_obj_add_flag(g.countdown_circle, LV_OBJ_FLAG_HIDDEN);
+     
+     g.countdown_text = lv_label_create(g.sos_screen);
+     lv_label_set_text(g.countdown_text, "3");
+     lv_obj_set_style_text_color(g.countdown_text, lv_color_white(), 0);
+     lv_obj_set_style_text_font(g.countdown_text, &montserrat_time_82_extra_bold, 0);
+     lv_obj_set_style_text_align(g.countdown_text, LV_TEXT_ALIGN_CENTER, 0);
+     lv_obj_center(g.countdown_text);
+     lv_obj_add_flag(g.countdown_text, LV_OBJ_FLAG_HIDDEN);
+     lv_obj_move_foreground(g.countdown_text); // Move to top of z-order
+
+     /* Black background areas for top and bottom */
+     lv_obj_t *top_bg = lv_obj_create(g.sos_screen);
+     lv_obj_set_size(top_bg, CATTLE_SCREEN_WIDTH, 80);
+     lv_obj_align(top_bg, LV_ALIGN_TOP_MID, 0, 0);
+     lv_obj_set_style_bg_color(top_bg, lv_color_black(), 0);
+     lv_obj_set_style_bg_opa(top_bg, LV_OPA_COVER, 0);
+     lv_obj_set_style_border_width(top_bg, 0, 0);
+     lv_obj_clear_flag(top_bg, LV_OBJ_FLAG_SCROLLABLE);
+     
+     lv_obj_t *bottom_bg = lv_obj_create(g.sos_screen);
+     lv_obj_set_size(bottom_bg, CATTLE_SCREEN_WIDTH, 80);
+     lv_obj_align(bottom_bg, LV_ALIGN_BOTTOM_MID, 0, 0);
+     lv_obj_set_style_bg_color(bottom_bg, lv_color_black(), 0);
+     lv_obj_set_style_bg_opa(bottom_bg, LV_OPA_COVER, 0);
+     lv_obj_set_style_border_width(bottom_bg, 0, 0);
+     lv_obj_clear_flag(bottom_bg, LV_OBJ_FLAG_SCROLLABLE);
+
+     
+     /* Create 3 animated circles with red shades */
+     uint32_t red_shades[3] = {0xFF0000, 0xFF3333, 0xFF6666}; // Most hot red, hotter red, hot red
+     
+     for (int i = 0; i < 3; i++) {
+         g.sos_circles[i] = lv_obj_create(g.sos_screen);
+         lv_obj_set_size(g.sos_circles[i], 140 + i * 80, 140 + i * 80); // Larger base size and more spacing
+         lv_obj_center(g.sos_circles[i]);
+         lv_obj_set_style_radius(g.sos_circles[i], LV_RADIUS_CIRCLE, 0);
+         lv_obj_set_style_bg_color(g.sos_circles[i], lv_color_hex(red_shades[i]), 0);
+         lv_obj_set_style_bg_opa(g.sos_circles[i], LV_OPA_40 - i * 10, 0);
+         lv_obj_set_style_border_width(g.sos_circles[i], 0, 0);
+         lv_obj_clear_flag(g.sos_circles[i], LV_OBJ_FLAG_SCROLLABLE);
+         
+         /* Simplified size pulsing animation with larger spread */
+         lv_anim_t size_anim;
+         lv_anim_init(&size_anim);
+         lv_anim_set_var(&size_anim, g.sos_circles[i]);
+         lv_anim_set_values(&size_anim, 120 + i * 60, 180 + i * 100); // Larger range for bigger spread
+         lv_anim_set_time(&size_anim, 1500 + i * 200); // Shorter time
+         lv_anim_set_repeat_count(&size_anim, LV_ANIM_REPEAT_INFINITE);
+         lv_anim_set_playback_time(&size_anim, 1500 + i * 200);
+         lv_anim_set_exec_cb(&size_anim, (lv_anim_exec_xcb_t)lv_obj_set_size);
+         lv_anim_set_ready_cb(&size_anim, NULL); // No ready callback to prevent crashes
+         lv_anim_start(&size_anim);
+         
+         /* Simplified opacity animation */
+         lv_anim_t opa_anim;
+         lv_anim_init(&opa_anim);
+         lv_anim_set_var(&opa_anim, g.sos_circles[i]);
+         lv_anim_set_values(&opa_anim, LV_OPA_30 - i * 5, LV_OPA_50 - i * 8); // Smaller opacity range
+         lv_anim_set_time(&opa_anim, 1800 + i * 250); // Shorter time
+         lv_anim_set_repeat_count(&opa_anim, LV_ANIM_REPEAT_INFINITE);
+         lv_anim_set_playback_time(&opa_anim, 1800 + i * 250);
+         lv_anim_set_exec_cb(&opa_anim, (lv_anim_exec_xcb_t)lv_obj_set_style_bg_opa);
+         lv_anim_set_ready_cb(&opa_anim, NULL); // No ready callback to prevent crashes
+         lv_anim_start(&opa_anim);
+         
+         }
+        
+    /* Large SOS text in center with Puhui 30 font */
+    g.sos_title = lv_label_create(g.sos_screen);
+    lv_label_set_text(g.sos_title, "SOS");
+    lv_obj_set_style_text_color(g.sos_title, lv_color_white(), 0);
+    lv_obj_set_style_text_font(g.sos_title, &font_puhui_18_2, 0);
+    lv_obj_set_style_text_align(g.sos_title, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_align(g.sos_title, LV_ALIGN_CENTER, 0, -15); // 15px higher than center
+    
+    /* Emergency text below SOS */
+    g.emergency_text = lv_label_create(g.sos_screen);
+    lv_label_set_text(g.emergency_text, "紧急报警");
+    lv_obj_set_style_text_color(g.emergency_text, lv_color_white(), 0);
+    lv_obj_set_style_text_font(g.emergency_text, &font_puhui_18_2, 0);
+    lv_obj_set_style_text_align(g.emergency_text, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_align(g.emergency_text, LV_ALIGN_CENTER, 0, 10); // 10px below center (moved up 15px from 25px)
+
+
+     /* Cancel button with Puhui 18 font and rounded corners */
+     g.sos_cancel_btn = lv_btn_create(g.sos_screen);
+     lv_obj_set_size(g.sos_cancel_btn, 120, 40);
+     lv_obj_align(g.sos_cancel_btn, LV_ALIGN_BOTTOM_MID, 0, -40);
+     lv_obj_set_style_radius(g.sos_cancel_btn, 20, 0); // Large rounded corners
+     lv_obj_set_style_bg_color(g.sos_cancel_btn, lv_color_white(), 0);
+     lv_obj_set_style_bg_opa(g.sos_cancel_btn, LV_OPA_80, 0);
+     
+     lv_obj_t *cancel_label = lv_label_create(g.sos_cancel_btn);
+     lv_label_set_text(cancel_label, "取消");
+     lv_obj_set_style_text_color(cancel_label, lv_color_black(), 0);
+     lv_obj_set_style_text_font(cancel_label, &font_puhui_18_2, 0);
+     lv_obj_center(cancel_label);
+     
+     lv_obj_add_event_cb(g.sos_cancel_btn, on_sos_cancel, LV_EVENT_CLICKED, NULL);
 
      /* Hold progress ring (shown during long press on main/root) */
      g.sos_hold_ring = lv_arc_create(g.screen);
@@ -2286,6 +2416,37 @@ static void eye_look_timer_cb(lv_timer_t *timer)
      slide_tracking(true);
  }
 
+ static void on_countdown_timer(lv_timer_t *timer)
+ {
+     g.countdown_value--;
+     
+     if (g.countdown_value > 0) {
+         char countdown_str[4];
+         sprintf(countdown_str, "%d", g.countdown_value);
+         lv_label_set_text(g.countdown_text, countdown_str);
+     } else {
+         /* Countdown finished - show full SOS interface */
+         lv_timer_del(g.countdown_timer);
+         g.countdown_timer = NULL;
+         
+         /* Hide countdown elements */
+         lv_obj_add_flag(g.countdown_text, LV_OBJ_FLAG_HIDDEN);
+         lv_obj_add_flag(g.countdown_circle, LV_OBJ_FLAG_HIDDEN);
+         
+         /* Show main SOS content */
+         lv_obj_clear_flag(g.sos_title, LV_OBJ_FLAG_HIDDEN);
+         lv_obj_clear_flag(g.emergency_text, LV_OBJ_FLAG_HIDDEN);
+         lv_obj_clear_flag(g.sos_cancel_btn, LV_OBJ_FLAG_HIDDEN);
+         for (int i = 0; i < 3; i++) {
+             lv_obj_clear_flag(g.sos_circles[i], LV_OBJ_FLAG_HIDDEN);
+         }
+         
+         /* SOS callback - SOS is now truly started */
+         printf("SOS TRULY STARTED - Emergency activated!\n");
+         // Add your SOS start callback here
+     }
+ }
+
  static void show_sos_alert(void)
  {
      g.sos_active = true;
@@ -2297,12 +2458,56 @@ static void eye_look_timer_cb(lv_timer_t *timer)
      lv_obj_clear_flag(g.sos_screen, LV_OBJ_FLAG_HIDDEN);
      lv_obj_add_flag(g.settings_panel, LV_OBJ_FLAG_HIDDEN);
      lv_obj_add_flag(g.settings_backdrop, LV_OBJ_FLAG_HIDDEN);
+     
+     /* Start countdown */
+     g.countdown_value = 3;
+     lv_obj_clear_flag(g.countdown_text, LV_OBJ_FLAG_HIDDEN);
+     lv_obj_clear_flag(g.countdown_circle, LV_OBJ_FLAG_HIDDEN);
+     lv_label_set_text(g.countdown_text, "3");
+     
+     /* Hide main SOS content during countdown */
+     lv_obj_add_flag(g.sos_title, LV_OBJ_FLAG_HIDDEN);
+     lv_obj_add_flag(g.emergency_text, LV_OBJ_FLAG_HIDDEN);
+     lv_obj_add_flag(g.sos_cancel_btn, LV_OBJ_FLAG_HIDDEN);
+     for (int i = 0; i < 3; i++) {
+         lv_obj_add_flag(g.sos_circles[i], LV_OBJ_FLAG_HIDDEN);
+     }
+     
+     /* Start countdown timer */
+     g.countdown_timer = lv_timer_create(on_countdown_timer, 1000, NULL);
+     lv_timer_set_repeat_count(g.countdown_timer, 3);
  }
 
  static void hide_sos_alert(void)
  {
+     printf("Hiding SOS alert, setting sos_active to false\n");
      g.sos_active = false;
+     
+     /* Stop countdown timer if running */
+     if (g.countdown_timer != NULL) {
+         lv_timer_del(g.countdown_timer);
+         g.countdown_timer = NULL;
+     }
+     
+     /* Stop all animations on SOS circles to prevent crashes */
+     for (int i = 0; i < 3; i++) {
+         if (g.sos_circles[i] != NULL) {
+             lv_anim_del(g.sos_circles[i], NULL); // Delete all animations on this object
+         }
+     }
+     
+     /* Hide countdown elements */
+     lv_obj_add_flag(g.countdown_text, LV_OBJ_FLAG_HIDDEN);
+     lv_obj_add_flag(g.countdown_circle, LV_OBJ_FLAG_HIDDEN);
+     
      lv_obj_add_flag(g.sos_screen, LV_OBJ_FLAG_HIDDEN);
+     show_idle(); // Restore the idle screen when SOS is cancelled
+     
+     /* SOS cancel callback */
+     printf("SOS CANCELLED - Emergency deactivated!\n");
+     // Add your SOS cancel callback here
+     
+     printf("SOS alert hidden, sos_active=%d\n", g.sos_active);
  }
 
  static void slide_settings(bool open)
@@ -2533,9 +2738,11 @@ static void eye_look_timer_cb(lv_timer_t *timer)
          }
          break;
      case ' ': // Space for SOS
-         // printf("Space - triggering SOS\n");
+         printf("Space - triggering SOS, sos_active=%d\n", g.sos_active);
          if (!g.sos_active) {
              show_sos_alert();
+         } else {
+             printf("SOS already active, ignoring spacebar\n");
          }
          break;
      case '0': // 50m scale

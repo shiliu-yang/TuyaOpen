@@ -60,11 +60,13 @@ void user_main(void)
 
     lv_vendor_init(DISPLAY_NAME);
 
-    LV_IMG_DECLARE(tuya_gif2);
+    LV_IMG_DECLARE(cow_stready);
+    // LV_IMG_DECLARE(cow_animate);
+    // LV_IMG_DECLARE(tuya_gif2);
+    
     lv_obj_t * img;
-
     img = lv_gif_create(lv_scr_act());
-    lv_gif_set_src(img, &tuya_gif2);
+    lv_gif_set_src(img, &cow_stready);
     lv_obj_align(img, LV_ALIGN_CENTER, 0, 0);
 
     lv_vendor_start(5, 1024*8);

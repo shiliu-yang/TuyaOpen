@@ -17,7 +17,7 @@
 #include "app_display.h"
 #include "tuya_lvgl.h"
 
-#include "font_awesome_symbols.h"
+// #include "font_awesome_symbols.h"
 #include "ui_display.h"
 
 #include "tal_log.h"
@@ -157,25 +157,25 @@ __attribute__((unused)) static OPERATE_RET __get_ui_font(UI_FONT_T *ui_font)
 
 static char *__ui_wifi_icon_get(UI_WIFI_STATUS_E status)
 {
-    char *wifi_icon = FONT_AWESOME_WIFI_OFF;
+    char *wifi_icon = NULL;
 
-    switch (status) {
-    case UI_WIFI_STATUS_DISCONNECTED:
-        wifi_icon = FONT_AWESOME_WIFI_OFF;
-        break;
-    case UI_WIFI_STATUS_GOOD:
-        wifi_icon = FONT_AWESOME_WIFI;
-        break;
-    case UI_WIFI_STATUS_FAIR:
-        wifi_icon = FONT_AWESOME_WIFI_FAIR;
-        break;
-    case UI_WIFI_STATUS_WEAK:
-        wifi_icon = FONT_AWESOME_WIFI_WEAK;
-        break;
-    default:
-        wifi_icon = FONT_AWESOME_WIFI_OFF;
-        break;
-    }
+    // switch (status) {
+    // case UI_WIFI_STATUS_DISCONNECTED:
+    //     wifi_icon = FONT_AWESOME_WIFI_OFF;
+    //     break;
+    // case UI_WIFI_STATUS_GOOD:
+    //     wifi_icon = FONT_AWESOME_WIFI;
+    //     break;
+    // case UI_WIFI_STATUS_FAIR:
+    //     wifi_icon = FONT_AWESOME_WIFI_FAIR;
+    //     break;
+    // case UI_WIFI_STATUS_WEAK:
+    //     wifi_icon = FONT_AWESOME_WIFI_WEAK;
+    //     break;
+    // default:
+    //     wifi_icon = FONT_AWESOME_WIFI_OFF;
+    //     break;
+    // }
 
     return wifi_icon;
 }

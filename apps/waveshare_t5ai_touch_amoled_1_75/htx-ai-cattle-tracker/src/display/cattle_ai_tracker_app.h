@@ -13,6 +13,7 @@ extern "C" {
 
 /* Font declarations - only fonts actually used */
 LV_FONT_DECLARE(font_puhui_18_2);  /* Used for idle text, settings labels */
+// LV_FONT_DECLARE(font_puhui_30_4);  /* Used for idle text, settings labels */
 LV_FONT_DECLARE(montserrat_time_82_extra_bold);  /* Used for large time display */
 
 /* Icon image declarations */
