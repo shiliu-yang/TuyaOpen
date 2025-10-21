@@ -1285,10 +1285,10 @@ static void eye_look_timer_cb(lv_timer_t *timer)
      if (meters >= 1000) {
          /* Display in kilometers */
          float km = meters / 1000.0f;
-         snprintf(distance_str, sizeof(distance_str), "%.1fKM", km);
+         snprintf(distance_str, sizeof(distance_str), "%.1f公里", km);
      } else {
          /* Display in meters */
-         snprintf(distance_str, sizeof(distance_str), "%dM", meters);
+         snprintf(distance_str, sizeof(distance_str), "%d米", meters);
      }
 
      lv_label_set_text(g.distance_text, distance_str);
@@ -1688,17 +1688,112 @@ static void eye_look_timer_cb(lv_timer_t *timer)
  static void render_target_markers(void)
  {
  #if ENABLE_CLOSE_TRACKING
-     /* Don't render markers in close-range mode */
-     if (g.close_range_mode) {
-         /* Clear existing markers */
-         for (int i = 0; i < MAX_TARGETS; i++) {
-             if (g.target_markers[i]) {
-                 lv_obj_del(g.target_markers[i]);
-                 g.target_markers[i] = NULL;
-             }
-         }
-         return;
-     }
+    /* In close-range mode, only render cow markers (like tracker page) */
+    if (g.close_range_mode) {
+        /* Clear existing markers first */
+        for (int i = 0; i < MAX_TARGETS; i++) {
+            if (g.target_markers[i]) {
+                lv_obj_del(g.target_markers[i]);
+                g.target_markers[i] = NULL;
+            }
+        }
+        
+        /* Render only cow markers in close-range mode */
+        for (int i = 0; i < g.target_count; i++) {
+            if (!g.targets[i].active || g.targets[i].color != TARGET_COLOR_COW)
+                continue;
+                
+            /* Use same cow marker logic as tracker page, but create in close tracking container */
+            g.target_markers[i] = lv_obj_create(g.close_nav_container);
+            lv_obj_set_size(g.target_markers[i], 48, 48);
+            lv_obj_set_style_radius(g.target_markers[i], 24, 0);
+            lv_obj_set_style_bg_opa(g.target_markers[i], LV_OPA_TRANSP, 0);
+            lv_obj_set_style_border_width(g.target_markers[i], 1, 0);
+            lv_obj_set_style_border_color(g.target_markers[i], lv_color_white(), 0);
+            
+            /* Disable scrolling for cow target container */
+            lv_obj_clear_flag(g.target_markers[i], LV_OBJ_FLAG_SCROLLABLE);
+            lv_obj_clear_flag(g.target_markers[i], LV_OBJ_FLAG_SCROLL_ELASTIC);
+            lv_obj_clear_flag(g.target_markers[i], LV_OBJ_FLAG_SCROLL_MOMENTUM);
+            lv_obj_clear_flag(g.target_markers[i], LV_OBJ_FLAG_SCROLL_ONE);
+            lv_obj_clear_flag(g.target_markers[i], LV_OBJ_FLAG_SCROLL_CHAIN);
+            
+            /* Create cow image as child of the circle */
+            lv_obj_t *cow_img = lv_img_create(g.target_markers[i]);
+            lv_img_set_src(cow_img, &compass_cow_loc);
+            lv_obj_set_size(cow_img, 48, 48);
+            lv_obj_center(cow_img);
+            
+            /* Ensure the container is exactly 48x48 */
+            lv_obj_set_size(g.target_markers[i], 48, 48);
+            
+            /* Disable scrolling for cow image */
+            lv_obj_clear_flag(cow_img, LV_OBJ_FLAG_SCROLLABLE);
+            lv_obj_clear_flag(cow_img, LV_OBJ_FLAG_SCROLL_ELASTIC);
+            lv_obj_clear_flag(cow_img, LV_OBJ_FLAG_SCROLL_MOMENTUM);
+            lv_obj_clear_flag(cow_img, LV_OBJ_FLAG_SCROLL_ONE);
+            lv_obj_clear_flag(cow_img, LV_OBJ_FLAG_SCROLL_CHAIN);
+            
+            /* Position cow marker using same logic as tracker page */
+            float delta_lat = g.targets[i].lat - g.self_lat;
+            float delta_lon = g.targets[i].lon - g.self_lon;
+            
+            /* Use uniform scaling to ensure circular movement */
+            float lat_factor = 111320.0f;
+            float lon_factor = 111320.0f; /* Use uniform longitude factor for circular movement */
+            
+            float x_meters = delta_lon * lon_factor;
+            float y_meters = delta_lat * lat_factor;
+            
+            float angle_rad = -g.yaw_deg * M_PI / 180.0f;
+            float cos_angle = cosf(angle_rad);
+            float sin_angle = sinf(angle_rad);
+            
+            float rotated_x = x_meters * cos_angle - y_meters * sin_angle;
+            float rotated_y = x_meters * sin_angle + y_meters * cos_angle;
+            
+            /* Apply uniform scaling to ensure circular movement */
+            float x_pixels = rotated_x / g.map_scale;
+            float y_pixels = -rotated_y / g.map_scale;
+            
+            /* Add offset variables for fine-tuning cow icon position */
+            float offset_x = -13.0f; /* X offset in pixels */
+            float offset_y = -13.0f; /* Y offset in pixels */
+            
+            float screen_x = CATTLE_SCREEN_WIDTH / 2 + x_pixels + offset_x;
+            float screen_y = CATTLE_SCREEN_HEIGHT / 2 + y_pixels + offset_y;
+            
+            /* Calculate distance from center for boundary checking */
+            float distance_from_center = sqrtf(x_pixels * x_pixels + y_pixels * y_pixels);
+            float screen_radius = (275.0f/2)-8; /* Constant 50px radius */
+            
+            if (distance_from_center > screen_radius) {
+                /* Target exceeds circle - position at boundary */
+                float angle = atan2f(y_pixels, x_pixels);
+                float boundary_x = cosf(angle) * screen_radius;
+                float boundary_y = sinf(angle) * screen_radius;
+                
+                /* Position the 48px container so its center is at the boundary */
+                lv_obj_set_pos(g.target_markers[i], CATTLE_SCREEN_WIDTH / 2 + boundary_x - 24 + offset_x,
+                               CATTLE_SCREEN_HEIGHT / 2 + boundary_y - 24 + offset_y);
+                
+                /* Add thicker border for targets beyond circle */
+                lv_obj_set_style_border_width(g.target_markers[i], 3, 0);
+                lv_obj_set_style_border_color(g.target_markers[i], lv_color_white(), 0);
+            } else {
+                /* Target is within circle - normal positioning */
+                lv_obj_set_pos(g.target_markers[i], screen_x - 24, screen_y - 24);
+                
+                /* Normal border for targets within circle */
+                lv_obj_set_style_border_width(g.target_markers[i], 1, 0);
+                lv_obj_set_style_border_color(g.target_markers[i], lv_color_white(), 0);
+            }
+            
+            /* Ensure the marker is visible */
+            lv_obj_clear_flag(g.target_markers[i], LV_OBJ_FLAG_HIDDEN);
+        }
+        return;
+    }
  #endif
 
      /* Clear existing markers */
@@ -1826,8 +1921,76 @@ static void eye_look_timer_cb(lv_timer_t *timer)
  static void update_target_positions(void)
  {
  #if ENABLE_CLOSE_TRACKING
-     /* Don't update markers in close-range mode */
+     /* In close-range mode, update cow targets using close-range logic */
      if (g.close_range_mode) {
+         /* Update cow target positions in close-range mode */
+         for (int i = 0; i < g.target_count; i++) {
+             if (!g.targets[i].active || g.targets[i].color != TARGET_COLOR_COW || !g.target_markers[i])
+                 continue;
+                 
+             /* Calculate relative position */
+             float delta_lat = g.targets[i].lat - g.self_lat;
+             float delta_lon = g.targets[i].lon - g.self_lon;
+             
+             /* Use uniform scaling to ensure circular movement */
+             float lat_factor = 111320.0f;
+             float lon_factor = 111320.0f; /* Use uniform longitude factor for circular movement */
+             
+             float x_meters = delta_lon * lon_factor;
+             float y_meters = delta_lat * lat_factor;
+             
+             float angle_rad = -g.yaw_deg * M_PI / 180.0f;
+             float cos_angle = cosf(angle_rad);
+             float sin_angle = sinf(angle_rad);
+             
+             float rotated_x = x_meters * cos_angle - y_meters * sin_angle;
+             float rotated_y = x_meters * sin_angle + y_meters * cos_angle;
+             
+             float x_pixels = rotated_x / g.map_scale;
+             float y_pixels = -rotated_y / g.map_scale;
+             
+            /* Add offset variables for fine-tuning cow icon position */
+            float offset_x = -10.0f; /* X offset in pixels */
+            float offset_y = -10.0f; /* Y offset in pixels */
+            
+            float screen_x = CATTLE_SCREEN_WIDTH / 2 + x_pixels + offset_x;
+            float screen_y = CATTLE_SCREEN_HEIGHT / 2 + y_pixels + offset_y;
+            
+            /* Add debug dot to show cow path during rotation */
+            lv_obj_t *debug_dot = lv_obj_create(g.close_nav_container);
+            lv_obj_set_size(debug_dot, 3, 3);
+            lv_obj_set_pos(debug_dot, screen_x - 1, screen_y - 1);
+            lv_obj_set_style_bg_color(debug_dot, lv_color_hex(0x00FF00), 0); /* Green dot */
+            lv_obj_set_style_bg_opa(debug_dot, LV_OPA_COVER, 0);
+            lv_obj_set_style_radius(debug_dot, 1, 0);
+            lv_obj_set_style_border_width(debug_dot, 0, 0);
+            
+            /* Calculate distance from center for boundary checking */
+             float distance_from_center = sqrtf(x_pixels * x_pixels + y_pixels * y_pixels);
+             float screen_radius = 50.0f; /* Constant 50px radius */
+             
+             if (distance_from_center > screen_radius) {
+                 /* Target exceeds circle - position at boundary */
+                 float angle = atan2f(y_pixels, x_pixels);
+                 float boundary_x = cosf(angle) * screen_radius;
+                 float boundary_y = sinf(angle) * screen_radius;
+                 
+                /* Position the 48px container so its center is at the boundary */
+                lv_obj_set_pos(g.target_markers[i], CATTLE_SCREEN_WIDTH / 2 + boundary_x - 24 + offset_x,
+                               CATTLE_SCREEN_HEIGHT / 2 + boundary_y - 24 + offset_y);
+                 
+                 /* Add thicker border for targets beyond circle */
+                 lv_obj_set_style_border_width(g.target_markers[i], 3, 0);
+                 lv_obj_set_style_border_color(g.target_markers[i], lv_color_white(), 0);
+             } else {
+                 /* Target is within circle - normal positioning */
+                 lv_obj_set_pos(g.target_markers[i], screen_x - 24, screen_y - 24);
+                 
+                 /* Normal border for targets within circle */
+                 lv_obj_set_style_border_width(g.target_markers[i], 1, 0);
+                 lv_obj_set_style_border_color(g.target_markers[i], lv_color_white(), 0);
+             }
+         }
          return;
      }
  #endif
@@ -2959,6 +3122,9 @@ static void eye_look_timer_cb(lv_timer_t *timer)
 
      /* Update target positions with new compass rotation */
      update_target_positions();
+     
+     /* Re-render target markers to update cow icons in close tracking mode */
+     render_target_markers();
 
  #if ENABLE_CLOSE_TRACKING
      /* Update close-range navigation if active */
@@ -3652,13 +3818,13 @@ void tracker_update_compass_heading(float heading_degrees)
      /* Create distance text */
      g.close_nav_distance_text = lv_label_create(g.close_nav_container);
      lv_obj_set_style_text_color(g.close_nav_distance_text, lv_color_white(), 0);
-     lv_obj_set_style_text_font(g.close_nav_distance_text, &lv_font_montserrat_24, 0);
+     lv_obj_set_style_text_font(g.close_nav_distance_text, &font_puhui_18_2, 0);
      lv_obj_align(g.close_nav_distance_text, LV_ALIGN_TOP_MID, 0, 20);
 
      /* Create compass text */
      g.close_nav_compass_text = lv_label_create(g.close_nav_container);
      lv_obj_set_style_text_color(g.close_nav_compass_text, lv_color_white(), 0);
-     lv_obj_set_style_text_font(g.close_nav_compass_text, &lv_font_montserrat_16, 0);
+     lv_obj_set_style_text_font(g.close_nav_compass_text, &font_puhui_18_2, 0);
      lv_obj_align(g.close_nav_compass_text, LV_ALIGN_BOTTOM_MID, 0, -20);
 
      /* Create found state elements (initially hidden) */
@@ -3686,19 +3852,33 @@ void tracker_update_compass_heading(float heading_degrees)
          create_close_range_ui();
      }
 
-     /* Clear all dummy targets when entering close-range mode */
-     clear_all_targets();
+     printf("Entering close-range mode, initial target_count=%d\n", g.target_count);
+     
+     /* Keep only cow targets when entering close-range mode */
+     for (int i = g.target_count - 1; i >= 0; i--) {
+         if (g.targets[i].active && g.targets[i].color != TARGET_COLOR_COW) {
+             printf("Removing non-cow target at index %d, color=0x%x\n", i, g.targets[i].color);
+             remove_target_coord(i);
+         }
+     }
+     
+     printf("After filtering, target_count=%d\n", g.target_count);
+     
+     /* Render cow markers after filtering */
+     render_target_markers();
 
      /* Set transform pivot to center of screen for proper scaling */
      lv_obj_set_style_transform_pivot_x(g.close_nav_container, CATTLE_SCREEN_WIDTH / 2, 0);
      lv_obj_set_style_transform_pivot_y(g.close_nav_container, CATTLE_SCREEN_HEIGHT / 2, 0);
 
-     /* Start with small scale for zoom-in animation */
-     lv_obj_set_style_transform_zoom(g.close_nav_container, 128, 0); /* 128 = 0.5x scale (small) */
+     /* Start with full scale (no zoom animation) */
+     lv_obj_set_style_transform_zoom(g.close_nav_container, 256, 0); /* 256 = 1.0x scale (full size) */
      lv_obj_center(g.close_nav_container);
 
      /* Show close-range navigation */
      lv_obj_clear_flag(g.close_nav_container, LV_OBJ_FLAG_HIDDEN);
+     printf("Close-range container is now visible\n");
+     printf("Container actual size: %dx%d (zoom: 1.0x)\n", CATTLE_SCREEN_WIDTH, CATTLE_SCREEN_HEIGHT);
 
      /* Hide compass elements */
      lv_obj_add_flag(g.compass_container, LV_OBJ_FLAG_HIDDEN);
@@ -3715,7 +3895,7 @@ void tracker_update_compass_heading(float heading_degrees)
      g.close_nav_zoom_anim = &zoom_anim;
      lv_anim_init(g.close_nav_zoom_anim);
      lv_anim_set_var(g.close_nav_zoom_anim, g.close_nav_container);
-     lv_anim_set_values(g.close_nav_zoom_anim, 128, 256); /* From 0.5x to 1.0x scale */
+     lv_anim_set_values(g.close_nav_zoom_anim, 256, 256); /* From 1.0x to 1.0x scale (no animation) */
      lv_anim_set_time(g.close_nav_zoom_anim, 250);        /* 250ms animation - faster */
      lv_anim_set_exec_cb(g.close_nav_zoom_anim, on_close_nav_zoom_anim);
      lv_anim_set_ready_cb(g.close_nav_zoom_anim, on_close_nav_zoom_ready);
@@ -3753,7 +3933,7 @@ void tracker_update_compass_heading(float heading_degrees)
          /* The hiding will be handled in the animation ready callback */
      }
 
-     /* Restore dummy targets when exiting close-range mode */
+     /* Restore all dummy targets when exiting close-range mode */
      for (int i = 0; i < (int)DUMMY_TARGET_COUNT; i++) {
          add_target_coord(DUMMY_TARGETS[i].lat, DUMMY_TARGETS[i].lon, DUMMY_TARGETS[i].color);
      }
@@ -3775,12 +3955,27 @@ void tracker_update_compass_heading(float heading_degrees)
      /* Use main compass angle for rotation */
      float compass_angle = g.yaw_deg;
 
-     /* Use a fixed distance for close-range mode */
-     float distance = 50.0f; /* Fixed 50m distance for close-range display */
+     /* Calculate real GPS distance and position for the closest cow target */
+     float distance = 100.0f; /* Default fallback distance */
+     
+     /* Find the closest cow target */
+     for (int i = 0; i < g.target_count; i++) {
+         if (g.targets[i].active && g.targets[i].color == TARGET_COLOR_COW) {
+             distance = (float)g.targets[i].distance_meters;
+             break; /* Use the first cow target found */
+         }
+     }
 
-     /* Update distance text */
-     char distance_str[32];
-     snprintf(distance_str, sizeof(distance_str), "Distance: %.0fM", distance);
+     /* Update distance text with Chinese formatting */
+     char distance_str[64];
+     if (distance >= 1000.0f) {
+         /* Display in kilometers */
+         float km = distance / 1000.0f;
+         snprintf(distance_str, sizeof(distance_str), "距离: %.1f公里", km);
+     } else {
+         /* Display in meters */
+         snprintf(distance_str, sizeof(distance_str), "距离: %.0f米", distance);
+     }
      lv_label_set_text(g.close_nav_distance_text, distance_str);
 
      /* Update compass text */
@@ -3788,21 +3983,21 @@ void tracker_update_compass_heading(float heading_degrees)
      int degrees = (int)roundf(compass_angle);
      const char *direction;
      if (degrees >= 337.5f || degrees < 22.5f) {
-         direction = "N";
+         direction = "北";
      } else if (degrees >= 22.5f && degrees < 67.5f) {
-         direction = "NE";
+         direction = "东北";
      } else if (degrees >= 67.5f && degrees < 112.5f) {
-         direction = "E";
+         direction = "东";
      } else if (degrees >= 112.5f && degrees < 157.5f) {
-         direction = "SE";
+         direction = "东南";
      } else if (degrees >= 157.5f && degrees < 202.5f) {
-         direction = "S";
+         direction = "南";
      } else if (degrees >= 202.5f && degrees < 247.5f) {
-         direction = "SW";
+         direction = "西南";
      } else if (degrees >= 247.5f && degrees < 292.5f) {
-         direction = "W";
+         direction = "西";
      } else {
-         direction = "NW";
+         direction = "西北";
      }
      snprintf(compass_str, sizeof(compass_str), "%s-%d°", direction, degrees);
      lv_label_set_text(g.close_nav_compass_text, compass_str);
@@ -3816,8 +4011,8 @@ void tracker_update_compass_heading(float heading_degrees)
      /* Align the arrow image center to the screen center */
      lv_obj_align(g.close_nav_arrow_img, LV_ALIGN_CENTER, 0, 0);
 
-     /* Rotate only the navigation arrow based on compass angle */
-     lv_obj_set_style_transform_angle(g.close_nav_arrow_img, compass_angle * 10, 0);
+     /* Arrow is fixed - no rotation */
+     lv_obj_set_style_transform_angle(g.close_nav_arrow_img, 0, 0);
 
      /* Dots removed for clean close-range navigation */
  }
