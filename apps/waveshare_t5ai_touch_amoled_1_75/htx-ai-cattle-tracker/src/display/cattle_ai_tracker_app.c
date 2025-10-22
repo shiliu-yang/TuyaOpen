@@ -1760,7 +1760,7 @@ static void eye_look_timer_cb(lv_timer_t *timer)
             float x_meters = delta_lon * lon_factor;
             float y_meters = delta_lat * lat_factor;
             
-            float angle_rad = -g.yaw_deg * M_PI / 180.0f;
+            float angle_rad = g.yaw_deg * M_PI / 180.0f;
             float cos_angle = cosf(angle_rad);
             float sin_angle = sinf(angle_rad);
             
@@ -1954,7 +1954,7 @@ static void eye_look_timer_cb(lv_timer_t *timer)
              float x_meters = delta_lon * lon_factor;
              float y_meters = delta_lat * lat_factor;
              
-             float angle_rad = -g.yaw_deg * M_PI / 180.0f;
+             float angle_rad = g.yaw_deg * M_PI / 180.0f;
              float cos_angle = cosf(angle_rad);
              float sin_angle = sinf(angle_rad);
              
