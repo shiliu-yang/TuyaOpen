@@ -23,6 +23,7 @@
 #include "ai_audio.h"
 #include "tuya_lvgl.h"
 #include "tal_api.h"
+#include "app_sos.h"
 
  /*********************
   *      DEFINES
@@ -2626,8 +2627,46 @@ static void eye_look_timer_cb(lv_timer_t *timer)
              lv_obj_clear_flag(g.sos_circles[i], LV_OBJ_FLAG_HIDDEN);
          }
          
+         /* Restart SOS circle animations - only if no animations exist */
+         for (int i = 0; i < SOS_CIRCLE_NUM; i++) {
+             /* Check if animations already exist on this object */
+             lv_anim_t * size_anim_exists = lv_anim_get(g.sos_circles[i], on_sos_circle_size_anim);
+             lv_anim_t * opa_anim_exists = lv_anim_get(g.sos_circles[i], (lv_anim_exec_xcb_t)lv_obj_set_style_bg_opa);
+             
+             /* Only create animations if they don't already exist */
+             if (size_anim_exists == NULL) {
+                 /* Simplified size pulsing animation with larger spread - maintains perfect circle */
+                 lv_anim_t size_anim;
+                 lv_anim_init(&size_anim);
+                 lv_anim_set_var(&size_anim, g.sos_circles[i]);
+                 lv_anim_set_values(&size_anim, 100 + i * 50, 150 + i * 70); // Reduced range to stay within circular bounds
+                 lv_anim_set_time(&size_anim, 1500 + i * 200); // Shorter time
+                 lv_anim_set_repeat_count(&size_anim, LV_ANIM_REPEAT_INFINITE);
+                 lv_anim_set_playback_delay(&size_anim, 500 + i * 100);
+                 lv_anim_set_playback_time(&size_anim, 1500 + i * 200);
+                 lv_anim_set_exec_cb(&size_anim, on_sos_circle_size_anim); // Use custom callback to maintain circle shape
+                 lv_anim_set_ready_cb(&size_anim, NULL); // No ready callback to prevent crashes
+                 lv_anim_start(&size_anim);
+             }
+             
+             if (opa_anim_exists == NULL) {
+                 /* Simplified opacity animation */
+                 lv_anim_t opa_anim;
+                 lv_anim_init(&opa_anim);
+                 lv_anim_set_var(&opa_anim, g.sos_circles[i]);
+                 lv_anim_set_values(&opa_anim, LV_OPA_30 - i * 5, LV_OPA_50 - i * 8); // Smaller opacity range
+                 lv_anim_set_time(&opa_anim, 1800 + i * 250); // Shorter time
+                 lv_anim_set_repeat_count(&opa_anim, LV_ANIM_REPEAT_INFINITE);
+                 lv_anim_set_playback_delay(&opa_anim, 600 + i * 120);
+                 lv_anim_set_playback_time(&opa_anim, 1800 + i * 250);
+                 lv_anim_set_exec_cb(&opa_anim, (lv_anim_exec_xcb_t)lv_obj_set_style_bg_opa);
+                 lv_anim_set_ready_cb(&opa_anim, NULL); // No ready callback to prevent crashes
+                 lv_anim_start(&opa_anim);
+             }
+         }
+         
          /* SOS callback - SOS is now truly started */
-         printf("SOS TRULY STARTED - Emergency activated!\n");
+        // printf("SOS TRULY STARTED - Emergency activated!\n");
          // Add your SOS start callback here
      }
  }
@@ -2665,7 +2704,7 @@ static void eye_look_timer_cb(lv_timer_t *timer)
 
  static void hide_sos_alert(void)
  {
-     printf("Hiding SOS alert, setting sos_active to false\n");
+     // printf("Hiding SOS alert, setting sos_active to false\n");
      g.sos_active = false;
      
      /* Stop countdown timer if running */
@@ -2687,12 +2726,15 @@ static void eye_look_timer_cb(lv_timer_t *timer)
      
      lv_obj_add_flag(g.sos_screen, LV_OBJ_FLAG_HIDDEN);
      show_idle(); // Restore the idle screen when SOS is cancelled
+
+     // Update SOS state in the application
+     app_sos_set_without_ui(false);
      
      /* SOS cancel callback */
-     printf("SOS CANCELLED - Emergency deactivated!\n");
+     // printf("SOS CANCELLED - Emergency deactivated!\n");
      // Add your SOS cancel callback here
      
-     printf("SOS alert hidden, sos_active=%d\n", g.sos_active);
+     // printf("SOS alert hidden, sos_active=%d\n", g.sos_active);
  }
 
  static void slide_settings(bool open)
@@ -2923,11 +2965,11 @@ static void eye_look_timer_cb(lv_timer_t *timer)
          }
          break;
      case ' ': // Space for SOS
-         printf("Space - triggering SOS, sos_active=%d\n", g.sos_active);
+         // printf("Space - triggering SOS, sos_active=%d\n", g.sos_active);
          if (!g.sos_active) {
              show_sos_alert();
          } else {
-             printf("SOS already active, ignoring spacebar\n");
+             // printf("SOS already active, ignoring spacebar\n");
          }
          break;
      case '0': // 50m scale
@@ -3873,17 +3915,17 @@ void tracker_update_compass_heading(float heading_degrees)
          create_close_range_ui();
      }
 
-     printf("Entering close-range mode, initial target_count=%d\n", g.target_count);
+     // printf("Entering close-range mode, initial target_count=%d\n", g.target_count);
      
      /* Keep only cow targets when entering close-range mode */
      for (int i = g.target_count - 1; i >= 0; i--) {
          if (g.targets[i].active && g.targets[i].color != TARGET_COLOR_COW) {
-             printf("Removing non-cow target at index %d, color=0x%x\n", i, g.targets[i].color);
+             // printf("Removing non-cow target at index %d, color=0x%x\n", i, g.targets[i].color);
              remove_target_coord(i);
          }
      }
      
-     printf("After filtering, target_count=%d\n", g.target_count);
+     // printf("After filtering, target_count=%d\n", g.target_count);
      
      /* Render cow markers after filtering */
      render_target_markers();
@@ -3898,8 +3940,8 @@ void tracker_update_compass_heading(float heading_degrees)
 
      /* Show close-range navigation */
      lv_obj_clear_flag(g.close_nav_container, LV_OBJ_FLAG_HIDDEN);
-     printf("Close-range container is now visible\n");
-     printf("Container actual size: %dx%d (zoom: 1.0x)\n", CATTLE_SCREEN_WIDTH, CATTLE_SCREEN_HEIGHT);
+     // printf("Close-range container is now visible\n");
+     // printf("Container actual size: %dx%d (zoom: 1.0x)\n", CATTLE_SCREEN_WIDTH, CATTLE_SCREEN_HEIGHT);
 
      /* Hide compass elements */
      lv_obj_add_flag(g.compass_container, LV_OBJ_FLAG_HIDDEN);

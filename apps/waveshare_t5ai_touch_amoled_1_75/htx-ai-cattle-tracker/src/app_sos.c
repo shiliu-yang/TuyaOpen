@@ -61,6 +61,29 @@ void app_sos_set(bool sos_status)
     }
 }
 
+void app_sos_set_without_ui(bool sos_status)
+{
+    if (sg_sos_mutex == NULL) {
+        OPERATE_RET ret = tal_mutex_create_init(&sg_sos_mutex);
+        if (ret != OPRT_OK) {
+            PR_ERR("[SOS] Failed to create mutex (error: %d)", ret);
+        }
+    }
+
+    if (sg_sos_mutex) {
+        tal_mutex_lock(sg_sos_mutex);
+    }
+
+    // update dp
+    app_dp_sos_set(sos_status);
+
+    sg_sos_status = sos_status;
+
+    if (sg_sos_mutex) {
+        tal_mutex_unlock(sg_sos_mutex);
+    }
+}
+
 bool app_sos_get(void)
 {
     return sg_sos_status;
