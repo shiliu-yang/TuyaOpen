@@ -28,6 +28,9 @@
   *      DEFINES
   *********************/
 
+  // sos animation number of circles
+  #define SOS_CIRCLE_NUM 3
+
  /* Dummy GPS data structure */
  typedef struct {
      float lat, lon;
@@ -261,6 +264,7 @@ static void update_pupil_position(void);
  static void create_tracking_screen(void);
  static void create_settings_panel(void);
  static void create_sos_screen(void);
+ static void on_sos_circle_size_anim(void *var, int32_t value);
 
  static void show_idle(void);
  static void __attribute__((unused)) show_tracking(void);
@@ -301,6 +305,15 @@ static void update_pupil_position(void);
  {
      lv_obj_t *obj = (lv_obj_t *)var;
      lv_obj_set_style_bg_opa(obj, (lv_opa_t)value, 0);
+ }
+
+ static void on_sos_circle_size_anim(void *var, int32_t value)
+ {
+     lv_obj_t *obj = (lv_obj_t *)var;
+     /* Set both width and height to the same value to maintain perfect circle */
+     lv_obj_set_size(obj, value, value);
+     /* Update the radius to match the new size for perfect circular shape */
+     lv_obj_set_style_radius(obj, value / 2, 0);
  }
 
  static void compass_update(float yaw_deg);
@@ -2447,30 +2460,32 @@ static void eye_look_timer_cb(lv_timer_t *timer)
      lv_obj_add_flag(g.countdown_text, LV_OBJ_FLAG_HIDDEN);
      lv_obj_move_foreground(g.countdown_text); // Move to top of z-order
 
-     /* Black background areas for top and bottom */
+     /* Enhanced black background areas for top and bottom to mask circle overflow */
      lv_obj_t *top_bg = lv_obj_create(g.sos_screen);
-     lv_obj_set_size(top_bg, CATTLE_SCREEN_WIDTH, 80);
+     lv_obj_set_size(top_bg, CATTLE_SCREEN_WIDTH, 100); // Increased height for better coverage
      lv_obj_align(top_bg, LV_ALIGN_TOP_MID, 0, 0);
      lv_obj_set_style_bg_color(top_bg, lv_color_black(), 0);
      lv_obj_set_style_bg_opa(top_bg, LV_OPA_COVER, 0);
      lv_obj_set_style_border_width(top_bg, 0, 0);
      lv_obj_clear_flag(top_bg, LV_OBJ_FLAG_SCROLLABLE);
+     lv_obj_move_foreground(top_bg); // Ensure it's above circles
      
      lv_obj_t *bottom_bg = lv_obj_create(g.sos_screen);
-     lv_obj_set_size(bottom_bg, CATTLE_SCREEN_WIDTH, 80);
+     lv_obj_set_size(bottom_bg, CATTLE_SCREEN_WIDTH, 100); // Increased height for better coverage
      lv_obj_align(bottom_bg, LV_ALIGN_BOTTOM_MID, 0, 0);
      lv_obj_set_style_bg_color(bottom_bg, lv_color_black(), 0);
      lv_obj_set_style_bg_opa(bottom_bg, LV_OPA_COVER, 0);
      lv_obj_set_style_border_width(bottom_bg, 0, 0);
      lv_obj_clear_flag(bottom_bg, LV_OBJ_FLAG_SCROLLABLE);
+     lv_obj_move_foreground(bottom_bg); // Ensure it's above circles
 
      
      /* Create 3 animated circles with red shades */
      uint32_t red_shades[3] = {0xFF0000, 0xFF3333, 0xFF6666}; // Most hot red, hotter red, hot red
      
-     for (int i = 0; i < 3; i++) {
+     for (int i = 0; i < SOS_CIRCLE_NUM; i++) {
          g.sos_circles[i] = lv_obj_create(g.sos_screen);
-         lv_obj_set_size(g.sos_circles[i], 140 + i * 80, 140 + i * 80); // Larger base size and more spacing
+         lv_obj_set_size(g.sos_circles[i], 120 + i * 60, 120 + i * 60); // Optimized size to stay within circular screen bounds
          lv_obj_center(g.sos_circles[i]);
          lv_obj_set_style_radius(g.sos_circles[i], LV_RADIUS_CIRCLE, 0);
          lv_obj_set_style_bg_color(g.sos_circles[i], lv_color_hex(red_shades[i]), 0);
@@ -2478,15 +2493,15 @@ static void eye_look_timer_cb(lv_timer_t *timer)
          lv_obj_set_style_border_width(g.sos_circles[i], 0, 0);
          lv_obj_clear_flag(g.sos_circles[i], LV_OBJ_FLAG_SCROLLABLE);
          
-         /* Simplified size pulsing animation with larger spread */
+         /* Simplified size pulsing animation with larger spread - maintains perfect circle */
          lv_anim_t size_anim;
          lv_anim_init(&size_anim);
          lv_anim_set_var(&size_anim, g.sos_circles[i]);
-         lv_anim_set_values(&size_anim, 120 + i * 60, 180 + i * 100); // Larger range for bigger spread
+         lv_anim_set_values(&size_anim, 100 + i * 50, 150 + i * 70); // Reduced range to stay within circular bounds
          lv_anim_set_time(&size_anim, 1500 + i * 200); // Shorter time
          lv_anim_set_repeat_count(&size_anim, LV_ANIM_REPEAT_INFINITE);
          lv_anim_set_playback_time(&size_anim, 1500 + i * 200);
-         lv_anim_set_exec_cb(&size_anim, (lv_anim_exec_xcb_t)lv_obj_set_size);
+         lv_anim_set_exec_cb(&size_anim, on_sos_circle_size_anim); // Use custom callback to maintain circle shape
          lv_anim_set_ready_cb(&size_anim, NULL); // No ready callback to prevent crashes
          lv_anim_start(&size_anim);
          
@@ -2536,6 +2551,11 @@ static void eye_look_timer_cb(lv_timer_t *timer)
      lv_obj_center(cancel_label);
      
      lv_obj_add_event_cb(g.sos_cancel_btn, on_sos_cancel, LV_EVENT_CLICKED, NULL);
+     
+     /* Ensure SOS UI elements are on top */
+     lv_obj_move_foreground(g.sos_title);
+     lv_obj_move_foreground(g.emergency_text);
+     lv_obj_move_foreground(g.sos_cancel_btn);
 
      /* Hold progress ring (shown during long press on main/root) */
      g.sos_hold_ring = lv_arc_create(g.screen);
@@ -2602,7 +2622,7 @@ static void eye_look_timer_cb(lv_timer_t *timer)
          lv_obj_clear_flag(g.sos_title, LV_OBJ_FLAG_HIDDEN);
          lv_obj_clear_flag(g.emergency_text, LV_OBJ_FLAG_HIDDEN);
          lv_obj_clear_flag(g.sos_cancel_btn, LV_OBJ_FLAG_HIDDEN);
-         for (int i = 0; i < 3; i++) {
+         for (int i = 0; i < SOS_CIRCLE_NUM; i++) {
              lv_obj_clear_flag(g.sos_circles[i], LV_OBJ_FLAG_HIDDEN);
          }
          
@@ -2634,7 +2654,7 @@ static void eye_look_timer_cb(lv_timer_t *timer)
      lv_obj_add_flag(g.sos_title, LV_OBJ_FLAG_HIDDEN);
      lv_obj_add_flag(g.emergency_text, LV_OBJ_FLAG_HIDDEN);
      lv_obj_add_flag(g.sos_cancel_btn, LV_OBJ_FLAG_HIDDEN);
-     for (int i = 0; i < 3; i++) {
+     for (int i = 0; i < SOS_CIRCLE_NUM; i++) {
          lv_obj_add_flag(g.sos_circles[i], LV_OBJ_FLAG_HIDDEN);
      }
      
@@ -2655,7 +2675,7 @@ static void eye_look_timer_cb(lv_timer_t *timer)
      }
      
      /* Stop all animations on SOS circles to prevent crashes */
-     for (int i = 0; i < 3; i++) {
+     for (int i = 0; i < SOS_CIRCLE_NUM; i++) {
          if (g.sos_circles[i] != NULL) {
              lv_anim_del(g.sos_circles[i], NULL); // Delete all animations on this object
          }
