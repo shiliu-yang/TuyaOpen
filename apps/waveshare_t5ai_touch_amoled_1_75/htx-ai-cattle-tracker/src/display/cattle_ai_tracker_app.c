@@ -1343,6 +1343,7 @@ static void eye_look_timer_cb(lv_timer_t *timer)
 
  void animate_distance_scale(int target_scale)
  {
+    tuya_lvgl_mutex_lock();
      /* Stop any existing animation */
      if (g.distance_anim) {
          lv_anim_del(g.distance_anim, NULL);
@@ -1362,6 +1363,7 @@ static void eye_look_timer_cb(lv_timer_t *timer)
      lv_anim_set_time(g.distance_anim, 500); /* 500ms animation duration */
      lv_anim_set_ready_cb(g.distance_anim, on_distance_anim_ready);
      lv_anim_start(g.distance_anim);
+     tuya_lvgl_mutex_unlock();
  }
 
  static void on_distance_anim_value(void *var, int32_t value)
@@ -3933,9 +3935,9 @@ void tracker_update_compass_heading(float heading_degrees)
      }
 
      /* Restore all dummy targets when exiting close-range mode */
-     for (int i = 0; i < (int)DUMMY_TARGET_COUNT; i++) {
-         add_target_coord(DUMMY_TARGETS[i].lat, DUMMY_TARGETS[i].lon, DUMMY_TARGETS[i].color);
-     }
+    //  for (int i = 0; i < (int)DUMMY_TARGET_COUNT; i++) {
+    //      add_target_coord(DUMMY_TARGETS[i].lat, DUMMY_TARGETS[i].lon, DUMMY_TARGETS[i].color);
+    //  }
      update_map_scale();
      render_target_markers();
 

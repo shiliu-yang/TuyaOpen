@@ -42,8 +42,6 @@ OPERATE_RET app_dp_battery_upload(uint8_t is_charging, uint8_t battery_percentag
 OPERATE_RET app_gps_height_upload(int height_m);
 OPERATE_RET app_gps_position_upload(double latitude, double longitude);
 
-uint8_t app_get_current_tracking_id(void);
-
 OPERATE_RET app_dp_sos_set(bool sos_status);
 
 #ifdef __cplusplus

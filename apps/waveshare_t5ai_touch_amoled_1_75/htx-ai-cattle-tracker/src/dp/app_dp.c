@@ -62,9 +62,6 @@ static double s_last_longitude = 0.0;
 // static int s_last_height_m = 0;
 static SYS_TIME_T s_last_gps_report_time = 0;
 
-// tracking id
-static uint8_t s_tracking_id = 1;
-
 /***********************************************************
 ***********************function define**********************
 ***********************************************************/
@@ -262,7 +259,7 @@ void app_dp_process(uint8_t id, dp_prop_tp_t type, dp_value_t value)
         app_volume_set(value.dp_value);
     } break;
     case APP_DPID_START_TRACKING: {
-        s_tracking_id = value.dp_value;
+        cloud_api_cattle_id_set(value.dp_value);
 #if defined(ENABLE_CLOUD_API) && (ENABLE_CLOUD_API == 1)
         cloud_api_update_cattle_location_ui(1);
 #endif
@@ -280,9 +277,4 @@ void app_dp_process(uint8_t id, dp_prop_tp_t type, dp_value_t value)
     }
 
     return;
-}
-
-uint8_t app_get_current_tracking_id(void)
-{
-    return s_tracking_id;
 }
