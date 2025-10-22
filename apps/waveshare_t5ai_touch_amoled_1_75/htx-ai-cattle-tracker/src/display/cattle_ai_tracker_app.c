@@ -25,6 +25,10 @@
 #include "tal_api.h"
 #include "app_sos.h"
 
+/* Compass canvas functions */
+extern lv_obj_t* compass_create_canvas(lv_obj_t *parent);
+extern void compass_update_canvas(lv_obj_t *canvas, float heading);
+
  /*********************
   *      DEFINES
   *********************/
@@ -42,10 +46,14 @@
  static const float DUMMY_SELF_LAT = 30.300500622255004f; /* Tracker location */
  static const float DUMMY_SELF_LON = 120.06815327830921f;
 
+//  static const dummy_target_t DUMMY_TARGETS[] = {
+//      {30.300500622255004f, 120.06815327830921f, TARGET_COLOR_CYAN},
+//      {30.31324992866212f, 120.07040253859043f, TARGET_COLOR_YELLOW},
+//      {30.30420156852781f, 120.10282414801489f, TARGET_COLOR_PINK},
+//      {30.295801190761917f, 120.06388543982636f, TARGET_COLOR_COW}, /* Cow target */
+//  };
+
  static const dummy_target_t DUMMY_TARGETS[] = {
-     {30.300500622255004f, 120.06815327830921f, TARGET_COLOR_CYAN},
-     {30.31324992866212f, 120.07040253859043f, TARGET_COLOR_YELLOW},
-     {30.30420156852781f, 120.10282414801489f, TARGET_COLOR_PINK},
      {30.295801190761917f, 120.06388543982636f, TARGET_COLOR_COW}, /* Cow target */
  };
 
@@ -1121,35 +1129,18 @@ static void eye_look_timer_cb(lv_timer_t *timer)
      lv_obj_clear_flag(g.compass_container, LV_OBJ_FLAG_SCROLL_ONE);
      lv_obj_clear_flag(g.compass_container, LV_OBJ_FLAG_SCROLL_CHAIN);
 
-     /* Compass face ring image - OPTIMIZED for performance */
-     g.compass_face_ring_img = lv_img_create(g.compass_container);
-     lv_img_set_src(g.compass_face_ring_img, &compass_face_ring);
-     lv_obj_set_size(g.compass_face_ring_img, 466, 466); /* Set actual image size */
-     lv_obj_center(g.compass_face_ring_img);
-     lv_obj_clear_flag(g.compass_face_ring_img, LV_OBJ_FLAG_CLICKABLE);
-     lv_obj_clear_flag(g.compass_face_ring_img, LV_OBJ_FLAG_SCROLLABLE);
-
-     /* Performance optimizations */
-     lv_obj_set_style_opa(g.compass_face_ring_img, LV_OPA_COVER, 0);                /* Ensure full opacity */
-     lv_obj_set_style_blend_mode(g.compass_face_ring_img, LV_BLEND_MODE_NORMAL, 0); /* Normal blending */
-     /* Note: antialiasing control not available in this LVGL version */
-
-     /* Set pivot point to screen center for rotation */
-     lv_obj_set_style_transform_pivot_x(g.compass_face_ring_img, CATTLE_SCREEN_WIDTH / 2, 0);
-     lv_obj_set_style_transform_pivot_y(g.compass_face_ring_img, CATTLE_SCREEN_HEIGHT / 2, 0);
-
-     /* Cache the image for better performance */
-     /* Note: lv_img_cache_set_size not available in this LVGL version */
-
-     /* Pre-cache the compass face ring image */
-    //  lv_img_cache_invalidate_src(&compass_face_ring);
-    //  lv_img_cache_invalidate_src(&compass_face_ring); /* Force cache */
-
-     /* Set rendering optimizations */
-     lv_obj_set_style_radius(g.compass_face_ring_img, 0, 0);        /* No rounded corners */
-     lv_obj_set_style_border_width(g.compass_face_ring_img, 0, 0);  /* No border */
-     lv_obj_set_style_outline_width(g.compass_face_ring_img, 0, 0); /* No outline */
-     lv_obj_set_style_shadow_width(g.compass_face_ring_img, 0, 0);  /* No shadow */
+    /* Compass face ring canvas - OPTIMIZED for performance */
+    /* Using compass.c's canvas drawing instead of static image */
+    g.compass_face_ring_img = compass_create_canvas(g.compass_container);
+    if (g.compass_face_ring_img == NULL) {
+        PR_ERR("Failed to create compass canvas");
+    } else {
+        PR_DEBUG("Compass canvas created successfully");
+        /* Ensure canvas is visible by moving it to foreground */
+        lv_obj_move_foreground(g.compass_face_ring_img);
+    }
+    /* Canvas is already configured with all optimizations in compass_create_canvas */
+    /* No need for additional lv_img_set_src or lv_obj_set_size calls */
 
      /* Create dynamic interval lines */
      create_interval_lines();
@@ -3158,47 +3149,38 @@ static void eye_look_timer_cb(lv_timer_t *timer)
 
  /* Calibration function removed - no longer needed */
 
- static void compass_update(float yaw_deg)
- {
-     /* Timer-based animation - 15 degrees per second */
-     static float last_yaw = -999.0f;      /* Initialize to impossible value */
-     if (fabsf(yaw_deg - last_yaw) < 1.0f) /* Threshold for timer-based updates */
-         return;                           /* Skip if change is negligible */
-     last_yaw = yaw_deg;
+static void compass_update(float yaw_deg)
+{
+    /* Timer-based animation - 15 degrees per second */
+    static float last_yaw = -999.0f;      /* Initialize to impossible value */
+    if (fabsf(yaw_deg - last_yaw) < 1.0f) /* Threshold for timer-based updates */
+        return;                           /* Skip if change is negligible */
+    last_yaw = yaw_deg;
 
-     int16_t angle_int = (int16_t)(yaw_deg * 10);
+    /* Redraw compass canvas with new heading instead of rotating the object */
+    /* This keeps text labels upright while rotating the compass ring */
+    if (g.compass_face_ring_img != NULL) {
+        compass_update_canvas(g.compass_face_ring_img, yaw_deg);
+    }
 
-     /* Rotate compass face ring image - OPTIMIZED */
-     /* Only update if angle change is significant (reduce unnecessary redraws) */
-     static int16_t last_angle = -1;
-     if (abs(angle_int - last_angle) >= 20) { /* Only update every 2 degrees for better performance */
-        //  lv_obj_set_style_transform_angle(g.compass_face_ring_img, angle_int, 0);
-         lv_obj_set_style_transform_angle(g.compass_face_ring_img, -angle_int, 0);
-         last_angle = angle_int;
+    /* Update rotation text display */
+    update_rotation_text(yaw_deg);
 
-         /* Force a refresh only when needed */
-         lv_obj_invalidate(g.compass_face_ring_img);
-     }
-     /* Pivot point is already set to screen center in compass_build() */
+    /* Update target positions with new compass rotation */
+    update_target_positions();
+    
+    /* Re-render target markers to update cow icons in close tracking mode */
+    render_target_markers();
 
-     /* Update rotation text display */
-     update_rotation_text(yaw_deg);
+#if ENABLE_CLOSE_TRACKING
+    /* Update close-range navigation if active */
+    if (g.close_range_mode) {
+        update_close_range_arrow();
+    }
+#endif
 
-     /* Update target positions with new compass rotation */
-     update_target_positions();
-     
-     /* Re-render target markers to update cow icons in close tracking mode */
-     render_target_markers();
-
- #if ENABLE_CLOSE_TRACKING
-     /* Update close-range navigation if active */
-     if (g.close_range_mode) {
-         update_close_range_arrow();
-     }
- #endif
-
-     /* Center overlay stays fixed - no rotation applied */
- }
+    /* Center overlay stays fixed - no rotation applied */
+}
 
  static void on_settings_close_anim_ready(lv_anim_t *anim)
  {
@@ -3756,7 +3738,7 @@ void tracker_update_compass_heading(float heading_degrees)
         last_log_time = now;
     }
 
-#if 0
+#if 1
     /* Start smooth rotation animation */
     start_smooth_rotation();
 #else
