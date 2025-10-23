@@ -86,6 +86,7 @@ static void __cellular_init(void)
     memset(&cfg, 0, sizeof(cfg));
     strcpy(cfg.apn, "");
     tal_cellular_init(&cfg);
+    PR_DEBUG("cellular initialized");
 }
 
 void __cellular_timer_cb(TIMER_ID timer_id, void *arg)
@@ -98,8 +99,34 @@ void __cellular_timer_cb(TIMER_ID timer_id, void *arg)
     __cellular_init();
 
     tal_sw_timer_delete(s_cellular_timer);
+    s_cellular_timer = NULL;
 
     return;
+}
+
+static int _activated_timer_count = 0;
+
+void __cellular_activated_timer_cb(TIMER_ID timer_id, void *arg)
+{
+    _activated_timer_count++;
+
+    netmgr_status_e status;
+
+    netmgr_conn_get(NETCONN_WIFI, NETCONN_CMD_STATUS, &status);
+
+    if (status == NETMGR_LINK_UP) {
+        _activated_timer_count = 0;
+        tal_sw_timer_delete(s_cellular_timer);
+        s_cellular_timer = NULL;
+        PR_DEBUG("cellular activated timer cb, wifi connected, skip cellular init");
+        return;
+    }
+
+    if (_activated_timer_count < 10) {
+        return;
+    }
+
+    __cellular_init();
 }
 
 OPERATE_RET netconn_cellular_open(void *config)
@@ -113,7 +140,13 @@ OPERATE_RET netconn_cellular_open(void *config)
     // else wait for active
     PR_DEBUG("cellular open, is activated: %d", tuya_iot_client_get()->is_activated);
     if (tuya_iot_client_get()->is_activated) {
-        __cellular_init();
+        tal_sw_timer_create((TAL_TIMER_CB)__cellular_activated_timer_cb, NULL, &s_cellular_timer);
+        if (s_cellular_timer == NULL) {
+            __cellular_init();
+            PR_ERR("cellular timer create failed");
+            return OPRT_COM_ERROR;
+        }
+        tal_sw_timer_start(s_cellular_timer, 1000, TAL_TIMER_CYCLE);
     } else {
         tal_sw_timer_create((TAL_TIMER_CB)__cellular_timer_cb, NULL, &s_cellular_timer);
         if (s_cellular_timer == NULL) {

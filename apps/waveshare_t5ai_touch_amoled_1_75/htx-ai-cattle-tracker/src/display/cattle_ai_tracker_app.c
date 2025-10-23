@@ -23,10 +23,18 @@
 #include "ai_audio.h"
 #include "tuya_lvgl.h"
 #include "tal_api.h"
+#include "app_sos.h"
+
+/* Compass canvas functions */
+extern lv_obj_t* compass_create_canvas(lv_obj_t *parent);
+extern void compass_update_canvas(lv_obj_t *canvas, float heading);
 
  /*********************
   *      DEFINES
   *********************/
+
+  // sos animation number of circles
+  #define SOS_CIRCLE_NUM 3
 
  /* Dummy GPS data structure */
  typedef struct {
@@ -38,10 +46,14 @@
  static const float DUMMY_SELF_LAT = 30.300500622255004f; /* Tracker location */
  static const float DUMMY_SELF_LON = 120.06815327830921f;
 
+//  static const dummy_target_t DUMMY_TARGETS[] = {
+//      {30.300500622255004f, 120.06815327830921f, TARGET_COLOR_CYAN},
+//      {30.31324992866212f, 120.07040253859043f, TARGET_COLOR_YELLOW},
+//      {30.30420156852781f, 120.10282414801489f, TARGET_COLOR_PINK},
+//      {30.295801190761917f, 120.06388543982636f, TARGET_COLOR_COW}, /* Cow target */
+//  };
+
  static const dummy_target_t DUMMY_TARGETS[] = {
-     {30.300500622255004f, 120.06815327830921f, TARGET_COLOR_CYAN},
-     {30.31324992866212f, 120.07040253859043f, TARGET_COLOR_YELLOW},
-     {30.30420156852781f, 120.10282414801489f, TARGET_COLOR_PINK},
      {30.295801190761917f, 120.06388543982636f, TARGET_COLOR_COW}, /* Cow target */
  };
 
@@ -261,6 +273,7 @@ static void update_pupil_position(void);
  static void create_tracking_screen(void);
  static void create_settings_panel(void);
  static void create_sos_screen(void);
+ static void on_sos_circle_size_anim(void *var, int32_t value);
 
  static void show_idle(void);
  static void __attribute__((unused)) show_tracking(void);
@@ -301,6 +314,15 @@ static void update_pupil_position(void);
  {
      lv_obj_t *obj = (lv_obj_t *)var;
      lv_obj_set_style_bg_opa(obj, (lv_opa_t)value, 0);
+ }
+
+ static void on_sos_circle_size_anim(void *var, int32_t value)
+ {
+     lv_obj_t *obj = (lv_obj_t *)var;
+     /* Set both width and height to the same value to maintain perfect circle */
+     lv_obj_set_size(obj, value, value);
+     /* Update the radius to match the new size for perfect circular shape */
+     lv_obj_set_style_radius(obj, value / 2, 0);
  }
 
  static void compass_update(float yaw_deg);
@@ -1107,35 +1129,18 @@ static void eye_look_timer_cb(lv_timer_t *timer)
      lv_obj_clear_flag(g.compass_container, LV_OBJ_FLAG_SCROLL_ONE);
      lv_obj_clear_flag(g.compass_container, LV_OBJ_FLAG_SCROLL_CHAIN);
 
-     /* Compass face ring image - OPTIMIZED for performance */
-     g.compass_face_ring_img = lv_img_create(g.compass_container);
-     lv_img_set_src(g.compass_face_ring_img, &compass_face_ring);
-     lv_obj_set_size(g.compass_face_ring_img, 466, 466); /* Set actual image size */
-     lv_obj_center(g.compass_face_ring_img);
-     lv_obj_clear_flag(g.compass_face_ring_img, LV_OBJ_FLAG_CLICKABLE);
-     lv_obj_clear_flag(g.compass_face_ring_img, LV_OBJ_FLAG_SCROLLABLE);
-
-     /* Performance optimizations */
-     lv_obj_set_style_opa(g.compass_face_ring_img, LV_OPA_COVER, 0);                /* Ensure full opacity */
-     lv_obj_set_style_blend_mode(g.compass_face_ring_img, LV_BLEND_MODE_NORMAL, 0); /* Normal blending */
-     /* Note: antialiasing control not available in this LVGL version */
-
-     /* Set pivot point to screen center for rotation */
-     lv_obj_set_style_transform_pivot_x(g.compass_face_ring_img, CATTLE_SCREEN_WIDTH / 2, 0);
-     lv_obj_set_style_transform_pivot_y(g.compass_face_ring_img, CATTLE_SCREEN_HEIGHT / 2, 0);
-
-     /* Cache the image for better performance */
-     /* Note: lv_img_cache_set_size not available in this LVGL version */
-
-     /* Pre-cache the compass face ring image */
-    //  lv_img_cache_invalidate_src(&compass_face_ring);
-    //  lv_img_cache_invalidate_src(&compass_face_ring); /* Force cache */
-
-     /* Set rendering optimizations */
-     lv_obj_set_style_radius(g.compass_face_ring_img, 0, 0);        /* No rounded corners */
-     lv_obj_set_style_border_width(g.compass_face_ring_img, 0, 0);  /* No border */
-     lv_obj_set_style_outline_width(g.compass_face_ring_img, 0, 0); /* No outline */
-     lv_obj_set_style_shadow_width(g.compass_face_ring_img, 0, 0);  /* No shadow */
+    /* Compass face ring canvas - OPTIMIZED for performance */
+    /* Using compass.c's canvas drawing instead of static image */
+    g.compass_face_ring_img = compass_create_canvas(g.compass_container);
+    if (g.compass_face_ring_img == NULL) {
+        PR_ERR("Failed to create compass canvas");
+    } else {
+        PR_DEBUG("Compass canvas created successfully");
+        /* Ensure canvas is visible by moving it to foreground */
+        lv_obj_move_foreground(g.compass_face_ring_img);
+    }
+    /* Canvas is already configured with all optimizations in compass_create_canvas */
+    /* No need for additional lv_img_set_src or lv_obj_set_size calls */
 
      /* Create dynamic interval lines */
      create_interval_lines();
@@ -1343,6 +1348,7 @@ static void eye_look_timer_cb(lv_timer_t *timer)
 
  void animate_distance_scale(int target_scale)
  {
+    tuya_lvgl_mutex_lock();
      /* Stop any existing animation */
      if (g.distance_anim) {
          lv_anim_del(g.distance_anim, NULL);
@@ -1362,6 +1368,7 @@ static void eye_look_timer_cb(lv_timer_t *timer)
      lv_anim_set_time(g.distance_anim, 500); /* 500ms animation duration */
      lv_anim_set_ready_cb(g.distance_anim, on_distance_anim_ready);
      lv_anim_start(g.distance_anim);
+     tuya_lvgl_mutex_unlock();
  }
 
  static void on_distance_anim_value(void *var, int32_t value)
@@ -1745,7 +1752,7 @@ static void eye_look_timer_cb(lv_timer_t *timer)
             float x_meters = delta_lon * lon_factor;
             float y_meters = delta_lat * lat_factor;
             
-            float angle_rad = -g.yaw_deg * M_PI / 180.0f;
+            float angle_rad = g.yaw_deg * M_PI / 180.0f;
             float cos_angle = cosf(angle_rad);
             float sin_angle = sinf(angle_rad);
             
@@ -1939,7 +1946,7 @@ static void eye_look_timer_cb(lv_timer_t *timer)
              float x_meters = delta_lon * lon_factor;
              float y_meters = delta_lat * lat_factor;
              
-             float angle_rad = -g.yaw_deg * M_PI / 180.0f;
+             float angle_rad = g.yaw_deg * M_PI / 180.0f;
              float cos_angle = cosf(angle_rad);
              float sin_angle = sinf(angle_rad);
              
@@ -2445,30 +2452,32 @@ static void eye_look_timer_cb(lv_timer_t *timer)
      lv_obj_add_flag(g.countdown_text, LV_OBJ_FLAG_HIDDEN);
      lv_obj_move_foreground(g.countdown_text); // Move to top of z-order
 
-     /* Black background areas for top and bottom */
+     /* Enhanced black background areas for top and bottom to mask circle overflow */
      lv_obj_t *top_bg = lv_obj_create(g.sos_screen);
-     lv_obj_set_size(top_bg, CATTLE_SCREEN_WIDTH, 80);
+     lv_obj_set_size(top_bg, CATTLE_SCREEN_WIDTH, 100); // Increased height for better coverage
      lv_obj_align(top_bg, LV_ALIGN_TOP_MID, 0, 0);
      lv_obj_set_style_bg_color(top_bg, lv_color_black(), 0);
      lv_obj_set_style_bg_opa(top_bg, LV_OPA_COVER, 0);
      lv_obj_set_style_border_width(top_bg, 0, 0);
      lv_obj_clear_flag(top_bg, LV_OBJ_FLAG_SCROLLABLE);
+     lv_obj_move_foreground(top_bg); // Ensure it's above circles
      
      lv_obj_t *bottom_bg = lv_obj_create(g.sos_screen);
-     lv_obj_set_size(bottom_bg, CATTLE_SCREEN_WIDTH, 80);
+     lv_obj_set_size(bottom_bg, CATTLE_SCREEN_WIDTH, 100); // Increased height for better coverage
      lv_obj_align(bottom_bg, LV_ALIGN_BOTTOM_MID, 0, 0);
      lv_obj_set_style_bg_color(bottom_bg, lv_color_black(), 0);
      lv_obj_set_style_bg_opa(bottom_bg, LV_OPA_COVER, 0);
      lv_obj_set_style_border_width(bottom_bg, 0, 0);
      lv_obj_clear_flag(bottom_bg, LV_OBJ_FLAG_SCROLLABLE);
+     lv_obj_move_foreground(bottom_bg); // Ensure it's above circles
 
      
      /* Create 3 animated circles with red shades */
      uint32_t red_shades[3] = {0xFF0000, 0xFF3333, 0xFF6666}; // Most hot red, hotter red, hot red
      
-     for (int i = 0; i < 3; i++) {
+     for (int i = 0; i < SOS_CIRCLE_NUM; i++) {
          g.sos_circles[i] = lv_obj_create(g.sos_screen);
-         lv_obj_set_size(g.sos_circles[i], 140 + i * 80, 140 + i * 80); // Larger base size and more spacing
+         lv_obj_set_size(g.sos_circles[i], 120 + i * 60, 120 + i * 60); // Optimized size to stay within circular screen bounds
          lv_obj_center(g.sos_circles[i]);
          lv_obj_set_style_radius(g.sos_circles[i], LV_RADIUS_CIRCLE, 0);
          lv_obj_set_style_bg_color(g.sos_circles[i], lv_color_hex(red_shades[i]), 0);
@@ -2476,15 +2485,15 @@ static void eye_look_timer_cb(lv_timer_t *timer)
          lv_obj_set_style_border_width(g.sos_circles[i], 0, 0);
          lv_obj_clear_flag(g.sos_circles[i], LV_OBJ_FLAG_SCROLLABLE);
          
-         /* Simplified size pulsing animation with larger spread */
+         /* Simplified size pulsing animation with larger spread - maintains perfect circle */
          lv_anim_t size_anim;
          lv_anim_init(&size_anim);
          lv_anim_set_var(&size_anim, g.sos_circles[i]);
-         lv_anim_set_values(&size_anim, 120 + i * 60, 180 + i * 100); // Larger range for bigger spread
+         lv_anim_set_values(&size_anim, 100 + i * 50, 150 + i * 70); // Reduced range to stay within circular bounds
          lv_anim_set_time(&size_anim, 1500 + i * 200); // Shorter time
          lv_anim_set_repeat_count(&size_anim, LV_ANIM_REPEAT_INFINITE);
          lv_anim_set_playback_time(&size_anim, 1500 + i * 200);
-         lv_anim_set_exec_cb(&size_anim, (lv_anim_exec_xcb_t)lv_obj_set_size);
+         lv_anim_set_exec_cb(&size_anim, on_sos_circle_size_anim); // Use custom callback to maintain circle shape
          lv_anim_set_ready_cb(&size_anim, NULL); // No ready callback to prevent crashes
          lv_anim_start(&size_anim);
          
@@ -2534,6 +2543,11 @@ static void eye_look_timer_cb(lv_timer_t *timer)
      lv_obj_center(cancel_label);
      
      lv_obj_add_event_cb(g.sos_cancel_btn, on_sos_cancel, LV_EVENT_CLICKED, NULL);
+     
+     /* Ensure SOS UI elements are on top */
+     lv_obj_move_foreground(g.sos_title);
+     lv_obj_move_foreground(g.emergency_text);
+     lv_obj_move_foreground(g.sos_cancel_btn);
 
      /* Hold progress ring (shown during long press on main/root) */
      g.sos_hold_ring = lv_arc_create(g.screen);
@@ -2600,12 +2614,50 @@ static void eye_look_timer_cb(lv_timer_t *timer)
          lv_obj_clear_flag(g.sos_title, LV_OBJ_FLAG_HIDDEN);
          lv_obj_clear_flag(g.emergency_text, LV_OBJ_FLAG_HIDDEN);
          lv_obj_clear_flag(g.sos_cancel_btn, LV_OBJ_FLAG_HIDDEN);
-         for (int i = 0; i < 3; i++) {
+         for (int i = 0; i < SOS_CIRCLE_NUM; i++) {
              lv_obj_clear_flag(g.sos_circles[i], LV_OBJ_FLAG_HIDDEN);
          }
          
+         /* Restart SOS circle animations - only if no animations exist */
+         for (int i = 0; i < SOS_CIRCLE_NUM; i++) {
+             /* Check if animations already exist on this object */
+             lv_anim_t * size_anim_exists = lv_anim_get(g.sos_circles[i], on_sos_circle_size_anim);
+             lv_anim_t * opa_anim_exists = lv_anim_get(g.sos_circles[i], (lv_anim_exec_xcb_t)lv_obj_set_style_bg_opa);
+             
+             /* Only create animations if they don't already exist */
+             if (size_anim_exists == NULL) {
+                 /* Simplified size pulsing animation with larger spread - maintains perfect circle */
+                 lv_anim_t size_anim;
+                 lv_anim_init(&size_anim);
+                 lv_anim_set_var(&size_anim, g.sos_circles[i]);
+                 lv_anim_set_values(&size_anim, 100 + i * 50, 150 + i * 70); // Reduced range to stay within circular bounds
+                 lv_anim_set_time(&size_anim, 1500 + i * 200); // Shorter time
+                 lv_anim_set_repeat_count(&size_anim, LV_ANIM_REPEAT_INFINITE);
+                 lv_anim_set_playback_delay(&size_anim, 500 + i * 100);
+                 lv_anim_set_playback_time(&size_anim, 1500 + i * 200);
+                 lv_anim_set_exec_cb(&size_anim, on_sos_circle_size_anim); // Use custom callback to maintain circle shape
+                 lv_anim_set_ready_cb(&size_anim, NULL); // No ready callback to prevent crashes
+                 lv_anim_start(&size_anim);
+             }
+             
+             if (opa_anim_exists == NULL) {
+                 /* Simplified opacity animation */
+                 lv_anim_t opa_anim;
+                 lv_anim_init(&opa_anim);
+                 lv_anim_set_var(&opa_anim, g.sos_circles[i]);
+                 lv_anim_set_values(&opa_anim, LV_OPA_30 - i * 5, LV_OPA_50 - i * 8); // Smaller opacity range
+                 lv_anim_set_time(&opa_anim, 1800 + i * 250); // Shorter time
+                 lv_anim_set_repeat_count(&opa_anim, LV_ANIM_REPEAT_INFINITE);
+                 lv_anim_set_playback_delay(&opa_anim, 600 + i * 120);
+                 lv_anim_set_playback_time(&opa_anim, 1800 + i * 250);
+                 lv_anim_set_exec_cb(&opa_anim, (lv_anim_exec_xcb_t)lv_obj_set_style_bg_opa);
+                 lv_anim_set_ready_cb(&opa_anim, NULL); // No ready callback to prevent crashes
+                 lv_anim_start(&opa_anim);
+             }
+         }
+         
          /* SOS callback - SOS is now truly started */
-         printf("SOS TRULY STARTED - Emergency activated!\n");
+        // printf("SOS TRULY STARTED - Emergency activated!\n");
          // Add your SOS start callback here
      }
  }
@@ -2632,7 +2684,7 @@ static void eye_look_timer_cb(lv_timer_t *timer)
      lv_obj_add_flag(g.sos_title, LV_OBJ_FLAG_HIDDEN);
      lv_obj_add_flag(g.emergency_text, LV_OBJ_FLAG_HIDDEN);
      lv_obj_add_flag(g.sos_cancel_btn, LV_OBJ_FLAG_HIDDEN);
-     for (int i = 0; i < 3; i++) {
+     for (int i = 0; i < SOS_CIRCLE_NUM; i++) {
          lv_obj_add_flag(g.sos_circles[i], LV_OBJ_FLAG_HIDDEN);
      }
      
@@ -2643,7 +2695,7 @@ static void eye_look_timer_cb(lv_timer_t *timer)
 
  static void hide_sos_alert(void)
  {
-     printf("Hiding SOS alert, setting sos_active to false\n");
+     // printf("Hiding SOS alert, setting sos_active to false\n");
      g.sos_active = false;
      
      /* Stop countdown timer if running */
@@ -2653,7 +2705,7 @@ static void eye_look_timer_cb(lv_timer_t *timer)
      }
      
      /* Stop all animations on SOS circles to prevent crashes */
-     for (int i = 0; i < 3; i++) {
+     for (int i = 0; i < SOS_CIRCLE_NUM; i++) {
          if (g.sos_circles[i] != NULL) {
              lv_anim_del(g.sos_circles[i], NULL); // Delete all animations on this object
          }
@@ -2665,12 +2717,15 @@ static void eye_look_timer_cb(lv_timer_t *timer)
      
      lv_obj_add_flag(g.sos_screen, LV_OBJ_FLAG_HIDDEN);
      show_idle(); // Restore the idle screen when SOS is cancelled
+
+     // Update SOS state in the application
+     app_sos_set_without_ui(false);
      
      /* SOS cancel callback */
-     printf("SOS CANCELLED - Emergency deactivated!\n");
+     // printf("SOS CANCELLED - Emergency deactivated!\n");
      // Add your SOS cancel callback here
      
-     printf("SOS alert hidden, sos_active=%d\n", g.sos_active);
+     // printf("SOS alert hidden, sos_active=%d\n", g.sos_active);
  }
 
  static void slide_settings(bool open)
@@ -2901,11 +2956,11 @@ static void eye_look_timer_cb(lv_timer_t *timer)
          }
          break;
      case ' ': // Space for SOS
-         printf("Space - triggering SOS, sos_active=%d\n", g.sos_active);
+         // printf("Space - triggering SOS, sos_active=%d\n", g.sos_active);
          if (!g.sos_active) {
              show_sos_alert();
          } else {
-             printf("SOS already active, ignoring spacebar\n");
+             // printf("SOS already active, ignoring spacebar\n");
          }
          break;
      case '0': // 50m scale
@@ -3094,47 +3149,38 @@ static void eye_look_timer_cb(lv_timer_t *timer)
 
  /* Calibration function removed - no longer needed */
 
- static void compass_update(float yaw_deg)
- {
-     /* Timer-based animation - 15 degrees per second */
-     static float last_yaw = -999.0f;      /* Initialize to impossible value */
-     if (fabsf(yaw_deg - last_yaw) < 1.0f) /* Threshold for timer-based updates */
-         return;                           /* Skip if change is negligible */
-     last_yaw = yaw_deg;
+static void compass_update(float yaw_deg)
+{
+    /* Timer-based animation - 15 degrees per second */
+    static float last_yaw = -999.0f;      /* Initialize to impossible value */
+    if (fabsf(yaw_deg - last_yaw) < 1.0f) /* Threshold for timer-based updates */
+        return;                           /* Skip if change is negligible */
+    last_yaw = yaw_deg;
 
-     int16_t angle_int = (int16_t)(yaw_deg * 10);
+    /* Redraw compass canvas with new heading instead of rotating the object */
+    /* This keeps text labels upright while rotating the compass ring */
+    if (g.compass_face_ring_img != NULL) {
+        compass_update_canvas(g.compass_face_ring_img, yaw_deg);
+    }
 
-     /* Rotate compass face ring image - OPTIMIZED */
-     /* Only update if angle change is significant (reduce unnecessary redraws) */
-     static int16_t last_angle = -1;
-     if (abs(angle_int - last_angle) >= 20) { /* Only update every 2 degrees for better performance */
-        //  lv_obj_set_style_transform_angle(g.compass_face_ring_img, angle_int, 0);
-         lv_obj_set_style_transform_angle(g.compass_face_ring_img, -angle_int, 0);
-         last_angle = angle_int;
+    /* Update rotation text display */
+    update_rotation_text(yaw_deg);
 
-         /* Force a refresh only when needed */
-         lv_obj_invalidate(g.compass_face_ring_img);
-     }
-     /* Pivot point is already set to screen center in compass_build() */
+    /* Update target positions with new compass rotation */
+    update_target_positions();
+    
+    /* Re-render target markers to update cow icons in close tracking mode */
+    render_target_markers();
 
-     /* Update rotation text display */
-     update_rotation_text(yaw_deg);
+#if ENABLE_CLOSE_TRACKING
+    /* Update close-range navigation if active */
+    if (g.close_range_mode) {
+        update_close_range_arrow();
+    }
+#endif
 
-     /* Update target positions with new compass rotation */
-     update_target_positions();
-     
-     /* Re-render target markers to update cow icons in close tracking mode */
-     render_target_markers();
-
- #if ENABLE_CLOSE_TRACKING
-     /* Update close-range navigation if active */
-     if (g.close_range_mode) {
-         update_close_range_arrow();
-     }
- #endif
-
-     /* Center overlay stays fixed - no rotation applied */
- }
+    /* Center overlay stays fixed - no rotation applied */
+}
 
  static void on_settings_close_anim_ready(lv_anim_t *anim)
  {
@@ -3229,8 +3275,6 @@ static void eye_look_timer_cb(lv_timer_t *timer)
  /* Smooth rotation animation functions */
  static void start_smooth_rotation(void)
  {
-    tuya_lvgl_mutex_lock();
-
      /* Stop any existing animation */
      if (g.rotation_anim) {
          lv_anim_del(g.rotation_anim, NULL);
@@ -3251,8 +3295,6 @@ static void eye_look_timer_cb(lv_timer_t *timer)
      lv_anim_set_ready_cb(g.rotation_anim, on_rotation_anim_ready);
      lv_anim_set_path_cb(g.rotation_anim, lv_anim_path_ease_out); /* Smooth easing */
      lv_anim_start(g.rotation_anim);
-    
-    tuya_lvgl_mutex_unlock();
  }
 
  static void on_rotation_anim_value(void *var, int32_t value)
@@ -3669,6 +3711,8 @@ void set_idle_eye_state(int state)
  */
 void tracker_update_compass_heading(float heading_degrees)
 {
+    tuya_lvgl_mutex_lock();
+
     /* Normalize heading to 0-360 range */
     heading_degrees = wrap_deg(heading_degrees);
 
@@ -3679,13 +3723,6 @@ void tracker_update_compass_heading(float heading_degrees)
     float diff = fabsf(heading_degrees - current_angle);
     if (diff > 180.0f) {
         diff = 360.0f - diff; /* Handle wrap-around */
-    }
-    
-    /* Only update if change is significant (> 2 degrees) to avoid jitter
-     * This threshold filters out sensor noise and prevents excessive animations
-     * at 10Hz BMM150 update rate */
-    if (diff < 2.0f) {
-        return;
     }
     
     /* Calculate smooth target angle to avoid 360-0 glitch */
@@ -3700,9 +3737,17 @@ void tracker_update_compass_heading(float heading_degrees)
                  current_angle, heading_degrees, diff);
         last_log_time = now;
     }
-    
+
+#if 1
     /* Start smooth rotation animation */
     start_smooth_rotation();
+#else
+    /* Immediate update without animation */
+    g.yaw_deg = heading_degrees;
+    compass_update(g.yaw_deg);
+#endif
+
+    tuya_lvgl_mutex_unlock();
 }
 
  void gps_remove_target(int index)
@@ -3852,17 +3897,17 @@ void tracker_update_compass_heading(float heading_degrees)
          create_close_range_ui();
      }
 
-     printf("Entering close-range mode, initial target_count=%d\n", g.target_count);
+     // printf("Entering close-range mode, initial target_count=%d\n", g.target_count);
      
      /* Keep only cow targets when entering close-range mode */
      for (int i = g.target_count - 1; i >= 0; i--) {
          if (g.targets[i].active && g.targets[i].color != TARGET_COLOR_COW) {
-             printf("Removing non-cow target at index %d, color=0x%x\n", i, g.targets[i].color);
+             // printf("Removing non-cow target at index %d, color=0x%x\n", i, g.targets[i].color);
              remove_target_coord(i);
          }
      }
      
-     printf("After filtering, target_count=%d\n", g.target_count);
+     // printf("After filtering, target_count=%d\n", g.target_count);
      
      /* Render cow markers after filtering */
      render_target_markers();
@@ -3877,8 +3922,8 @@ void tracker_update_compass_heading(float heading_degrees)
 
      /* Show close-range navigation */
      lv_obj_clear_flag(g.close_nav_container, LV_OBJ_FLAG_HIDDEN);
-     printf("Close-range container is now visible\n");
-     printf("Container actual size: %dx%d (zoom: 1.0x)\n", CATTLE_SCREEN_WIDTH, CATTLE_SCREEN_HEIGHT);
+     // printf("Close-range container is now visible\n");
+     // printf("Container actual size: %dx%d (zoom: 1.0x)\n", CATTLE_SCREEN_WIDTH, CATTLE_SCREEN_HEIGHT);
 
      /* Hide compass elements */
      lv_obj_add_flag(g.compass_container, LV_OBJ_FLAG_HIDDEN);
@@ -3934,9 +3979,9 @@ void tracker_update_compass_heading(float heading_degrees)
      }
 
      /* Restore all dummy targets when exiting close-range mode */
-     for (int i = 0; i < (int)DUMMY_TARGET_COUNT; i++) {
-         add_target_coord(DUMMY_TARGETS[i].lat, DUMMY_TARGETS[i].lon, DUMMY_TARGETS[i].color);
-     }
+    //  for (int i = 0; i < (int)DUMMY_TARGET_COUNT; i++) {
+    //      add_target_coord(DUMMY_TARGETS[i].lat, DUMMY_TARGETS[i].lon, DUMMY_TARGETS[i].color);
+    //  }
      update_map_scale();
      render_target_markers();
 

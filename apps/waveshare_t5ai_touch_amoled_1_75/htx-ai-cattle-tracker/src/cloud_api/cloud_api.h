@@ -73,6 +73,8 @@ uint32_t cloud_api_get_request_interval(void);
  */
 void cloud_api_reset_error_state(void);
 
+void cloud_api_cattle_id_set(int cattle_id);
+
 void cloud_api_update_cattle_location_ui(uint8_t force_update);
 
 #ifdef __cplusplus

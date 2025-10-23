@@ -28,6 +28,8 @@ extern "C" {
 
 void app_sos_set(bool sos_status);
 
+void app_sos_set_without_ui(bool sos_status);
+
 bool app_sos_get(void);
 
 #ifdef __cplusplus

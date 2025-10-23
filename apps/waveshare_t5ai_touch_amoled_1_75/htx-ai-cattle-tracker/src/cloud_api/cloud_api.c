@@ -34,12 +34,15 @@
 
 #define DEFAULT_REQUEST_INTERVAL_MS (30 * 1000) // default minimum interval between requests in milliseconds
 
+#define KEY_CATTLE_ID "cattleId"
+
 /***********************************************************
 ***********************typedef define***********************
 ***********************************************************/
 typedef struct {
     MUTEX_HANDLE mutex;
     SEM_HANDLE sem;
+    int cattle_id;
     OPERATE_RET api_rt;
     uint8_t is_getting;
     uint8_t error_count;
@@ -57,6 +60,7 @@ typedef struct {
 static cloud_api_ctx_t sg_cloud_api_ctx = {
     .mutex = NULL,
     .sem = NULL,
+    .cattle_id = 1,
     .api_rt = OPRT_OK,
     .is_getting = 0,
     .error_count = 0,
@@ -129,9 +133,30 @@ static void __increment_error_count(void)
             (uint32_t)sg_cloud_api_ctx.request_interval_ms);
 }
 
+void cloud_api_cattle_id_set(int cattle_id)
+{
+    sg_cloud_api_ctx.cattle_id = cattle_id;
+    tal_kv_set(KEY_CATTLE_ID, (uint8_t *)&cattle_id, sizeof(cattle_id));
+}
+
+int cloud_api_cattle_id_get(void)
+{
+    return sg_cloud_api_ctx.cattle_id;
+}
+
 OPERATE_RET cloud_api_init(void)
 {
     OPERATE_RET rt = OPRT_OK;
+
+    uint8_t *p_cattle_id = 0;
+    size_t length = 0;
+    rt = tal_kv_get(KEY_CATTLE_ID, &p_cattle_id, &length);
+    if (rt == OPRT_OK && length == sizeof(sg_cloud_api_ctx.cattle_id)) {
+        sg_cloud_api_ctx.cattle_id = *((int *)p_cattle_id);
+        tal_kv_free(p_cattle_id);
+        p_cattle_id = NULL;
+        PR_INFO("Loaded cattle_id %d from KV store", sg_cloud_api_ctx.cattle_id);
+    }
 
     if (sg_cloud_api_ctx.mutex == NULL) {
         TUYA_CALL_ERR_GOTO(tal_mutex_create_init(&sg_cloud_api_ctx.mutex), __EXIT);
@@ -203,7 +228,7 @@ static void __attribute__((unused)) __get_cattle_location_work_queue_cb(void *da
     TIME_T timestamp = 0;
     timestamp = tal_time_get_posix();
     (void)timestamp;
-    uint8_t cattle_id = app_get_current_tracking_id();
+    uint8_t cattle_id = cloud_api_cattle_id_get();
     snprintf(post_data, post_data_len, "{\"compassDeviceId\":\"%s\",\"cattleId\":\"%d\",\"t\":%d}",
              tuya_iot_devid_get(tuya_iot_client_get()), cattle_id, timestamp);
 
