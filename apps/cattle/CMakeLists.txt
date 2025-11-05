@@ -10,10 +10,12 @@ set(APP_PATH ${CMAKE_CURRENT_LIST_DIR})
 get_filename_component(APP_NAME ${APP_PATH} NAME)
 
 # APP_SRC
-aux_source_directory(${APP_PATH}/src APP_SRC)
+file(GLOB_RECURSE APP_SRC "${APP_PATH}/src/*.c")
 
 # APP_INC
-set(APP_INC ${APP_PATH}/include)
+set(APP_INC 
+        ${APP_PATH}/include 
+        ${APP_PATH}/include/func)
 
 list(APPEND APP_INC "${APP_PATH}/assets")
 
@@ -22,18 +24,18 @@ set(APP_OPTIONS "")  # -W
 
 # APP UI
 if (CONFIG_ENABLE_APP_UI STREQUAL "y")
-    # aux_source_directory(${APP_PATH}/app_ui APP_UI_SRC)
-    # aux_source_directory(${APP_PATH}/app_ui/screens APP_UI_SCREENS_SRC)
     file(GLOB_RECURSE APP_UI_SRC 
         "${APP_PATH}/app_ui/*.c" )
 
     set(APP_UI_INC ${APP_PATH}/app_ui)
-    # set(APP_UI_SCREEN_INC ${APP_PATH}/app_ui/screens)
-    # list(APPEND APP_SRC ${APP_UI_SRC} ${APP_UI_SCREENS_SRC})
-    # list(APPEND APP_INC ${APP_UI_INC} ${APP_UI_SCREEN_INC})
     list(APPEND APP_SRC ${APP_UI_SRC})
     list(APPEND APP_INC ${APP_UI_INC})
 endif()
+
+# DP
+add_subdirectory(${APP_PATH}/app_dp)
+list(APPEND APP_SRC ${DP_SRCS})
+list(APPEND APP_INC ${DP_INCS})
 
 ########################################
 # Target Configure

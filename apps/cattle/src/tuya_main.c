@@ -38,8 +38,14 @@
 #include "board_com_api.h"
 #include "app_chat_bot.h"
 
+#if defined(ENABLE_APP_UI) && (ENABLE_APP_UI == 1)
 #include "app_ui_main.h"
+#endif
+
+#include "app_encoder.h"
+
 #include "app_system_info.h"
+#include "app_dp.h"
 
 #if defined(ENABLE_QRCODE) && (ENABLE_QRCODE == 1)
 #include "qrencode_print.h"
@@ -141,40 +147,9 @@ void user_event_handler_on(tuya_iot_client_t *client, tuya_event_msg_t *event)
             PR_DEBUG("devid.%s", dpobj->devid);
         }
 
-        uint32_t index = 0;
-        for (index = 0; index < dpobj->dpscnt; index++) {
-            dp_obj_t *dp = dpobj->dps + index;
-            PR_DEBUG("idx:%d dpid:%d type:%d ts:%u", index, dp->id, dp->type, dp->time_stamp);
-            switch (dp->type) {
-            case PROP_BOOL: {
-                PR_DEBUG("bool value:%d", dp->value.dp_bool);
-                break;
-            }
-            case PROP_VALUE: {
-                PR_DEBUG("int value:%d", dp->value.dp_value);
-                break;
-            }
-            case PROP_STR: {
-                PR_DEBUG("str value:%s", dp->value.dp_str);
-                break;
-            }
-            case PROP_ENUM: {
-                PR_DEBUG("enum value:%u", dp->value.dp_enum);
-                break;
-            }
-            case PROP_BITMAP: {
-                PR_DEBUG("bits value:0x%X", dp->value.dp_bitmap);
-                break;
-            }
-            default: {
-                PR_ERR("idx:%d dpid:%d type:%d ts:%u is invalid", index, dp->id, dp->type, dp->time_stamp);
-                break;
-            }
-            } // end of switch
+        for (uint32_t i = 0; i < dpobj->dpscnt; i++) {
+            app_dp_process(dpobj->dps[i].id, dpobj->dps[i].type, dpobj->dps[i].value);
         }
-
-        tuya_iot_dp_obj_report(client, dpobj->devid, dpobj->dps, dpobj->dpscnt, 0);
-
     } break;
 
     /* RECV RAW DP */
@@ -238,6 +213,7 @@ void user_main(void)
     });
     tal_sw_timer_init();
     tal_workq_init();
+    tal_time_service_init();
 
     tuya_authorize_init();
 
@@ -286,6 +262,9 @@ void user_main(void)
     TUYA_CALL_ERR_LOG(app_chat_bot_init());
 
     app_system_info();
+
+    // init encoder
+    TUYA_CALL_ERR_LOG(app_encoder_init());
 
     PR_DEBUG("tuya_iot_init success");
     /* Start tuya iot task */

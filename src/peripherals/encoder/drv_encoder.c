@@ -173,7 +173,7 @@ OPERATE_RET tkl_encoder_init(void)
     TUYA_CALL_ERR_RETURN(tal_mutex_create_init(&mutex_hdl));
 
     THREAD_CFG_T thread_cfg = {
-        .thrdname = "sem_wait",
+        .thrdname = "encoder_task",
         .stackDepth = 2048,
         .priority = THREAD_PRIO_2,
     };

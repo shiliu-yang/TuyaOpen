@@ -36,16 +36,6 @@ extern "C" {
 #include "tal_api.h"
 #include "tal_log.h"
 #include "tkl_output.h"
-/**
- * @brief Get the angle value of the encoder.
- *
- * This function locks the mutex before getting the angle value to ensure thread safety.
- * After reading the angle value, it unlocks the mutex. The returned value is the current
- * angle of the encoder.
- *
- * @return The current angle value of the encoder, in degrees.
- */
-int32_t encoder_get_angle(void);
 
 /**
  * @brief Get the angle value of the encoder.

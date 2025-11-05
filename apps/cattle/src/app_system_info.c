@@ -7,6 +7,8 @@
 
 #include "app_system_info.h"
 
+#include "tuya_iot.h"
+#include "netmgr.h"
 #include "tal_api.h"
 
 /***********************************************************
@@ -45,4 +47,19 @@ void app_system_info(void)
     tal_sw_timer_start(system_info.heap_tm, FREE_HEAP_TM, TAL_TIMER_CYCLE);
 
     return;
+}
+
+bool app_network_is_ready(void)
+{
+    tuya_iot_client_t *client = tuya_iot_client_get();
+
+    // check client and activation status
+    if (client == NULL || client->is_activated == false) {
+        PR_ERR("device not activated");
+        return false;
+    }
+
+    netmgr_status_e status = NETMGR_LINK_DOWN;
+    netmgr_conn_get(NETCONN_AUTO, NETCONN_CMD_STATUS, &status);
+    return status == NETMGR_LINK_DOWN ? false : true;
 }

@@ -1,14 +1,16 @@
 /**
- * @file app_system_info.h
- * @brief app_system_info module is used to
+ * @file app_dp.h
+ * @brief app_dp module is used to handle the data points
  * @version 0.1
  * @copyright Copyright (c) 2021-2025 Tuya Inc. All Rights Reserved.
  */
 
-#ifndef __APP_SYSTEM_INFO_H__
-#define __APP_SYSTEM_INFO_H__
+#ifndef __APP_DP_H__
+#define __APP_DP_H__
 
 #include "tuya_cloud_types.h"
+#include "tuya_iot.h"
+#include "tuya_iot_dp.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -18,20 +20,26 @@ extern "C" {
 ************************macro define************************
 ***********************************************************/
 
+
 /***********************************************************
 ***********************typedef define***********************
 ***********************************************************/
+
 
 /***********************************************************
 ********************function declaration********************
 ***********************************************************/
 
-void app_system_info(void);
+void app_dp_process(uint8_t id, dp_prop_tp_t type, dp_value_t value);
 
-bool app_network_is_ready(void);
+// DP update functions
+OPERATE_RET app_dp_volume_upload(uint8_t volume);
+OPERATE_RET app_dp_sos_set(bool sos_status);
+OPERATE_RET app_dp_switch_set(bool switch_status);
+OPERATE_RET app_dp_battery_upload(uint8_t is_charging, uint8_t battery_percentage);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __APP_SYSTEM_INFO_H__ */
+#endif /* __APP_DP_H__ */
