@@ -4,18 +4,29 @@
 // Project name: cattle_Project
 
 #include "../ui.h"
+#include <stdlib.h>
 
-lv_obj_t * ui_ai_chat = NULL;
-lv_obj_t * ui_left_eye = NULL;
-lv_obj_t * ui_right_eye = NULL;
-lv_obj_t * ui_chat_text = NULL;
-lv_obj_t * ui_red_ring = NULL;
+lv_obj_t *ui_ai_chat = NULL;
+lv_obj_t *ui_left_eye = NULL;
+lv_obj_t *ui_right_eye = NULL;
+lv_obj_t *ui_chat_text = NULL;
+lv_obj_t *ui_red_ring = NULL;
+
+/* Animation timer for random eye animations */
+static lv_timer_t *eye_animation_timer = NULL;
+
+/* Forward declarations */
+static void eye_animation_timer_cb(lv_timer_t *timer);
+static void play_random_eye_animation(void);
+static void ui_ai_chat_screen_loaded_cb(lv_event_t *e);
+static void ui_ai_chat_screen_unloaded_cb(lv_event_t *e);
+
 // event funtions
-void ui_event_ai_chat(lv_event_t * e)
+void ui_event_ai_chat(lv_event_t *e)
 {
     lv_event_code_t event_code = lv_event_get_code(e);
 
-    if(event_code == LV_EVENT_GESTURE) {
+    if (event_code == LV_EVENT_GESTURE) {
         lv_indev_wait_release(lv_indev_active());
         ai_chat_event_callback(e);
     }
@@ -30,8 +41,8 @@ void ui_ai_chat_screen_init(void)
     }
 
     ui_ai_chat = lv_obj_create(NULL);
-    lv_obj_remove_flag(ui_ai_chat, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC |
-                       LV_OBJ_FLAG_SCROLL_MOMENTUM);      /// Flags
+    lv_obj_remove_flag(ui_ai_chat,
+                       LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM); /// Flags
     lv_obj_set_style_bg_color(ui_ai_chat, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(ui_ai_chat, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -43,7 +54,7 @@ void ui_ai_chat_screen_init(void)
     lv_obj_set_y(ui_left_eye, -50);
     lv_obj_set_align(ui_left_eye, LV_ALIGN_CENTER);
     lv_obj_remove_flag(ui_left_eye, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC |
-                       LV_OBJ_FLAG_SCROLL_MOMENTUM | LV_OBJ_FLAG_SCROLL_CHAIN);     /// Flags
+                                        LV_OBJ_FLAG_SCROLL_MOMENTUM | LV_OBJ_FLAG_SCROLL_CHAIN); /// Flags
     lv_obj_set_style_radius(ui_left_eye, 32767, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_color(ui_left_eye, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(ui_left_eye, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -56,7 +67,7 @@ void ui_ai_chat_screen_init(void)
     lv_obj_set_y(ui_right_eye, -50);
     lv_obj_set_align(ui_right_eye, LV_ALIGN_CENTER);
     lv_obj_remove_flag(ui_right_eye, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC |
-                       LV_OBJ_FLAG_SCROLL_MOMENTUM | LV_OBJ_FLAG_SCROLL_CHAIN);     /// Flags
+                                         LV_OBJ_FLAG_SCROLL_MOMENTUM | LV_OBJ_FLAG_SCROLL_CHAIN); /// Flags
     lv_obj_set_style_radius(ui_right_eye, 32767, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_color(ui_right_eye, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(ui_right_eye, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -85,7 +96,7 @@ void ui_ai_chat_screen_init(void)
     lv_obj_set_height(ui_red_ring, 466);
     lv_obj_set_align(ui_red_ring, LV_ALIGN_CENTER);
     lv_obj_remove_flag(ui_red_ring, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC |
-                       LV_OBJ_FLAG_SCROLL_MOMENTUM | LV_OBJ_FLAG_SCROLL_CHAIN);     /// Flags
+                                        LV_OBJ_FLAG_SCROLL_MOMENTUM | LV_OBJ_FLAG_SCROLL_CHAIN); /// Flags
     lv_obj_set_style_radius(ui_red_ring, 32767, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_border_color(ui_red_ring, lv_color_hex(0xFF0000), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_border_opa(ui_red_ring, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -96,11 +107,107 @@ void ui_ai_chat_screen_init(void)
 
     lv_obj_add_event_cb(ui_ai_chat, ui_event_ai_chat, LV_EVENT_ALL, NULL);
 
+    /* Add screen load/unload event handlers for animation control */
+    lv_obj_add_event_cb(ui_ai_chat, ui_ai_chat_screen_loaded_cb, LV_EVENT_SCREEN_LOADED, NULL);
+    lv_obj_add_event_cb(ui_ai_chat, ui_ai_chat_screen_unloaded_cb, LV_EVENT_SCREEN_UNLOADED, NULL);
+}
+
+/**
+ * Screen loaded event: start eye animation timer
+ */
+static void ui_ai_chat_screen_loaded_cb(lv_event_t *e)
+{
+    (void)e;
+
+    /* Start random eye animation timer when screen is loaded */
+    if (eye_animation_timer == NULL) {
+        eye_animation_timer = lv_timer_create(eye_animation_timer_cb, 2000, NULL);
+    } else {
+        lv_timer_resume(eye_animation_timer);
+        lv_timer_reset(eye_animation_timer); /* Reset timer to trigger immediately */
+    }
+}
+
+/**
+ * Screen unloaded event: stop eye animation timer
+ */
+static void ui_ai_chat_screen_unloaded_cb(lv_event_t *e)
+{
+    (void)e;
+
+    /* Pause animation timer when screen is unloaded */
+    if (eye_animation_timer) {
+        lv_timer_pause(eye_animation_timer);
+    }
+
+    /* Delete all animations on eyes */
+    if (ui_left_eye) {
+        lv_anim_del(ui_left_eye, NULL);
+    }
+    if (ui_right_eye) {
+        lv_anim_del(ui_right_eye, NULL);
+    }
+}
+
+/**
+ * Play a random eye animation on both eyes
+ */
+static void play_random_eye_animation(void)
+{
+    if (ui_left_eye == NULL || ui_right_eye == NULL) {
+        return;
+    }
+
+    /* Random animation selection: 0=blink, 1=lookup, 2=lookleft, 3=lookright */
+    int anim_type = rand() % 4;
+
+    switch (anim_type) {
+    case 0: /* Blinking */
+        eyeblinking_Animation(ui_left_eye, 0);
+        eyeblinking_Animation(ui_right_eye, 0);
+        break;
+    case 1: /* Look up */
+        eyelookup_Animation(ui_left_eye, 0);
+        eyelookup_Animation(ui_right_eye, 0);
+        break;
+    case 2: /* Look left */
+        eyelookleft_Animation(ui_left_eye, 0);
+        eyelookleft_Animation(ui_right_eye, 0);
+        break;
+    case 3: /* Look right */
+        eyelookright_Animation(ui_left_eye, 0);
+        eyelookright_Animation(ui_right_eye, 0);
+        break;
+    }
+}
+
+/**
+ * Timer callback: trigger random eye animation and set next random interval
+ */
+static void eye_animation_timer_cb(lv_timer_t *timer)
+{
+    (void)timer;
+
+    /* Play random animation */
+    play_random_eye_animation();
+
+    /* Set next random interval: 2000-5000ms */
+    if (eye_animation_timer) {
+        uint32_t next_interval = 2000 + (rand() % 3001); /* 2000 + [0, 3000] = [2000, 5000] */
+        lv_timer_set_period(eye_animation_timer, next_interval);
+    }
 }
 
 void ui_ai_chat_screen_destroy(void)
 {
-    if(ui_ai_chat) lv_obj_del(ui_ai_chat);
+    /* Clean up timer when screen is destroyed */
+    if (eye_animation_timer) {
+        lv_timer_del(eye_animation_timer);
+        eye_animation_timer = NULL;
+    }
+
+    if (ui_ai_chat)
+        lv_obj_del(ui_ai_chat);
 
     // NULL screen variables
     ui_ai_chat = NULL;
@@ -108,5 +215,4 @@ void ui_ai_chat_screen_destroy(void)
     ui_right_eye = NULL;
     ui_chat_text = NULL;
     ui_red_ring = NULL;
-
 }
