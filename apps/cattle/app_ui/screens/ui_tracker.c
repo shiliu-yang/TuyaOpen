@@ -106,13 +106,13 @@ void ui_tracker_screen_init(void)
 
     ui_image_search_scope = lv_image_create(ui_tracker);
     lv_image_set_src(ui_image_search_scope, &ui_img_image_search_scope_png);
-    lv_obj_set_width(ui_image_search_scope, LV_SIZE_CONTENT);   /// 222
-    lv_obj_set_height(ui_image_search_scope, LV_SIZE_CONTENT);    /// 130
+    lv_obj_set_width(ui_image_search_scope, LV_SIZE_CONTENT);  /// 222
+    lv_obj_set_height(ui_image_search_scope, LV_SIZE_CONTENT); /// 130
     lv_obj_align(ui_image_search_scope, LV_ALIGN_BOTTOM_MID, 0, -217);
-    lv_obj_add_flag(ui_image_search_scope, LV_OBJ_FLAG_CLICKABLE);     /// Flags
+    lv_obj_add_flag(ui_image_search_scope, LV_OBJ_FLAG_CLICKABLE); /// Flags
     lv_obj_remove_flag(ui_image_search_scope,
                        LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM |
-                       LV_OBJ_FLAG_SCROLL_CHAIN);     /// Flags
+                           LV_OBJ_FLAG_SCROLL_CHAIN); /// Flags
 
     ui_image_cattle = lv_image_create(ui_tracker);
     lv_image_set_src(ui_image_cattle, &ui_img_image_cattle_icon_png);
@@ -145,10 +145,14 @@ static void draw_compass_and_intervals(lv_obj_t *canvas, float heading, uint32_t
     const int32_t h = 466;
     const int32_t cx = w / 2;
     const int32_t cy = h / 2;
-    const int32_t outer_r = 200; /* Compass outer radius */
-    const int32_t tick_long = 14;
-    const int32_t tick_mid = 8;
-    const int32_t tick_short = 4;
+
+    /* Compass design parameters matching the reference image */
+    const int32_t tick_distance_from_edge = 40;                  /* Tick marks 40px from screen edge */
+    const int32_t label_size = 36;                               /* Label box 36x36 */
+    const int32_t tick_radius = w / 2 - tick_distance_from_edge; /* Tick position radius */
+    const int32_t label_radius = tick_radius;                    /* Label center at same radius as tick center */
+    const int32_t ticks_between_labels = 8;                      /* Number of ticks between each 30° label (adjustable) */
+    const int32_t tick_avoid_range = 5;                          /* Skip ticks within 5° of labels to avoid overlap */
 
     lv_layer_t layer;
     lv_canvas_init_layer(canvas, &layer);
@@ -156,7 +160,7 @@ static void draw_compass_and_intervals(lv_obj_t *canvas, float heading, uint32_t
     /* ===== PART 1: Draw interval distance circles ===== */
 
     /* Calculate map scale based on total distance */
-    float screen_radius = 200; /* Same as compass outer_r for consistency */
+    float screen_radius = 200; /* Use 200 as reference radius for distance scaling */
     float map_scale = (distance > 0) ? (float)distance / screen_radius : 1.0f;
 
     /* Step size lookup table */
@@ -194,10 +198,10 @@ static void draw_compass_and_intervals(lv_obj_t *canvas, float heading, uint32_t
     circle_dsc.start_angle = 0;
     circle_dsc.end_angle = 360;
 
-    /* Draw up to 12 interval circles */
+    /* Draw up to 12 interval circles, but keep them inside compass area */
     int max_circles = 12;
     float min_radius = 20.0f;
-    float max_radius = (float)outer_r - 5.0f; /* Leave space for compass */
+    float max_radius = (float)(tick_radius - 20); /* Leave space for compass ticks */
 
     for (float interval = step_size; interval <= distance && max_circles > 0; interval += step_size) {
         float circle_radius = interval / map_scale;
@@ -210,91 +214,100 @@ static void draw_compass_and_intervals(lv_obj_t *canvas, float heading, uint32_t
         }
     }
 
-    /* ===== PART 2: Draw compass (same as before) ===== */
+    /* ===== PART 2: Draw compass ticks and labels ===== */
 
-    /* Draw outer compass ring */
-    lv_draw_arc_dsc_t arc_dsc;
-    lv_draw_arc_dsc_init(&arc_dsc);
-    arc_dsc.color = lv_color_white();
-    arc_dsc.width = 2;
-    arc_dsc.center.x = cx;
-    arc_dsc.center.y = cy;
-    arc_dsc.radius = outer_r;
-    arc_dsc.start_angle = 0;
-    arc_dsc.end_angle = 360;
-    lv_draw_arc(&layer, &arc_dsc);
+    /* Draw tick marks between labels */
+    /* Calculate tick spacing: 30° divided by (ticks_between_labels + 1) segments */
+    float tick_spacing = 30.0f / (float)(ticks_between_labels + 1);
+    
+    for (int segment = 0; segment < 12; segment++) { /* 12 segments of 30° each */
+        int base_deg = segment * 30;
 
-    /* Compass tick marks */
-    lv_draw_line_dsc_t line_dsc;
-    lv_draw_line_dsc_init(&line_dsc);
-    line_dsc.color = lv_color_hex(0xB0B0B0);
-    line_dsc.width = 2;
-    for (int deg = 0; deg < 360; deg += 10) {
-        int len = tick_short;
-        if (deg % 90 == 0)
-            len = tick_long;
-        else if (deg % 30 == 0)
-            len = tick_mid;
+        /* Draw ticks in the middle of this 30° segment, avoiding the label positions */
+        for (int tick_in_segment = 1; tick_in_segment <= ticks_between_labels; tick_in_segment++) {
+            float deg = base_deg + tick_in_segment * tick_spacing; /* Evenly space ticks */
 
-        float a = (float)(90 - deg + heading) * (float)M_PI / 180.0f;
-        float s = sinf(a);
-        float c = cosf(a);
-        lv_draw_line_dsc_t ld = line_dsc;
-        ld.p1.x = (lv_value_precise_t)(cx + c * (outer_r - len));
-        ld.p1.y = (lv_value_precise_t)(cy - s * (outer_r - len));
-        ld.p2.x = (lv_value_precise_t)(cx + c * (outer_r + 2));
-        ld.p2.y = (lv_value_precise_t)(cy - s * (outer_r + 2));
-        lv_draw_line(&layer, &ld);
+            /* Skip if too close to label positions (within tick_avoid_range degrees) */
+            float dist_to_prev_label = fmodf(deg, 30.0f);
+            float dist_to_next_label = 30.0f - dist_to_prev_label;
+            if (dist_to_prev_label < tick_avoid_range || dist_to_next_label < tick_avoid_range) {
+                continue; /* Too close to a label */
+            }
+
+            /* Calculate tick position with heading offset */
+            float angle_rad = (float)(90 - deg + heading) * (float)M_PI / 180.0f;
+            float sin_a = sinf(angle_rad);
+            float cos_a = cosf(angle_rad);
+
+            /* Draw line from outer point to inner point (pointing toward center) */
+            lv_draw_line_dsc_t line_dsc;
+            lv_draw_line_dsc_init(&line_dsc);
+            line_dsc.color = lv_color_hex(0x808080); /* Gray color #808080 */
+            line_dsc.width = 2;                      /* 2px wide */
+            line_dsc.round_start = 1;
+            line_dsc.round_end = 1;
+
+            line_dsc.p1.x = (int)(cx + cos_a * (tick_radius + 6)); /* Outer end */
+            line_dsc.p1.y = (int)(cy - sin_a * (tick_radius + 6));
+            line_dsc.p2.x = (int)(cx + cos_a * (tick_radius - 6)); /* Inner end (toward center) */
+            line_dsc.p2.y = (int)(cy - sin_a * (tick_radius - 6));
+
+            lv_draw_line(&layer, &line_dsc);
+        }
     }
 
-    /* Degree labels */
-    lv_draw_label_dsc_t lbl_dsc;
-    lv_draw_label_dsc_init(&lbl_dsc);
-    lbl_dsc.color = lv_color_hex(0xC8C8C8);
-    lbl_dsc.align = LV_TEXT_ALIGN_CENTER;
-
+    /* Draw direction labels at 0°, 90°, 180°, 270° (N, E, S, W) and 30° intervals */
     static const char *degree_texts[] = {"N", "30", "60", "E", "120", "150", "S", "210", "240", "W", "300", "330"};
     int text_idx = 0;
 
     for (int deg = 0; deg < 360; deg += 30) {
-        if (deg % 90 == 0) {
-#ifdef LV_FONT_MONTSERRAT_16
-            lbl_dsc.font = &lv_font_montserrat_16;
-#else
-            lbl_dsc.font = &lv_font_montserrat_14;
-#endif
-        } else {
-            lbl_dsc.font = &lv_font_montserrat_14;
+        /* Calculate label position with heading offset */
+        float angle_rad = (float)(90 - deg + heading) * (float)M_PI / 180.0f;
+        float sin_a = sinf(angle_rad);
+        float cos_a = cosf(angle_rad);
+
+        /* Calculate label center position */
+        int label_x = (int)(cx + cos_a * label_radius);
+        int label_y = (int)(cy - sin_a * label_radius);
+
+        /* Create 36x36 label area centered at calculated position */
+        lv_area_t area;
+        area.x1 = label_x - label_size / 2;
+        area.y1 = label_y - label_size / 2;
+        area.x2 = label_x + label_size / 2;
+        area.y2 = label_y + label_size / 2;
+
+        /* Set up label descriptor */
+        lv_draw_label_dsc_t lbl_dsc;
+        lv_draw_label_dsc_init(&lbl_dsc);
+        lbl_dsc.align = LV_TEXT_ALIGN_CENTER;
+        lbl_dsc.text = degree_texts[text_idx];
+
+        /* N uses red color and larger font, numbers use white color and 20pt font */
+        if (text_idx == 0) {                        /* "N" */
+            lbl_dsc.color = lv_color_hex(0xFF3B30); /* Red color */
+            lbl_dsc.font = &lv_font_montserrat_20;
+        } else if (text_idx == 3 || text_idx == 6 || text_idx == 9) { /* "E", "S", "W" */
+            lbl_dsc.color = lv_color_hex(0xFFFFFF);                   /* White color */
+            lbl_dsc.font = &lv_font_montserrat_20;
+        } else {                                    /* Numbers: "30", "60", "120", "150", "210", "240", "300", "330" */
+            lbl_dsc.color = lv_color_hex(0xFFFFFF); /* White color */
+            lbl_dsc.font = &lv_font_montserrat_16;  /* 16号字体 */
         }
 
-        float a = (float)(90 - deg + heading) * (float)M_PI / 180.0f;
-        float s = sinf(a);
-        float c = cosf(a);
-        int r = outer_r - 26;
-        lv_area_t area;
-        int x = (int)(cx + c * r);
-        int y = (int)(cy - s * r);
-        area.x1 = x - 20;
-        area.y1 = y - 10;
-        area.x2 = x + 20;
-        area.y2 = y + 10;
-        lbl_dsc.text = degree_texts[text_idx++];
         lv_draw_label(&layer, &lbl_dsc, &area);
+        text_idx++;
     }
 
     /* Red north marker triangle */
-    lv_draw_line_dsc_t red;
-    lv_draw_line_dsc_init(&red);
-    red.color = lv_color_hex(0xFF3B30);
-    red.width = 3;
-
     float north_angle = (90.0f - 0.0f + heading) * (float)M_PI / 180.0f;
     float s = sinf(north_angle);
     float c = cosf(north_angle);
 
-    int tri_r_tip = outer_r + 20;
-    int tri_r_base = outer_r + 4;
-    int tri_width = 8;
+    /* Position triangle just outside the label area */
+    int tri_r_tip = w / 2 - 10;  /* 10px from edge */
+    int tri_r_base = w / 2 - 22; /* Triangle base */
+    int tri_width = 8;           /* Triangle width */
 
     int16_t xt = (int16_t)(cx + c * tri_r_tip);
     int16_t yt = (int16_t)(cy - s * tri_r_tip);
