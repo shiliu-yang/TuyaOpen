@@ -37,6 +37,8 @@ void tracker_event_callback(lv_event_t * e)
     lv_dir_t dir = lv_indev_get_gesture_dir(lv_indev_get_act());
     if (dir == LV_DIR_RIGHT) {
         app_page_back(LV_SCR_LOAD_ANIM_MOVE_RIGHT, 0);
+    } else if (dir == LV_DIR_BOTTOM) {
+        app_page_load(&setting_page, LV_SCR_LOAD_ANIM_MOVE_BOTTOM, 0);
     }
 }
 
