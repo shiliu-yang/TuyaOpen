@@ -7,6 +7,7 @@
 #include "tal_api.h"
 #include <math.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -339,6 +340,90 @@ static void draw_compass_and_intervals(lv_obj_t *canvas, float heading, uint32_t
     tri_dsc.p[2].y = yr;
 
     lv_draw_triangle(&layer, &tri_dsc);
+
+    /* ===== PART 3: Draw distance scale ruler ===== */
+
+    /* Scale ruler position: specified coordinates */
+    const int32_t ruler_y = 239;        /* Y position at 239 */
+    const int32_t ruler_left_x = 253;   /* Left arrow at x=253 */
+    const int32_t ruler_right_x = 390;  /* Right arrow at x=390 */
+    const int32_t arrow_size = 6;       /* Arrow triangle size */
+    const int32_t ruler_line_width = 2; /* Ruler line width */
+
+    /* Draw horizontal ruler line */
+    lv_draw_line_dsc_t ruler_line_dsc;
+    lv_draw_line_dsc_init(&ruler_line_dsc);
+    ruler_line_dsc.color = lv_color_hex(0xFFFFFF); /* White color */
+    ruler_line_dsc.width = ruler_line_width;
+    ruler_line_dsc.p1.x = ruler_left_x;
+    ruler_line_dsc.p1.y = ruler_y;
+    ruler_line_dsc.p2.x = ruler_right_x;
+    ruler_line_dsc.p2.y = ruler_y;
+    lv_draw_line(&layer, &ruler_line_dsc);
+
+    /* Draw left arrow (pointing to center) */
+    lv_draw_triangle_dsc_t left_arrow_dsc;
+    lv_draw_triangle_dsc_init(&left_arrow_dsc);
+    left_arrow_dsc.bg_color = lv_color_hex(0xFFFFFF);
+    left_arrow_dsc.bg_opa = LV_OPA_COVER;
+    left_arrow_dsc.p[0].x = ruler_left_x - arrow_size; /* Arrow tip (left) */
+    left_arrow_dsc.p[0].y = ruler_y;
+    left_arrow_dsc.p[1].x = ruler_left_x; /* Arrow base top */
+    left_arrow_dsc.p[1].y = ruler_y - arrow_size / 2;
+    left_arrow_dsc.p[2].x = ruler_left_x; /* Arrow base bottom */
+    left_arrow_dsc.p[2].y = ruler_y + arrow_size / 2;
+    lv_draw_triangle(&layer, &left_arrow_dsc);
+
+    /* Draw right arrow (pointing to right) */
+    lv_draw_triangle_dsc_t right_arrow_dsc;
+    lv_draw_triangle_dsc_init(&right_arrow_dsc);
+    right_arrow_dsc.bg_color = lv_color_hex(0xFFFFFF);
+    right_arrow_dsc.bg_opa = LV_OPA_COVER;
+    right_arrow_dsc.p[0].x = ruler_right_x + arrow_size; /* Arrow tip (right) */
+    right_arrow_dsc.p[0].y = ruler_y;
+    right_arrow_dsc.p[1].x = ruler_right_x; /* Arrow base top */
+    right_arrow_dsc.p[1].y = ruler_y - arrow_size / 2;
+    right_arrow_dsc.p[2].x = ruler_right_x; /* Arrow base bottom */
+    right_arrow_dsc.p[2].y = ruler_y + arrow_size / 2;
+    lv_draw_triangle(&layer, &right_arrow_dsc);
+
+    /* Draw distance label below the ruler */
+    /* Find current max_distance for the scale */
+    float current_max_distance = step_size; /* Default to step_size */
+    for (int i = 0; i < 9; i++) {
+        if (distance <= step_lookup[i].max_distance) {
+            current_max_distance = step_lookup[i].max_distance;
+            break;
+        }
+    }
+
+    /* Format distance text */
+    char distance_text[32];
+    if (current_max_distance >= 1000.0f) {
+        /* Display in kilometers */
+        float km = current_max_distance / 1000.0f;
+        snprintf(distance_text, sizeof(distance_text), "%.1fkm", km);
+    } else {
+        /* Display in meters */
+        snprintf(distance_text, sizeof(distance_text), "%.0fm", current_max_distance);
+    }
+
+    /* Draw distance label */
+    lv_draw_label_dsc_t distance_lbl_dsc;
+    lv_draw_label_dsc_init(&distance_lbl_dsc);
+    distance_lbl_dsc.color = lv_color_hex(0xFFFFFF);
+    distance_lbl_dsc.align = LV_TEXT_ALIGN_CENTER;
+    distance_lbl_dsc.font = &lv_font_montserrat_12;
+    distance_lbl_dsc.text = distance_text;
+
+    /* Position label below ruler line, centered between left and right */
+    int32_t label_center_x = (ruler_left_x + ruler_right_x) / 2;
+    lv_area_t distance_label_area;
+    distance_label_area.x1 = label_center_x - 50;
+    distance_label_area.y1 = ruler_y + 8;
+    distance_label_area.x2 = label_center_x + 50;
+    distance_label_area.y2 = ruler_y + 26;
+    lv_draw_label(&layer, &distance_lbl_dsc, &distance_label_area);
 
     lv_canvas_finish_layer(canvas, &layer);
 }
