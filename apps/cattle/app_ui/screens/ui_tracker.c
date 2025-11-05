@@ -151,8 +151,8 @@ static void draw_compass_and_intervals(lv_obj_t *canvas, float heading, uint32_t
     const int32_t label_size = 36;                               /* Label box 36x36 */
     const int32_t tick_radius = w / 2 - tick_distance_from_edge; /* Tick position radius */
     const int32_t label_radius = tick_radius;                    /* Label center at same radius as tick center */
-    const int32_t ticks_between_labels = 8;                      /* Number of ticks between each 30° label (adjustable) */
-    const int32_t tick_avoid_range = 5;                          /* Skip ticks within 5° of labels to avoid overlap */
+    const int32_t ticks_between_labels = 8; /* Number of ticks between each 30° label (adjustable) */
+    const int32_t tick_avoid_range = 5;     /* Skip ticks within 5° of labels to avoid overlap */
 
     lv_layer_t layer;
     lv_canvas_init_layer(canvas, &layer);
@@ -219,7 +219,7 @@ static void draw_compass_and_intervals(lv_obj_t *canvas, float heading, uint32_t
     /* Draw tick marks between labels */
     /* Calculate tick spacing: 30° divided by (ticks_between_labels + 1) segments */
     float tick_spacing = 30.0f / (float)(ticks_between_labels + 1);
-    
+
     for (int segment = 0; segment < 12; segment++) { /* 12 segments of 30° each */
         int base_deg = segment * 30;
 
@@ -266,9 +266,19 @@ static void draw_compass_and_intervals(lv_obj_t *canvas, float heading, uint32_t
         float sin_a = sinf(angle_rad);
         float cos_a = cosf(angle_rad);
 
-        /* Calculate label center position */
-        int label_x = (int)(cx + cos_a * label_radius);
-        int label_y = (int)(cy - sin_a * label_radius);
+        /* For bottom half of screen (deg 120-240 range after heading adjustment),
+         * move labels outward by 3px and downward by 5px */
+        float actual_deg = fmodf(90.0f - deg + heading + 360.0f, 360.0f);
+        int radius_offset = 0;
+        int y_offset = 10; /* Move downward 10px for all labels */
+        if (actual_deg >= 120.0f && actual_deg <= 240.0f) {
+            radius_offset = 5; /* Move outward 5px for bottom half */
+            // y_offset = 10;      /* Move downward 10px for bottom half */
+        }
+
+        /* Calculate label center position with optional offset */
+        int label_x = (int)(cx + cos_a * (label_radius + radius_offset));
+        int label_y = (int)(cy - sin_a * (label_radius + radius_offset)) + y_offset;
 
         /* Create 36x36 label area centered at calculated position */
         lv_area_t area;
