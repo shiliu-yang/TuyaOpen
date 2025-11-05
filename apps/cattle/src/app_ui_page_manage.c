@@ -176,7 +176,9 @@ void app_page_load_initial(app_page_t *initial_page)
 
     // Initialize initial page
     if (initial_page->init) {
+        tuya_lvgl_mutex_lock();
         initial_page->init();
+        tuya_lvgl_mutex_unlock();
     }
 
     // Load page UI without animation for initial page
@@ -198,7 +200,7 @@ void app_page_load_initial(app_page_t *initial_page)
  */
 void app_page_load(app_page_t *new_page, lv_screen_load_anim_t anim_type, uint8_t need_lvgl_mutex)
 {
-    PR_DEBUG("Loading new page...");
+    PR_DEBUG("Loading new page..., need_lvgl_mutex: %d", need_lvgl_mutex);
 
     if (!new_page) {
         PR_ERR("Invalid page parameter");
@@ -244,7 +246,13 @@ void app_page_load(app_page_t *new_page, lv_screen_load_anim_t anim_type, uint8_
 
     // Initialize new page
     if (new_page->init) {
+        if (need_lvgl_mutex) {
+            tuya_lvgl_mutex_lock();
+        }
         new_page->init();
+        if (need_lvgl_mutex) {
+            tuya_lvgl_mutex_unlock();
+        }
     }
 
     // Load page UI with animation
@@ -253,7 +261,11 @@ void app_page_load(app_page_t *new_page, lv_screen_load_anim_t anim_type, uint8_
         if (need_lvgl_mutex) {
             tuya_lvgl_mutex_lock();
         }
-        lv_scr_load_anim(*new_page->page_obj, anim_type, 300, 0, false);
+        if (anim_type == LV_SCR_LOAD_ANIM_NONE) {
+            lv_scr_load(*new_page->page_obj);
+        } else {
+            lv_scr_load_anim(*new_page->page_obj, anim_type, 300, 0, false);
+        }
         if (need_lvgl_mutex) {
             tuya_lvgl_mutex_unlock();
         }
@@ -305,7 +317,13 @@ void app_page_back(lv_screen_load_anim_t anim_type, uint8_t need_lvgl_mutex)
     app_page_t *prev_page = page_stack_top(&s_page_stack);
     if (prev_page) {
         if (prev_page->init) {
+            if (need_lvgl_mutex) {
+                tuya_lvgl_mutex_lock();
+            }
             prev_page->init();
+            if (need_lvgl_mutex) {
+                tuya_lvgl_mutex_unlock();
+            }
         }
 
         // Load previous page UI with animation
@@ -314,7 +332,11 @@ void app_page_back(lv_screen_load_anim_t anim_type, uint8_t need_lvgl_mutex)
             if (need_lvgl_mutex) {
                 tuya_lvgl_mutex_lock();
             }
-            lv_scr_load_anim(*prev_page->page_obj, anim_type, 300, 0, false);
+            if (anim_type == LV_SCR_LOAD_ANIM_NONE) {
+                lv_scr_load(*prev_page->page_obj);
+            } else {
+                lv_scr_load_anim(*prev_page->page_obj, anim_type, 300, 0, false);
+            }
             if (need_lvgl_mutex) {
                 tuya_lvgl_mutex_unlock();
             }
@@ -357,7 +379,13 @@ void app_page_back_to_bottom(lv_screen_load_anim_t anim_type, uint8_t need_lvgl_
     app_page_t *bottom_page = page_stack_top(&s_page_stack);
     if (bottom_page) {
         if (bottom_page->init) {
+            if (need_lvgl_mutex) {
+                tuya_lvgl_mutex_lock();
+            }
             bottom_page->init();
+            if (need_lvgl_mutex) {
+                tuya_lvgl_mutex_unlock();
+            }
         }
 
         // Load bottom page UI with animation
@@ -366,7 +394,11 @@ void app_page_back_to_bottom(lv_screen_load_anim_t anim_type, uint8_t need_lvgl_
             if (need_lvgl_mutex) {
                 tuya_lvgl_mutex_lock();
             }
-            lv_scr_load_anim(*bottom_page->page_obj, anim_type, 300, 0, false);
+            if (anim_type == LV_SCR_LOAD_ANIM_NONE) {
+                lv_scr_load(*bottom_page->page_obj);
+            } else {
+                lv_scr_load_anim(*bottom_page->page_obj, anim_type, 300, 0, false);
+            }
             if (need_lvgl_mutex) {
                 tuya_lvgl_mutex_unlock();
             }

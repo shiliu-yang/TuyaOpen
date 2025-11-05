@@ -13,6 +13,12 @@ void sos_countdown_start(lv_event_t * e)
     // Your code here
 }
 
+void sos_cancel_clicked(lv_event_t * e)
+{
+    // Notify external code that cancel button was clicked
+    PR_DEBUG("SOS cancel button clicked");
+}
+
 void ai_chat_event_callback(lv_event_t * e)
 {
     lv_dir_t dir = lv_indev_get_gesture_dir(lv_indev_get_act());

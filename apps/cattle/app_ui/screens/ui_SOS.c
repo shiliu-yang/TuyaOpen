@@ -4,89 +4,368 @@
 // Project name: cattle_Project
 
 #include "../ui.h"
+#include "../ui_events.h"
+#include <stdio.h>
 
-lv_obj_t * ui_SOS = NULL;
-lv_obj_t * ui_label_SOS = NULL;
-lv_obj_t * ui_container_count_down = NULL;
-lv_obj_t * ui_label_count_down = NULL;
-lv_obj_t * ui_label_bottom = NULL;
-// event funtions
-void ui_event_SOS(lv_event_t * e)
+#include "tal_api.h"
+
+/* SOS Configuration */
+#define SOS_CIRCLE_NUM 3
+#define CATTLE_SCREEN_WIDTH 466
+
+/* Screen objects */
+lv_obj_t *ui_SOS = NULL;
+lv_obj_t *ui_label_SOS = NULL;
+lv_obj_t *ui_container_count_down = NULL;
+lv_obj_t *ui_label_count_down = NULL;
+lv_obj_t *ui_label_bottom = NULL;
+
+/* SOS animation objects */
+static lv_obj_t *sos_circles[SOS_CIRCLE_NUM] = {NULL, NULL, NULL};
+static lv_obj_t *sos_cancel_btn = NULL;
+static lv_timer_t *countdown_timer = NULL;
+static int countdown_value = 3;
+static bool sos_active = false;
+
+/* Forward declarations */
+static void on_sos_circle_size_anim(void *var, int32_t value);
+static void on_countdown_timer(lv_timer_t *timer);
+static void start_sos_circle_animations(void);
+static void on_cancel_btn_clicked(lv_event_t *e);
+
+/* Animation callback for SOS circles - LV_RADIUS_CIRCLE auto-maintains perfect circle */
+static void on_sos_circle_size_anim(void *var, int32_t value)
 {
-    lv_event_code_t event_code = lv_event_get_code(e);
+    lv_obj_t *obj = (lv_obj_t *)var;
+    /* Set size only - radius is automatically maintained by LV_RADIUS_CIRCLE */
+    lv_obj_set_size(obj, value, value);
+}
 
-    if(event_code == LV_EVENT_SCREEN_LOADED) {
-        sos_countdown_start(e);
+/* Start or restart SOS circle animations */
+static void start_sos_circle_animations(void)
+{
+    for (int i = 0; i < SOS_CIRCLE_NUM; i++) {
+        if (!sos_circles[i]) continue;
+        
+        /* Check if animation already exists on this object */
+        lv_anim_t *size_anim_exists = lv_anim_get(sos_circles[i], on_sos_circle_size_anim);
+        
+        /* Only create animation if it doesn't already exist */
+        if (size_anim_exists == NULL) {
+            lv_anim_t size_anim;
+            lv_anim_init(&size_anim);
+            lv_anim_set_var(&size_anim, sos_circles[i]);
+            lv_anim_set_values(&size_anim, 100 + i * 50, 150 + i * 70);
+            lv_anim_set_time(&size_anim, 2000 + i * 300);
+            lv_anim_set_repeat_count(&size_anim, LV_ANIM_REPEAT_INFINITE);
+            lv_anim_set_playback_time(&size_anim, 2000 + i * 300);
+            lv_anim_set_exec_cb(&size_anim, on_sos_circle_size_anim);
+            lv_anim_start(&size_anim);
+        }
     }
 }
 
-// build funtions
+/* Cancel button click handler */
+static void on_cancel_btn_clicked(lv_event_t *e)
+{
+    /* Notify external code through ui_events.c */
+    sos_cancel_clicked(e);
+    
+    /* Execute internal cancel logic */
+    // sos_cancel();
+}
 
+/* Countdown timer callback */
+static void on_countdown_timer(lv_timer_t *timer)
+{
+    (void)timer; /* Unused parameter */
+    countdown_value--;
+    
+    if (countdown_value > 0) {
+        char countdown_str[4];
+        snprintf(countdown_str, sizeof(countdown_str), "%d", countdown_value);
+        lv_label_set_text(ui_label_count_down, countdown_str);
+    } else {
+        /* Countdown finished - show full SOS interface */
+        lv_timer_del(countdown_timer);
+        countdown_timer = NULL;
+        
+        /* Hide countdown elements and instruction text */
+        lv_obj_add_flag(ui_container_count_down, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_label_bottom, LV_OBJ_FLAG_HIDDEN);
+        
+        /* Show SOS circles and cancel button (SOS title already visible) */
+        for (int i = 0; i < SOS_CIRCLE_NUM; i++) {
+            if (sos_circles[i]) {
+                lv_obj_clear_flag(sos_circles[i], LV_OBJ_FLAG_HIDDEN);
+            }
+        }
+        if (sos_cancel_btn) {
+            lv_obj_clear_flag(sos_cancel_btn, LV_OBJ_FLAG_HIDDEN);
+        }
+        
+        /* Start SOS circle animations */
+        start_sos_circle_animations();
+    }
+}
+
+/* Event functions */
+void ui_event_SOS(lv_event_t *e)
+{
+    lv_event_code_t event_code = lv_event_get_code(e);
+
+    if (event_code == LV_EVENT_SCREEN_LOADED) {
+        ui_sos_screen_countdown_start(e);
+    } else if (event_code == LV_EVENT_SCREEN_UNLOADED) {
+        /* Stop countdown and animations when leaving the screen */
+        sos_cancel();
+    }
+}
+
+/* Build functions */
 void ui_SOS_screen_init(void)
 {
+    PR_DEBUG("ui_SOS_screen_init");
+
     if (ui_SOS != NULL) {
+        PR_DEBUG("ui_SOS already initialized");
         return;
     }
 
+    /* Create main SOS screen */
     ui_SOS = lv_obj_create(NULL);
-    lv_obj_remove_flag(ui_SOS, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
+    lv_obj_remove_flag(ui_SOS, LV_OBJ_FLAG_SCROLLABLE);
+    
+    /* Set black background immediately to cover previous screen */
     lv_obj_set_style_bg_color(ui_SOS, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_opa(ui_SOS, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_opa(ui_SOS, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
+    
+    /* Force background to render immediately */
+    lv_obj_move_background(ui_SOS);
+    lv_refr_now(NULL);
+    
+    /* Disable all scrolling flags */
+    lv_obj_clear_flag(ui_SOS, LV_OBJ_FLAG_SCROLL_ELASTIC);
+    lv_obj_clear_flag(ui_SOS, LV_OBJ_FLAG_SCROLL_MOMENTUM);
+    lv_obj_clear_flag(ui_SOS, LV_OBJ_FLAG_SCROLL_ONE);
+    lv_obj_clear_flag(ui_SOS, LV_OBJ_FLAG_SCROLL_CHAIN);
+    
+    /* Enable circular clipping */
+    lv_obj_set_style_clip_corner(ui_SOS, true, 0);
+    lv_obj_set_style_radius(ui_SOS, LV_RADIUS_CIRCLE, 0);
 
+    /* Create 3 animated circles with red shades - optimized for performance */
+    uint32_t red_shades[3] = {0xFF0000, 0xFF3333, 0xFF6666};
+    uint8_t opa_values[3] = {LV_OPA_40, LV_OPA_30, LV_OPA_20};  /* Static opacity */
+    
+    for (int i = 0; i < SOS_CIRCLE_NUM; i++) {
+        sos_circles[i] = lv_obj_create(ui_SOS);
+        lv_obj_set_size(sos_circles[i], 120 + i * 60, 120 + i * 60);
+        lv_obj_center(sos_circles[i]);
+        lv_obj_set_style_radius(sos_circles[i], LV_RADIUS_CIRCLE, 0);
+        lv_obj_set_style_bg_color(sos_circles[i], lv_color_hex(red_shades[i]), 0);
+        lv_obj_set_style_bg_opa(sos_circles[i], opa_values[i], 0);
+        lv_obj_set_style_border_width(sos_circles[i], 0, 0);
+        lv_obj_clear_flag(sos_circles[i], LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_add_flag(sos_circles[i], LV_OBJ_FLAG_HIDDEN); /* Initially hidden */
+    }
+    PR_DEBUG("ui_SOS_screen_init: sos_circles created");
+    
+    /* Animations will be started after countdown finishes */
+
+    /* SOS title label */
     ui_label_SOS = lv_label_create(ui_SOS);
-    lv_obj_set_width(ui_label_SOS, LV_SIZE_CONTENT);   /// 1
-    lv_obj_set_height(ui_label_SOS, LV_SIZE_CONTENT);    /// 1
-    lv_obj_set_x(ui_label_SOS, 0);
-    lv_obj_set_y(ui_label_SOS, 60);
-    lv_obj_set_align(ui_label_SOS, LV_ALIGN_TOP_MID);
+    lv_obj_set_width(ui_label_SOS, LV_SIZE_CONTENT);
+    lv_obj_set_height(ui_label_SOS, LV_SIZE_CONTENT);
+    lv_obj_align(ui_label_SOS, LV_ALIGN_TOP_MID, 0, 60);
     lv_label_set_text(ui_label_SOS, "SOS");
     lv_obj_set_style_text_color(ui_label_SOS, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(ui_label_SOS, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(ui_label_SOS, &lv_font_montserrat_32, LV_PART_MAIN | LV_STATE_DEFAULT);
-
+    lv_obj_add_flag(ui_label_SOS, LV_OBJ_FLAG_HIDDEN); /* Initially hidden */
+    PR_DEBUG("ui_SOS_screen_init: ui_label_SOS created");
+    /* Countdown container (red circle) */
     ui_container_count_down = lv_obj_create(ui_SOS);
     lv_obj_remove_style_all(ui_container_count_down);
-    lv_obj_set_width(ui_container_count_down, 180);
-    lv_obj_set_height(ui_container_count_down, 180);
+    lv_obj_set_size(ui_container_count_down, 200, 200);
     lv_obj_set_align(ui_container_count_down, LV_ALIGN_CENTER);
-    lv_obj_remove_flag(ui_container_count_down, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);      /// Flags
-    lv_obj_set_style_radius(ui_container_count_down, 32767, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_color(ui_container_count_down, lv_color_hex(0xF04C4C), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_opa(ui_container_count_down, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-
+    lv_obj_remove_flag(ui_container_count_down, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_style_radius(ui_container_count_down, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(ui_container_count_down, lv_color_hex(0xFF0000), 0);
+    lv_obj_set_style_bg_opa(ui_container_count_down, LV_OPA_60, 0);
+    PR_DEBUG("ui_SOS_screen_init: ui_container_count_down created");
+    /* Countdown number label */
     ui_label_count_down = lv_label_create(ui_container_count_down);
-    lv_obj_set_width(ui_label_count_down, LV_SIZE_CONTENT);   /// 1
-    lv_obj_set_height(ui_label_count_down, LV_SIZE_CONTENT);    /// 1
+    lv_obj_set_width(ui_label_count_down, LV_SIZE_CONTENT);
+    lv_obj_set_height(ui_label_count_down, LV_SIZE_CONTENT);
     lv_obj_set_align(ui_label_count_down, LV_ALIGN_CENTER);
     lv_label_set_text(ui_label_count_down, "3");
     lv_obj_set_style_text_color(ui_label_count_down, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(ui_label_count_down, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(ui_label_count_down, &ui_font_mont_82, LV_PART_MAIN | LV_STATE_DEFAULT);
-
+    PR_DEBUG("ui_SOS_screen_init: ui_label_count_down created");
+    /* Bottom label - "紧急报警" */
     ui_label_bottom = lv_label_create(ui_SOS);
-    lv_obj_set_width(ui_label_bottom, LV_SIZE_CONTENT);   /// 1
-    lv_obj_set_height(ui_label_bottom, LV_SIZE_CONTENT);    /// 1
-    lv_obj_set_x(ui_label_bottom, 0);
-    lv_obj_set_y(ui_label_bottom, -66);
-    lv_obj_set_align(ui_label_bottom, LV_ALIGN_BOTTOM_MID);
-    lv_label_set_text(ui_label_bottom, "SOS Bottom");
+    lv_obj_set_width(ui_label_bottom, 172);
+    lv_obj_set_height(ui_label_bottom, 48);
+    lv_obj_align(ui_label_bottom, LV_ALIGN_BOTTOM_MID, 0, -66);
+    lv_label_set_text(ui_label_bottom, "长按三秒通知紧急联系人");
+    lv_label_set_long_mode(ui_label_bottom, LV_LABEL_LONG_WRAP);
+    lv_obj_set_style_text_align(ui_label_bottom, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_color(ui_label_bottom, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(ui_label_bottom, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(ui_label_bottom, &lv_font_montserrat_24, LV_PART_MAIN | LV_STATE_DEFAULT);
-
+    lv_obj_add_flag(ui_label_bottom, LV_OBJ_FLAG_HIDDEN); /* Initially hidden */
+    PR_DEBUG("ui_SOS_screen_init: ui_label_bottom created");
+    /* Cancel button - shown after countdown */
+    sos_cancel_btn = lv_obj_create(ui_SOS);
+    lv_obj_remove_style_all(sos_cancel_btn);
+    lv_obj_set_size(sos_cancel_btn, 209, 66);
+    lv_obj_align(sos_cancel_btn, LV_ALIGN_BOTTOM_MID, 0, -40);
+    lv_obj_set_style_radius(sos_cancel_btn, 180, 0);
+    lv_obj_set_style_bg_color(sos_cancel_btn, lv_color_hex(0x333333), 0);
+    lv_obj_set_style_bg_opa(sos_cancel_btn, LV_OPA_COVER, 0);
+    lv_obj_add_flag(sos_cancel_btn, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_clear_flag(sos_cancel_btn, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(sos_cancel_btn, LV_OBJ_FLAG_HIDDEN); /* Initially hidden */
+    lv_obj_add_event_cb(sos_cancel_btn, on_cancel_btn_clicked, LV_EVENT_CLICKED, NULL);
+    PR_DEBUG("ui_SOS_screen_init: sos_cancel_btn created");
+    /* Cancel button label */
+    lv_obj_t *cancel_label = lv_label_create(sos_cancel_btn);
+    lv_obj_set_width(cancel_label, LV_SIZE_CONTENT);
+    lv_obj_set_height(cancel_label, LV_SIZE_CONTENT);
+    lv_obj_align(cancel_label, LV_ALIGN_CENTER, 0, 0);
+    lv_label_set_text(cancel_label, "Cancel");
+    lv_obj_set_style_text_color(cancel_label, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_opa(cancel_label, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(cancel_label, &lv_font_montserrat_22, LV_PART_MAIN | LV_STATE_DEFAULT);
+    PR_DEBUG("ui_SOS_screen_init: cancel_label created");
+    /* Add event callback */
     lv_obj_add_event_cb(ui_SOS, ui_event_SOS, LV_EVENT_ALL, NULL);
-
+    PR_DEBUG("ui_SOS_screen_init: ui_SOS created");
 }
 
 void ui_SOS_screen_destroy(void)
 {
-    if(ui_SOS) lv_obj_del(ui_SOS);
+    /* Stop countdown timer if running */
+    if (countdown_timer != NULL) {
+        lv_timer_del(countdown_timer);
+        countdown_timer = NULL;
+    }
+    
+    /* Stop all animations on SOS circles */
+    for (int i = 0; i < SOS_CIRCLE_NUM; i++) {
+        if (sos_circles[i] != NULL) {
+            lv_anim_del(sos_circles[i], NULL);
+            sos_circles[i] = NULL;
+        }
+    }
+    
+    if (ui_SOS) {
+        lv_obj_del(ui_SOS);
+    }
 
-    // NULL screen variables
+    /* NULL all screen variables */
     ui_SOS = NULL;
     ui_label_SOS = NULL;
     ui_container_count_down = NULL;
     ui_label_count_down = NULL;
     ui_label_bottom = NULL;
+    sos_cancel_btn = NULL;
+    sos_active = false;
+}
 
+/* Public API to start SOS countdown */
+void ui_sos_screen_countdown_start(lv_event_t *e)
+{
+    (void)e; /* Unused parameter */
+    
+    /* If already active, stop current countdown first */
+    if (sos_active) {
+        if (countdown_timer != NULL) {
+            lv_timer_del(countdown_timer);
+            countdown_timer = NULL;
+        }
+    }
+
+    if (true == sos_active) {
+        return;
+    }
+    
+    sos_active = true;
+    countdown_value = 3;
+    
+    /* Show countdown elements, SOS title, and bottom instruction text */
+    lv_obj_clear_flag(ui_container_count_down, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_clear_flag(ui_label_SOS, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_clear_flag(ui_label_bottom, LV_OBJ_FLAG_HIDDEN);
+    lv_label_set_text(ui_label_count_down, "3");
+    
+    /* Hide circles and cancel button during countdown */
+    for (int i = 0; i < SOS_CIRCLE_NUM; i++) {
+        if (sos_circles[i]) {
+            lv_obj_add_flag(sos_circles[i], LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+    if (sos_cancel_btn) {
+        lv_obj_add_flag(sos_cancel_btn, LV_OBJ_FLAG_HIDDEN);
+    }
+    
+    /* Start countdown timer */
+    countdown_timer = lv_timer_create(on_countdown_timer, 1000, NULL);
+    lv_timer_set_repeat_count(countdown_timer, 3);
+}
+
+/* Public API to cancel SOS */
+void sos_cancel(void)
+{
+    if (NULL == ui_SOS) {
+        return;
+    }
+
+    if (false == sos_active) {
+        return;
+    }
+
+    sos_active = false;
+    
+    /* Stop countdown timer if running */
+    if (countdown_timer != NULL) {
+        lv_timer_del(countdown_timer);
+        countdown_timer = NULL;
+    }
+    
+    /* Stop all animations first to prevent any updates during cleanup */
+    for (int i = 0; i < SOS_CIRCLE_NUM; i++) {
+        if (sos_circles[i] != NULL) {
+            lv_anim_del(sos_circles[i], NULL);
+        }
+    }
+    
+    /* Hide all elements */
+    if (ui_container_count_down != NULL) {
+        lv_obj_add_flag(ui_container_count_down, LV_OBJ_FLAG_HIDDEN);
+    }
+    if (ui_label_SOS != NULL) {
+        lv_obj_add_flag(ui_label_SOS, LV_OBJ_FLAG_HIDDEN);
+    }
+    if (ui_label_bottom != NULL) {
+        lv_obj_add_flag(ui_label_bottom, LV_OBJ_FLAG_HIDDEN);
+    }
+    if (sos_cancel_btn != NULL) {
+        lv_obj_add_flag(sos_cancel_btn, LV_OBJ_FLAG_HIDDEN);
+    }
+    for (int i = 0; i < SOS_CIRCLE_NUM; i++) {
+        if (sos_circles[i] != NULL) {
+            lv_obj_add_flag(sos_circles[i], LV_OBJ_FLAG_HIDDEN);
+            /* Reset circle size to initial state */
+            lv_obj_set_size(sos_circles[i], 120 + i * 60, 120 + i * 60);
+        }
+    }
+    
+    /* Force immediate refresh to clear all visual elements */
+    lv_refr_now(NULL);
+    
+    /* Reset countdown value */
+    countdown_value = 3;
 }

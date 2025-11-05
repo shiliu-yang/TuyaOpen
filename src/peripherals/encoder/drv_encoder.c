@@ -35,7 +35,10 @@ static void __gpio_irq_callback(void *args)
 {
     (void)args; // Suppress unused parameter warning
 
-    tal_semaphore_post(example_sem_hdl);
+    if (NULL != example_sem_hdl) {
+        tkl_gpio_irq_disable(DECODER_INPUT_A);
+        tal_semaphore_post(example_sem_hdl);
+    }
 }
 
 /**
@@ -99,6 +102,7 @@ static void __sema_wait_task(void *args)
                 break;
             }
         }
+        tkl_gpio_irq_enable(DECODER_INPUT_A);
 
         if (THREAD_STATE_STOP == tal_thread_get_state(wait_thrd_hdl)) {
             break;

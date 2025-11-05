@@ -19,7 +19,10 @@ extern lv_obj_t * ui_label_SOS;
 extern lv_obj_t * ui_container_count_down;
 extern lv_obj_t * ui_label_count_down;
 extern lv_obj_t * ui_label_bottom;
-// CUSTOM VARIABLES
+
+// CUSTOM VARIABLES & FUNCTIONS
+extern void ui_sos_screen_countdown_start(lv_event_t *e);
+extern void sos_cancel(void);
 
 #ifdef __cplusplus
 } /*extern "C"*/

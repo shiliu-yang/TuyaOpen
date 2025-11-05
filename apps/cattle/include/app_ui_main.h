@@ -34,6 +34,8 @@ extern app_page_t tracker_close_page;
 
 OPERATE_RET app_ui_main_init(void);
 
+void app_ui_SOS_screen_load(uint8_t load);
+
 #ifdef __cplusplus
 }
 #endif

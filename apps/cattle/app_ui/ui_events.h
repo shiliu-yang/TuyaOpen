@@ -13,6 +13,7 @@ extern "C" {
 void ai_chat_event_callback(lv_event_t * e);
 void setting_event_callback(lv_event_t * e);
 void sos_countdown_start(lv_event_t * e);
+void sos_cancel_clicked(lv_event_t * e);
 void tracker_event_callback(lv_event_t * e);
 void tracker_close_event_callback(lv_event_t * e);
 

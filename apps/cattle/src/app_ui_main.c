@@ -51,7 +51,7 @@ app_page_t setting_page = {
 
 app_page_t sos_page = {
     .init = ui_SOS_screen_init,
-    .deinit = NULL,
+    .deinit = ui_SOS_screen_destroy,
     .page_obj = &ui_SOS,
 };
 
@@ -108,4 +108,34 @@ OPERATE_RET app_ui_main_init(void)
     TUYA_CALL_ERR_RETURN(tal_thread_create_and_start(&ui_thrd_hdl, NULL, NULL, __chat_bot_ui_task, NULL, &cfg));
 
     return OPRT_OK;
+}
+
+// SOS screen load
+static uint8_t s_load = 0;
+
+static void __SOS_screen_load_cb(void *data)
+{
+    (void)data;
+
+    if (s_load) {
+        app_page_load(&sos_page, LV_SCR_LOAD_ANIM_NONE, 1);
+    } else {
+        /* Call sos_cancel before going back to clean up state */
+        tuya_lvgl_mutex_lock();
+        sos_cancel();
+        tuya_lvgl_mutex_unlock();        
+        /* app_page_back will call ui_SOS_screen_destroy automatically */
+        app_page_back(LV_SCR_LOAD_ANIM_NONE, 1);
+    }
+}
+
+void app_ui_SOS_screen_load(uint8_t load)
+{
+    if (s_load == load) {
+        return;
+    }
+
+    s_load = load;
+
+    tal_workq_schedule(WORKQ_SYSTEM, __SOS_screen_load_cb, NULL);
 }
