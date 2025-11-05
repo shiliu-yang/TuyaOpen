@@ -16,11 +16,15 @@
 /* Enable test mode: auto-rotate compass and change distance every 3 seconds */
 #define UI_TRACKER_TEST_MODE 1
 
+/* Enable detailed debug logging */
+#define UI_TRACKER_DEBUG_POSITION 0
+
 /* Compass objects storage */
 
 lv_obj_t *ui_tracker = NULL;
 lv_obj_t *ui_image_search_scope = NULL;
 lv_obj_t *ui_image_cattle = NULL;
+lv_obj_t *ui_heading_label = NULL;  /* Heading display label */
 
 volatile uint32_t ui_total_distance = 0;  // Total distance variable
 volatile float ui_heading_degrees = 0.0f; // Heading in degrees
@@ -29,9 +33,23 @@ volatile float ui_heading_degrees = 0.0f; // Heading in degrees
 static lv_obj_t *compass_canvas = NULL;
 static uint8_t *compass_canvas_buf = NULL;
 
+/* Animation state for smooth transitions */
+static float current_heading = 0.0f;     /* Current animated heading */
+static float target_heading = 0.0f;      /* Target heading to animate to */
+static uint32_t current_distance = 0;    /* Current distance (no animation) */
+static uint32_t target_distance = 0;     /* Target distance */
+static float current_bearing = 0.0f;     /* Current bearing for cattle */
+static float target_bearing = 0.0f;      /* Target bearing */
+static lv_anim_t heading_anim;           /* Heading animation object */
+static bool animations_initialized = false;
+
 /* Forward declarations */
 static void draw_compass_and_intervals(lv_obj_t *canvas, float heading, uint32_t distance);
 static void update_canvas(float heading, uint32_t distance);
+static void update_cattle_position(uint32_t distance, float heading, float bearing);
+static void on_heading_anim_update(void *var, int32_t value);
+static float normalize_angle(float angle);
+static float calculate_shortest_rotation(float from, float to);
 
 #if UI_TRACKER_TEST_MODE
 static lv_timer_t *test_timer = NULL;
@@ -57,6 +75,15 @@ void ui_tracker_screen_init(void)
     if (ui_tracker != NULL) {
         return;
     }
+
+    /* Reset animation state */
+    animations_initialized = false;
+    current_heading = 0.0f;
+    target_heading = 0.0f;
+    current_distance = 0;
+    target_distance = 0;
+    current_bearing = 0.0f;
+    target_bearing = 0.0f;
 
     ui_tracker = lv_obj_create(NULL);
     lv_obj_remove_flag(ui_tracker, LV_OBJ_FLAG_SCROLLABLE); /// Flags
@@ -103,7 +130,7 @@ void ui_tracker_screen_init(void)
         // PR_DEBUG("Compass canvas created successfully (466x466)");
     }
 
-    ui_tracker_target_update(10000, 0.0f);
+    ui_tracker_target_update(10000, 0.0f, 0.0f);
 
     ui_image_search_scope = lv_image_create(ui_tracker);
     lv_image_set_src(ui_image_search_scope, &ui_img_image_search_scope_png);
@@ -124,6 +151,27 @@ void ui_tracker_screen_init(void)
     lv_obj_remove_flag(ui_image_cattle, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC |
                                             LV_OBJ_FLAG_SCROLL_MOMENTUM | LV_OBJ_FLAG_SCROLL_CHAIN); /// Flags
 
+    /* Create heading display label at position (179, 338) */
+    ui_heading_label = lv_obj_create(ui_tracker);
+    lv_obj_set_size(ui_heading_label, 107, 48);
+    lv_obj_set_pos(ui_heading_label, 179, 345);
+    lv_obj_set_style_bg_color(ui_heading_label, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(ui_heading_label, (lv_opa_t)(0.30 * 255), LV_PART_MAIN); /* rgba(255,255,255,0.30) */
+    lv_obj_set_style_radius(ui_heading_label, 180, LV_PART_MAIN); /* Fully rounded */
+    lv_obj_set_style_border_width(ui_heading_label, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_left(ui_heading_label, 22, LV_PART_MAIN);
+    lv_obj_set_style_pad_right(ui_heading_label, 22, LV_PART_MAIN);
+    lv_obj_set_style_pad_top(ui_heading_label, 8, LV_PART_MAIN);
+    lv_obj_set_style_pad_bottom(ui_heading_label, 8, LV_PART_MAIN);
+    lv_obj_clear_flag(ui_heading_label, LV_OBJ_FLAG_SCROLLABLE);
+
+    /* Create text label inside the heading container */
+    lv_obj_t *heading_text = lv_label_create(ui_heading_label);
+    lv_label_set_text(heading_text, "0.0°");
+    lv_obj_set_style_text_color(heading_text, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+    lv_obj_set_style_text_font(heading_text, &lv_font_montserrat_20, LV_PART_MAIN);
+    lv_obj_center(heading_text);
+
     lv_obj_add_event_cb(ui_tracker, ui_event_tracker, LV_EVENT_ALL, NULL);
 
 #if UI_TRACKER_TEST_MODE
@@ -141,6 +189,10 @@ void ui_tracker_screen_init(void)
  */
 static void draw_compass_and_intervals(lv_obj_t *canvas, float heading, uint32_t distance)
 {
+#if UI_TRACKER_DEBUG_POSITION
+    PR_DEBUG("Drawing compass and intervals: heading=%.2f°, distance=%um,", heading, distance);
+#endif
+
     /* Use fixed size since canvas size may not be updated immediately after creation */
     const int32_t w = 466;
     const int32_t h = 466;
@@ -161,8 +213,13 @@ static void draw_compass_and_intervals(lv_obj_t *canvas, float heading, uint32_t
     /* ===== PART 1: Draw interval distance circles ===== */
 
     /* Calculate map scale based on total distance */
-    float screen_radius = 200; /* Use 200 as reference radius for distance scaling */
-    float map_scale = (distance > 0) ? (float)distance / screen_radius : 1.0f;
+    /* Scale ruler position: specified coordinates */
+    const int32_t ruler_right_x = 390;                    /* Right arrow at x=390 */
+    const int32_t cx_to_ruler_right = ruler_right_x - cx; /* Distance from center to right arrow */
+
+    /* The right arrow should always align with the outermost circle */
+    /* So we set the outermost circle radius to match the ruler right position */
+    float screen_radius = (float)cx_to_ruler_right; /* Use ruler right position as reference radius */
 
     /* Step size lookup table */
     static const struct {
@@ -173,21 +230,32 @@ static void draw_compass_and_intervals(lv_obj_t *canvas, float heading, uint32_t
         {200.0f, 50.0f},         /* 50m steps at 200m scale */
         {500.0f, 100.0f},        /* 100m steps for medium scales */
         {1000.0f, 200.0f},       /* 200m steps at 1KM scale */
-        {2000.0f, 100.0f},       /* 100m steps for larger scales */
+        {2000.0f, 200.0f},       /* 200m steps for 2KM scale (was 100m) */
         {10000.0f, 1000.0f},     /* 1km steps for km scales */
         {50000.0f, 5000.0f},     /* 5km steps for larger km scales */
         {200000.0f, 20000.0f},   /* 20km steps for very large scales */
         {999999999.0f, 50000.0f} /* 50km steps for huge scales */
     };
 
-    /* Find appropriate step size */
+    /* Find appropriate step size and max_distance for the current distance */
     float step_size = 50000.0f;
+    float current_max_distance = 200000.0f;
     for (int i = 0; i < 9; i++) {
         if (distance <= step_lookup[i].max_distance) {
             step_size = step_lookup[i].step_size;
+            current_max_distance = step_lookup[i].max_distance;
             break;
         }
     }
+
+    /* Calculate map scale based on current_max_distance (not actual distance) */
+    /* This ensures the outermost circle always aligns with the ruler right arrow */
+    float map_scale = (current_max_distance > 0) ? (float)current_max_distance / screen_radius : 1.0f;
+
+#if UI_TRACKER_DEBUG_POSITION
+    PR_DEBUG("Scale: distance=%um, max_distance=%.1fm, step=%.1fm, screen_r=%.1fpx, map_scale=%.2f", distance,
+             current_max_distance, step_size, screen_radius, map_scale);
+#endif
 
     /* Draw interval circles */
     lv_draw_arc_dsc_t circle_dsc;
@@ -199,12 +267,15 @@ static void draw_compass_and_intervals(lv_obj_t *canvas, float heading, uint32_t
     circle_dsc.start_angle = 0;
     circle_dsc.end_angle = 360;
 
-    /* Draw up to 12 interval circles, but keep them inside compass area */
+    /* Draw up to 12 interval circles, constrained by screen_radius */
     int max_circles = 12;
     float min_radius = 20.0f;
-    float max_radius = (float)(tick_radius - 20); /* Leave space for compass ticks */
+    /* Use screen_radius as max to ensure outermost circle aligns with ruler */
+    float max_radius = screen_radius + 1.0f; /* Allow slight overflow for rounding */
 
-    for (float interval = step_size; interval <= distance && max_circles > 0; interval += step_size) {
+    /* Draw circles from step_size up to current_max_distance */
+    /* This ensures the outermost circle is always at screen_radius (157px) */
+    for (float interval = step_size; interval <= current_max_distance && max_circles > 0; interval += step_size) {
         float circle_radius = interval / map_scale;
 
         /* Only draw circles within reasonable bounds */
@@ -212,6 +283,9 @@ static void draw_compass_and_intervals(lv_obj_t *canvas, float heading, uint32_t
             circle_dsc.radius = (int32_t)circle_radius;
             lv_draw_arc(&layer, &circle_dsc);
             max_circles--;
+#if UI_TRACKER_DEBUG_POSITION
+            PR_DEBUG("  Circle: interval=%.0fm, radius=%.1fpx", interval, circle_radius);
+#endif
         }
     }
 
@@ -274,12 +348,37 @@ static void draw_compass_and_intervals(lv_obj_t *canvas, float heading, uint32_t
         int y_offset = 10; /* Move downward 10px for all labels */
         if (actual_deg >= 120.0f && actual_deg <= 240.0f) {
             radius_offset = 5; /* Move outward 5px for bottom half */
-            // y_offset = 10;      /* Move downward 10px for bottom half */
         }
 
         /* Calculate label center position with optional offset */
         int label_x = (int)(cx + cos_a * (label_radius + radius_offset));
         int label_y = (int)(cy - sin_a * (label_radius + radius_offset)) + y_offset;
+        
+#if UI_TRACKER_DEBUG_POSITION
+        /* Debug print for N marker position */
+        if (deg == 0) {
+            /* Calculate N marker position without offsets for comparison */
+            int label_x_no_offset = (int)(cx + cos_a * label_radius);
+            int label_y_no_offset = (int)(cy - sin_a * label_radius);
+            
+            /* Calculate vector from center to N marker (with and without offset) */
+            float vec_x_offset = label_x - cx;
+            float vec_y_offset = label_y - cy;
+            float vec_x_no_offset = label_x_no_offset - cx;
+            float vec_y_no_offset = label_y_no_offset - cy;
+            
+            /* Calculate angle from center to N marker */
+            float angle_to_n_offset = atan2f(vec_y_offset, vec_x_offset) * 180.0f / M_PI;
+            float angle_to_n_no_offset = atan2f(vec_y_no_offset, vec_x_no_offset) * 180.0f / M_PI;
+            
+            PR_DEBUG("  N marker: angle_raw=%.2f°, pos_with_offset=(%d,%d), pos_no_offset=(%d,%d)", 
+                     90.0f - deg + heading, label_x, label_y, label_x_no_offset, label_y_no_offset);
+            PR_DEBUG("  N marker: vec_offset=(%.1f,%.1f), vec_no_offset=(%.1f,%.1f)", 
+                     vec_x_offset, vec_y_offset, vec_x_no_offset, vec_y_no_offset);
+            PR_DEBUG("  N marker: angle_to_center_offset=%.2f°, angle_no_offset=%.2f°, offset_applied=(%d,%d)", 
+                     angle_to_n_offset, angle_to_n_no_offset, radius_offset, y_offset);
+        }
+#endif
 
         /* Create 36x36 label area centered at calculated position */
         lv_area_t area;
@@ -307,6 +406,17 @@ static void draw_compass_and_intervals(lv_obj_t *canvas, float heading, uint32_t
         }
 
         lv_draw_label(&layer, &lbl_dsc, &area);
+        
+#if UI_TRACKER_DEBUG_POSITION
+        /* Debug print after drawing N label */
+        if (deg == 0) {
+            PR_DEBUG("  N label drawn: area=(%d,%d)-(%d,%d), center=(%d,%d), size=%dx%d", 
+                     area.x1, area.y1, area.x2, area.y2, 
+                     label_x, label_y,
+                     area.x2 - area.x1, area.y2 - area.y1);
+        }
+#endif
+        
         text_idx++;
     }
 
@@ -344,9 +454,9 @@ static void draw_compass_and_intervals(lv_obj_t *canvas, float heading, uint32_t
     /* ===== PART 3: Draw distance scale ruler ===== */
 
     /* Scale ruler position: specified coordinates */
-    const int32_t ruler_y = 239;        /* Y position at 239 */
-    const int32_t ruler_left_x = 253;   /* Left arrow at x=253 */
-    const int32_t ruler_right_x = 390;  /* Right arrow at x=390 */
+    const int32_t ruler_y = 239;      /* Y position at 239 */
+    const int32_t ruler_left_x = 253; /* Left arrow at x=253 */
+    /* ruler_right_x already defined above for map scale calculation */
     const int32_t arrow_size = 6;       /* Arrow triangle size */
     const int32_t ruler_line_width = 2; /* Ruler line width */
 
@@ -388,14 +498,7 @@ static void draw_compass_and_intervals(lv_obj_t *canvas, float heading, uint32_t
     lv_draw_triangle(&layer, &right_arrow_dsc);
 
     /* Draw distance label below the ruler */
-    /* Find current max_distance for the scale */
-    float current_max_distance = step_size; /* Default to step_size */
-    for (int i = 0; i < 9; i++) {
-        if (distance <= step_lookup[i].max_distance) {
-            current_max_distance = step_lookup[i].max_distance;
-            break;
-        }
-    }
+    /* current_max_distance already calculated above */
 
     /* Format distance text */
     char distance_text[32];
@@ -437,13 +540,261 @@ static void update_canvas(float heading, uint32_t distance)
     }
 }
 
-void ui_tracker_target_update(uint32_t total_distance, float heading_degrees)
+/**
+ * Update cattle icon position based on distance and heading
+ * @param distance Total distance to target in meters
+ * @param heading Current compass heading in degrees (0-360, 0=North)
+ * @param bearing Target bearing angle in degrees (0-360, 0=North, relative to true north)
+ */
+static void update_cattle_position(uint32_t distance, float heading, float bearing)
+{
+    if (!ui_image_cattle) {
+        return;
+    }
+
+    /* Screen parameters */
+    const int32_t SCREEN_WIDTH = 466;
+    const int32_t SCREEN_HEIGHT = 466;
+    const int32_t CENTER_X = SCREEN_WIDTH / 2;
+    const int32_t CENTER_Y = SCREEN_HEIGHT / 2;
+
+    /* Cattle icon size (from SquareLine Studio: 50x50) */
+    const int32_t ICON_HALF_SIZE = 25; /* 50 / 2 */
+
+    /* Screen radius matching the ruler right arrow position */
+    const int32_t RULER_RIGHT_X = 390;
+    const float SCREEN_RADIUS = (float)(RULER_RIGHT_X - CENTER_X); /* 157px */
+
+    /* Step size lookup table - same as in draw_compass_and_intervals */
+    static const struct {
+        float max_distance;
+        float step_size;
+    } step_lookup[] = {{100.0f, 20.0f},     {200.0f, 50.0f},       {500.0f, 100.0f},
+                       {1000.0f, 200.0f},   {2000.0f, 200.0f},     {10000.0f, 1000.0f},
+                       {50000.0f, 5000.0f}, {200000.0f, 20000.0f}, {999999999.0f, 50000.0f}};
+
+    /* Find current max_distance for map scale */
+    float current_max_distance = 200000.0f;
+    for (int i = 0; i < 9; i++) {
+        if (distance <= step_lookup[i].max_distance) {
+            current_max_distance = step_lookup[i].max_distance;
+            break;
+        }
+    }
+
+    /* Calculate map scale: same as in draw_compass_and_intervals */
+    float map_scale = (current_max_distance > 0) ? (float)current_max_distance / SCREEN_RADIUS : 1.0f;
+
+    /* Convert distance to pixels on screen */
+    float distance_pixels = (float)distance / map_scale;
+
+    /* Calculate position with heading offset */
+    /* bearing: target's absolute direction (0-360, 0=North)
+     * heading: compass current direction (0-360, 0=North)
+     * The compass rotates by 'heading', so we need to compensate:
+     * - bearing tells us where the target actually is
+     * - heading rotates the compass display
+     * - final angle = 90° - bearing + heading (to match LVGL coordinate system)
+     */
+    float angle_rad = (float)(90.0f - bearing + heading) * (float)M_PI / 180.0f;
+    float sin_a = sinf(angle_rad);
+    float cos_a = cosf(angle_rad);
+
+    /* Calculate pixel position */
+    float x_pixels = cos_a * distance_pixels;
+    float y_pixels = -sin_a * distance_pixels; /* Negative for screen coordinates */
+
+    /* Calculate distance from center */
+    float distance_from_center = sqrtf(x_pixels * x_pixels + y_pixels * y_pixels);
+
+    /* Calculate screen position */
+    float screen_x, screen_y;
+
+    if (distance_from_center > SCREEN_RADIUS) {
+        /* Target exceeds circle - position at boundary */
+        float boundary_angle = atan2f(y_pixels, x_pixels);
+        float boundary_x = cosf(boundary_angle) * SCREEN_RADIUS;
+        float boundary_y = sinf(boundary_angle) * SCREEN_RADIUS;
+
+        screen_x = CENTER_X + boundary_x - ICON_HALF_SIZE;
+        screen_y = CENTER_Y + boundary_y - ICON_HALF_SIZE;
+
+        /* Add border for targets beyond circle */
+        lv_obj_set_style_border_width(ui_image_cattle, 3, 0);
+        lv_obj_set_style_border_color(ui_image_cattle, lv_color_white(), 0);
+    } else {
+        /* Target is within circle - normal positioning */
+        screen_x = CENTER_X + x_pixels - ICON_HALF_SIZE;
+        screen_y = CENTER_Y + y_pixels - ICON_HALF_SIZE;
+
+        /* No border for targets within circle */
+        lv_obj_set_style_border_width(ui_image_cattle, 0, 0);
+    }
+
+    /* Update position */
+    /* Clear any alignment settings to ensure absolute positioning works correctly */
+    lv_obj_set_align(ui_image_cattle, LV_ALIGN_DEFAULT);
+    lv_obj_set_pos(ui_image_cattle, (int32_t)screen_x, (int32_t)screen_y);
+    
+#if UI_TRACKER_DEBUG_POSITION
+    /* Calculate cattle icon center for comparison with N marker */
+    float cattle_center_x = screen_x + ICON_HALF_SIZE;
+    float cattle_center_y = screen_y + ICON_HALF_SIZE;
+    
+    /* Calculate vector from screen center to cattle center */
+    float vec_to_cattle_x = cattle_center_x - CENTER_X;
+    float vec_to_cattle_y = cattle_center_y - CENTER_Y;
+    float angle_to_cattle = atan2f(vec_to_cattle_y, vec_to_cattle_x) * 180.0f / M_PI;
+
+    PR_DEBUG("Cattle: distance=%um, heading=%.1f°, bearing=%.1f°", distance, heading, bearing);
+    PR_DEBUG("Cattle: angle_calculated=%.2f°, distance_pixels=%.1f, map_scale=%.2f", 
+             (90.0f - bearing + heading), distance_pixels, map_scale);
+    PR_DEBUG("Cattle: x_pixels=%.1f, y_pixels=%.1f, distance_from_center=%.1f/%.1f", 
+             x_pixels, y_pixels, distance_from_center, SCREEN_RADIUS);
+    PR_DEBUG("Cattle: icon_pos=(%.1f,%.1f), icon_center=(%.1f,%.1f)", 
+             screen_x, screen_y, cattle_center_x, cattle_center_y);
+    PR_DEBUG("Cattle: vec_to_center=(%.1f,%.1f), angle_to_center=%.2f°", 
+             vec_to_cattle_x, vec_to_cattle_y, angle_to_cattle);
+#endif
+}
+
+/**
+ * Normalize angle to 0-360 range
+ */
+static float normalize_angle(float angle)
+{
+    while (angle < 0.0f) {
+        angle += 360.0f;
+    }
+    while (angle >= 360.0f) {
+        angle -= 360.0f;
+    }
+    return angle;
+}
+
+/**
+ * Calculate shortest rotation path from 'from' angle to 'to' angle
+ * Returns the target angle adjusted for shortest path
+ */
+static float calculate_shortest_rotation(float from, float to)
+{
+    from = normalize_angle(from);
+    to = normalize_angle(to);
+    
+    float diff = to - from;
+    
+    /* If difference is greater than 180°, go the other way */
+    if (diff > 180.0f) {
+        to -= 360.0f;
+    } else if (diff < -180.0f) {
+        to += 360.0f;
+    }
+    
+    return to;
+}
+
+/**
+ * Heading animation update callback
+ */
+static void on_heading_anim_update(void *var, int32_t value)
+{
+    (void)var; /* Unused */
+    
+    /* Update current heading (value is scaled by 10 for precision) */
+    current_heading = (float)value / 10.0f;
+    current_heading = normalize_angle(current_heading);
+    
+    /* Redraw canvas with new heading and latest distance */
+    update_canvas(current_heading, current_distance);
+    
+    /* Update cattle position with LATEST values (no animation for cattle) */
+    update_cattle_position(target_distance, target_heading, current_bearing);
+}
+
+void ui_tracker_target_update(uint32_t total_distance, float heading_degrees, float bearing_degrees)
 {
     ui_total_distance = total_distance;
     ui_heading_degrees = heading_degrees;
 
-    /* Update both compass and interval lines in one canvas redraw */
-    update_canvas(heading_degrees, total_distance);
+    /* Initialize animations on first call */
+    if (!animations_initialized) {
+        current_heading = heading_degrees;
+        target_heading = heading_degrees;
+        current_distance = total_distance;
+        target_distance = total_distance;
+        current_bearing = bearing_degrees;
+        target_bearing = bearing_degrees;
+        animations_initialized = true;
+        
+        /* Initial draw without animation */
+        update_canvas(current_heading, current_distance);
+        update_cattle_position(current_distance, current_heading, current_bearing);
+        
+        /* Update heading display label */
+        if (ui_heading_label) {
+            lv_obj_t *heading_text = lv_obj_get_child(ui_heading_label, 0);
+            if (heading_text) {
+                char heading_str[16];
+                snprintf(heading_str, sizeof(heading_str), "%.1f°", heading_degrees);
+                lv_label_set_text(heading_text, heading_str);
+            }
+        }
+        return;
+    }
+
+    /* Update target values */
+    target_heading = heading_degrees;
+    target_distance = total_distance;
+    target_bearing = bearing_degrees;
+    current_bearing = bearing_degrees; /* Bearing updates immediately */
+
+    /* Immediately update cattle position with new bearing (no animation) */
+    update_cattle_position(total_distance, heading_degrees, bearing_degrees);
+
+    /* Check if heading changed significantly (> 0.5 degrees) */
+    float heading_diff = fabsf(heading_degrees - current_heading);
+    if (heading_diff > 180.0f) {
+        heading_diff = 360.0f - heading_diff;
+    }
+    
+    if (heading_diff > 0.5f) {
+        /* Stop existing heading animation */
+        lv_anim_del(&heading_anim, NULL);
+        
+        /* Calculate shortest rotation path */
+        float anim_target = calculate_shortest_rotation(current_heading, target_heading);
+        
+        /* Create smooth heading animation */
+        lv_anim_init(&heading_anim);
+        lv_anim_set_var(&heading_anim, NULL);
+        lv_anim_set_values(&heading_anim, (int32_t)(current_heading * 10.0f), (int32_t)(anim_target * 10.0f));
+        lv_anim_set_exec_cb(&heading_anim, on_heading_anim_update);
+        lv_anim_set_time(&heading_anim, 800); /* 800ms smooth rotation */
+        lv_anim_set_path_cb(&heading_anim, lv_anim_path_ease_in_out);
+        lv_anim_start(&heading_anim);
+    } else {
+        /* No animation needed, update immediately */
+        current_heading = heading_degrees;
+        update_canvas(current_heading, current_distance);
+    }
+
+    /* Update distance immediately (no animation for circles) */
+    current_distance = total_distance;
+    
+    /* Only redraw canvas if not already updated by heading animation */
+    if (heading_diff <= 0.5f) {
+        update_canvas(current_heading, current_distance);
+    }
+    
+    /* Update heading display label */
+    if (ui_heading_label) {
+        lv_obj_t *heading_text = lv_obj_get_child(ui_heading_label, 0);
+        if (heading_text) {
+            char heading_str[16];
+            snprintf(heading_str, sizeof(heading_str), "%.1f°", heading_degrees);
+            lv_label_set_text(heading_text, heading_str);
+        }
+    }
 }
 
 void ui_tracker_screen_destroy(void)
@@ -456,6 +807,10 @@ void ui_tracker_screen_destroy(void)
     }
 #endif
 
+    /* Stop and clean up animations */
+    lv_anim_del(&heading_anim, NULL);
+    animations_initialized = false;
+
     if (ui_tracker)
         lv_obj_del(ui_tracker);
 
@@ -463,6 +818,7 @@ void ui_tracker_screen_destroy(void)
     ui_tracker = NULL;
     ui_image_search_scope = NULL;
     ui_image_cattle = NULL;
+    ui_heading_label = NULL;
 }
 
 #if UI_TRACKER_TEST_MODE
@@ -479,6 +835,7 @@ static float get_random_float(float min, float max)
  * Test timer callback: randomly update heading and distance
  * - Heading: 90° to 180° (random rotation)
  * - Distance: 10m to 10000m (random distance)
+ * - Bearing: 0° to 360° (random target direction)
  */
 static void ui_tracker_test_timer_cb(lv_timer_t *timer)
 {
@@ -490,9 +847,13 @@ static void ui_tracker_test_timer_cb(lv_timer_t *timer)
     /* Generate random distance: 10m to 10000m */
     uint32_t random_distance = (uint32_t)get_random_float(10.0f, 10000.0f);
 
-    /* Update tracker UI */
-    ui_tracker_target_update(random_distance, random_heading);
+    /* Generate random bearing: 0° to 360° */
+    // float random_bearing = get_random_float(0.0f, 360.0f);
 
-    // PR_DEBUG("Test update: heading=%.1f°, distance=%um", random_heading, random_distance);
+    /* Update tracker UI */
+    ui_tracker_target_update(random_distance, random_heading, 0.0);
+
+    // PR_DEBUG("Test update: heading=%.1f°, distance=%um, bearing=%.1f°", random_heading, random_distance,
+    // random_bearing);
 }
 #endif

@@ -13,15 +13,20 @@ extern "C" {
 // SCREEN: ui_tracker
 extern void ui_tracker_screen_init(void);
 extern void ui_tracker_screen_destroy(void);
-extern void ui_event_tracker(lv_event_t * e);
-extern lv_obj_t * ui_tracker;
+extern void ui_event_tracker(lv_event_t *e);
+extern lv_obj_t *ui_tracker;
 // CUSTOM VARIABLES
 
-void ui_tracker_target_update(uint32_t total_distance, float heading_degrees);
+/**
+ * Update tracker screen with target information
+ * @param total_distance Distance from tracker to cattle in meters
+ * @param heading_degrees Current compass heading in degrees (0-360, 0=North)
+ * @param bearing_degrees Target bearing angle in degrees (0-360, 0=North, relative to true north)
+ */
+void ui_tracker_target_update(uint32_t total_distance, float heading_degrees, float bearing_degrees);
 
 #ifdef __cplusplus
 } /*extern "C"*/
 #endif
 
 #endif
-
