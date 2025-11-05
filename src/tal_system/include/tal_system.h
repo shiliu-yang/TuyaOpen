@@ -157,6 +157,55 @@ void tal_system_delay(uint32_t time_ms);
  */
 OPERATE_RET tal_system_get_cpu_info(TUYA_CPU_INFO_T **cpu_ary, int32_t *cpu_cnt);
 
+#if defined(ENABLE_EXT_RAM) && (ENABLE_EXT_RAM == 1)
+/**
+ * @brief Allocate memory from PSRAM (external RAM)
+ *
+ * @param[in] size: size of memory to allocate in bytes
+ *
+ * @return pointer to allocated memory on success, NULL on failure
+ */
+void *tal_psram_malloc(size_t size);
+
+/**
+ * @brief Free memory allocated from PSRAM
+ *
+ * @param[in] ptr: pointer to memory block to be freed
+ *
+ * @return none
+ */
+void tal_psram_free(void *ptr);
+
+/**
+ * @brief Allocate and initialize memory from PSRAM
+ *
+ * @param[in] nitems: number of items to allocate
+ * @param[in] size: size of each item in bytes
+ *
+ * @return pointer to allocated and zero-initialized memory on success, NULL on failure
+ */
+void *tal_psram_calloc(size_t nitems, size_t size);
+
+/**
+ * @brief Reallocate memory from PSRAM
+ *
+ * @param[in] ptr: pointer to previously allocated memory block
+ * @param[in] size: new size in bytes
+ *
+ * @return pointer to reallocated memory on success, NULL on failure
+ */
+void *tal_psram_realloc(void *ptr, size_t size);
+
+/**
+ * @brief Get free heap size of PSRAM
+ *
+ * @param[in] none
+ *
+ * @return free heap size in bytes, negative value on error
+ */
+int tal_system_get_psram_free_heap_size(void);
+#endif
+
 #ifdef __cplusplus
 }
 #endif

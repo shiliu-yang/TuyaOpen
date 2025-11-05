@@ -141,6 +141,12 @@ void *tal_psram_realloc(void *ptr, size_t size)
 {
     return tkl_system_psram_realloc(ptr, size);
 }
+
+int tal_system_get_psram_free_heap_size(void)
+{
+    return tkl_system_psram_get_free_heap_size();
+}
+
 #endif
 
 /**

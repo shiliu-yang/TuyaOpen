@@ -1,0 +1,111 @@
+/**
+ * @file app_ui_main.c
+ * @brief app_ui_main module is used to
+ * @version 0.1
+ * @copyright Copyright (c) 2021-2025 Tuya Inc. All Rights Reserved.
+ */
+
+#include "app_ui_main.h"
+
+#include "ui.h"
+#include "screens/ui_ai_chat.h"
+#include "screens/ui_setting.h"
+#include "screens/ui_SOS.h"
+#include "screens/ui_tracker.h"
+#include "screens/ui_tracker_close.h"
+
+#include "app_ui_page_manage.h"
+
+#include "tuya_lvgl.h"
+
+#include "tal_api.h"
+
+/***********************************************************
+************************macro define************************
+***********************************************************/
+
+/***********************************************************
+***********************typedef define***********************
+***********************************************************/
+
+/***********************************************************
+********************function declaration********************
+***********************************************************/
+
+/***********************************************************
+***********************variable define**********************
+***********************************************************/
+THREAD_HANDLE ui_thrd_hdl;
+
+static app_page_t ai_chat_page = {
+    .init = ui_ai_chat_screen_init,
+    .deinit = NULL,
+    .page_obj = &ui_ai_chat,
+};
+
+app_page_t setting_page = {
+    .init = ui_setting_screen_init,
+    .deinit = NULL,
+    .page_obj = &ui_setting,
+};
+
+app_page_t sos_page = {
+    .init = ui_SOS_screen_init,
+    .deinit = NULL,
+    .page_obj = &ui_SOS,
+};
+
+app_page_t tracker_page = {
+    .init = ui_tracker_screen_init,
+    .deinit = NULL,
+    .page_obj = &ui_tracker,
+};
+
+app_page_t tracker_close_page = {
+    .init = ui_tracker_close_screen_init,
+    .deinit = NULL,
+    .page_obj = &ui_tracker_close,
+};
+
+/***********************************************************
+***********************function define**********************
+***********************************************************/
+
+static void __chat_bot_ui_task(void *args)
+{
+    // OPERATE_RET rt = OPRT_OK;
+
+    (void)args;
+
+    PR_DEBUG("Initializing UI main...");
+
+    tuya_lvgl_mutex_lock();
+    ui_init();
+    tuya_lvgl_mutex_unlock();
+
+    PR_DEBUG("ui init success");
+
+    app_pages_init();
+    app_page_load_initial(&ai_chat_page);
+
+    for (;;) {
+        // Sleep for a while to yield CPU
+        tal_system_sleep(100);
+    }
+}
+
+OPERATE_RET app_ui_main_init(void)
+{
+    OPERATE_RET rt = OPRT_OK;
+
+    TUYA_CALL_ERR_RETURN(tuya_lvgl_init());
+
+    THREAD_CFG_T cfg = {
+        .thrdname = "tracker_ui",
+        .priority = THREAD_PRIO_2,
+        .stackDepth = 1024 * 4,
+    };
+    TUYA_CALL_ERR_RETURN(tal_thread_create_and_start(&ui_thrd_hdl, NULL, NULL, __chat_bot_ui_task, NULL, &cfg));
+
+    return OPRT_OK;
+}
