@@ -146,15 +146,10 @@ void app_ui_SOS_screen_load(uint8_t load)
     tal_workq_schedule(WORKQ_SYSTEM, __SOS_screen_load_cb, NULL);
 }
 
-void app_ui_setting_gps_count_update(uint8_t count)
+void app_ui_setting_gps_update(bool valid, uint8_t satellite_count)
 {
     tuya_lvgl_mutex_lock();
-    if (count > 0) {
-        ui_setting_set_gps_color(0x2DDA86);
-    } else {
-        ui_setting_set_gps_color(0xFF0000);
-    }
-    ui_setting_set_gps_count(count);
+    ui_setting_update_gps_status(valid, satellite_count);
     tuya_lvgl_mutex_unlock();
 }
 

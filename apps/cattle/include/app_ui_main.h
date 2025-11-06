@@ -45,7 +45,7 @@ void app_ui_setting_volume_update(uint8_t volume);
  * @param network_type Network type (0: 4G, 1: WiFi, 2: Wired)
  * @param status Network status (0: No network, 1: 1 bar, 2: 2 bars, 3: 3 bars, 4: 4 bars)
  */
- void app_ui_setting_network_update(uint8_t network_type, uint8_t status);
+void app_ui_setting_network_update(uint8_t network_type, uint8_t status);
 
 /**
  * @brief Set battery icon
@@ -53,6 +53,8 @@ void app_ui_setting_volume_update(uint8_t volume);
  * @param is_charging Is charging (true: charging, false: not charging)
  */
 void app_ui_setting_battery_update(uint8_t percentage, uint8_t is_charging);
+
+void app_ui_setting_gps_update(bool valid, uint8_t satellite_count);
 
 void app_ui_ai_chat_set_red_ring_visible(bool visible);
 

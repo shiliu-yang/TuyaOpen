@@ -44,7 +44,18 @@
 /***********************************************************
 ***********************variable define**********************
 ***********************************************************/
+// GPS position upload control
+static double sg_last_latitude = 0.0;
+static double sg_last_longitude = 0.0;
+static SYS_TIME_T sg_last_gps_report_time = 0;
 
+// GPS upload criteria
+#define GPS_REPORT_MIN_INTERVAL_MS (5 * 60 * 1000) // 5 minutes
+#define GPS_POSITION_DELTA_LAT     0.00003         // ~3.3 meters latitude change
+#define GPS_POSITION_DELTA_LON     0.00004         // ~3.3 meters longitude change
+
+// GPS position string buffer
+static char sg_gps_position_buffer[32] = {0};
 
 /***********************************************************
 ***********************function define**********************
@@ -132,6 +143,98 @@ OPERATE_RET app_dp_battery_upload(uint8_t is_charging, uint8_t battery_percentag
     dp_obj[1].value.dp_enum = is_charging ? 1 : 0;
 
     return tuya_iot_dp_obj_report(client, client->activate.devid, dp_obj, 2, 0);
+}
+
+/**
+ * @brief Upload GPS position to cloud
+ * 
+ * Uploads GPS position under the following conditions:
+ * - Latitude change ≥ 0.00003° (~3.3 meters)
+ * - Longitude change ≥ 0.00004° (~3.3 meters)
+ * - Force upload every 5 minutes
+ * 
+ * @param latitude Latitude in decimal degrees
+ * @param longitude Longitude in decimal degrees
+ * @return OPERATE_RET OPRT_OK on success
+ */
+OPERATE_RET app_dp_gps_position_upload(double latitude, double longitude)
+{
+    if (!app_network_is_ready()) {
+        PR_WARN("network not ready, skip gps position upload");
+        return OPRT_COM_ERROR;
+    }
+
+    /* Validate GPS coordinates */
+    if (latitude == 0.0 && longitude == 0.0) {
+        PR_WARN("GPS position invalid (0,0), skip upload");
+        return OPRT_OK;
+    }
+
+    /* Check if position changed enough or time interval exceeded */
+    SYS_TIME_T now = tal_time_get_posix_ms();
+    
+    double lat_diff = (latitude > sg_last_latitude) ? 
+                      (latitude - sg_last_latitude) : (sg_last_latitude - latitude);
+    double lon_diff = (longitude > sg_last_longitude) ? 
+                      (longitude - sg_last_longitude) : (sg_last_longitude - longitude);
+    
+    PR_DEBUG("GPS diff - lat: %.6f, lon: %.6f, time: %u ms", 
+             lat_diff, lon_diff, (unsigned int)(now - sg_last_gps_report_time));
+    
+    /* Check upload criteria */
+    if (lat_diff < GPS_POSITION_DELTA_LAT && 
+        lon_diff < GPS_POSITION_DELTA_LON &&
+        (now - sg_last_gps_report_time) < GPS_REPORT_MIN_INTERVAL_MS) {
+        PR_DEBUG("GPS position change too small or interval too short, skip upload");
+        return OPRT_OK;
+    }
+    
+    /* Update last position and time */
+    sg_last_latitude = latitude;
+    sg_last_longitude = longitude;
+    sg_last_gps_report_time = now;
+    
+    /* Format GPS position string */
+    memset(sg_gps_position_buffer, 0, sizeof(sg_gps_position_buffer));
+    snprintf(sg_gps_position_buffer, sizeof(sg_gps_position_buffer), 
+             "%.6f,%.6f", latitude, longitude);
+    
+    PR_INFO("DP upload GPS position: %s", sg_gps_position_buffer);
+    
+    /* Upload to cloud */
+    tuya_iot_client_t *client = tuya_iot_client_get();
+    
+    dp_obj_t dp_obj = {0};
+    dp_obj.id = DP_ID_GPS_POSITION;
+    dp_obj.type = PROP_STR;
+    dp_obj.value.dp_str = sg_gps_position_buffer;
+    
+    return tuya_iot_dp_obj_report(client, client->activate.devid, &dp_obj, 1, 0);
+}
+
+/**
+ * @brief Upload GPS altitude to cloud
+ * 
+ * @param height_m Altitude in meters
+ * @return OPERATE_RET OPRT_OK on success
+ */
+OPERATE_RET app_dp_gps_height_upload(int height_m)
+{
+    if (!app_network_is_ready()) {
+        PR_WARN("network not ready, skip gps height upload");
+        return OPRT_COM_ERROR;
+    }
+    
+    PR_DEBUG("DP upload GPS height: %d m", height_m);
+    
+    tuya_iot_client_t *client = tuya_iot_client_get();
+    
+    dp_obj_t dp_obj = {0};
+    dp_obj.id = DP_ID_GPS_HEIGHT;
+    dp_obj.type = PROP_VALUE;
+    dp_obj.value.dp_value = height_m;
+    
+    return tuya_iot_dp_obj_report(client, client->activate.devid, &dp_obj, 1, 0);
 }
 
 void app_dp_process(uint8_t id, dp_prop_tp_t type, dp_value_t value)

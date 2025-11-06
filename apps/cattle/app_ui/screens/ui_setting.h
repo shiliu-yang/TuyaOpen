@@ -32,16 +32,17 @@ extern lv_obj_t * ui_label_gps__number;
 
 // CUSTOM FUNCTIONS
 /**
- * @brief Set GPS color (both icon and label)
- * @param rgb_color 24-bit RGB color (e.g., 0xFF0000 for red, 0x00FF00 for green)
+ * @brief Update GPS status display (icon, label, satellite count)
+ * 
+ * Status indicators:
+ * - Invalid GPS (valid=false): Red color, "GPS 正在定位...", "0 颗卫星"
+ * - Valid GPS with < 10 satellites: Orange color, "GPS 状态", "x 颗卫星"
+ * - Valid GPS with >= 10 satellites: Green color, "GPS 状态", "x 颗卫星"
+ * 
+ * @param valid true if GPS has valid fix, false if searching
+ * @param satellite_count Number of satellites in use
  */
-void ui_setting_set_gps_color(uint32_t rgb_color);
-
-/**
- * @brief Update GPS satellite count
- * @param count Number of satellites
- */
-void ui_setting_set_gps_count(uint8_t count);
+void ui_setting_update_gps_status(bool valid, uint8_t satellite_count);
 
 /**
  * @brief Set time label text

@@ -49,6 +49,7 @@
 #include "app_dp.h"
 #include "app_volume.h"
 #include "app_battery.h"
+#include "app_gps.h"
 
 #include "cloud_api.h"
 
@@ -283,6 +284,9 @@ void user_main(void)
 
     // init encoder
     TUYA_CALL_ERR_LOG(app_encoder_init());
+
+    TUYA_CALL_ERR_LOG(app_gps_init());
+    TUYA_CALL_ERR_LOG(app_gps_start());
 
     PR_DEBUG("tuya_iot_init success");
     /* Start tuya iot task */

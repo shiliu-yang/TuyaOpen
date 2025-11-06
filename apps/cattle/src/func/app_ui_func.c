@@ -10,6 +10,7 @@
 #include "app_volume.h"
 #include "app_ui_main.h"
 #include "app_battery.h"
+#include "app_gps.h"
 
 #include "tal_api.h"
 #include "tal_event_info.h"
@@ -41,6 +42,11 @@ static bool network_event_subscribed = false;
 static bool volume_synced = false;
 
 static bool battery_synced = false;
+
+/* GPS status cache for change detection */
+static bool gps_last_valid = false;
+static uint8_t gps_last_satellite_count = 0;
+static bool gps_first_update = true;
 
 /***********************************************************
 ***********************function define**********************
@@ -119,7 +125,26 @@ void setting_load_timer_cb(TIMER_ID timer_id, void *arg)
 {
     OPERATE_RET rt = OPRT_OK;
 
-    // Update gps
+    // Update GPS status (only if changed)
+    bool valid = false;
+    uint8_t satellite_count = 0;
+    app_gps_get_status(&valid, &satellite_count);
+    
+    /* Update UI only if GPS status changed or first update */
+    if (gps_first_update || 
+        valid != gps_last_valid || 
+        satellite_count != gps_last_satellite_count) {
+        
+        app_ui_setting_gps_update(valid, satellite_count);
+        
+        /* Cache current status */
+        gps_last_valid = valid;
+        gps_last_satellite_count = satellite_count;
+        gps_first_update = false;
+        
+        PR_DEBUG("GPS status updated: valid=%d, sats=%d", valid, satellite_count);
+    }
+
     // update datetime
     __setting_get_date_time();
 

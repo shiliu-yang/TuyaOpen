@@ -279,40 +279,61 @@ void ui_setting_screen_destroy(void)
 ///////////////////// CUSTOM FUNCTIONS ////////////////////
 
 /**
- * @brief Set GPS color (both icon and label)
- * @param rgb_color 24-bit RGB color (e.g., 0xFF0000 for red, 0x00FF00 for green, 0x2DDA86 for default green)
+ * @brief Update GPS status display (icon, label, satellite count)
+ * 
+ * Status indicators:
+ * - Invalid GPS (valid=false): Red color, "GPS 正在定位...", "0 颗卫星"
+ * - Valid GPS with < 10 satellites: Orange color, "GPS 状态", "x 颗卫星"
+ * - Valid GPS with >= 10 satellites: Green color, "GPS 状态", "x 颗卫星"
+ * 
+ * @param valid true if GPS has valid fix, false if searching
+ * @param satellite_count Number of satellites in use
  */
-void ui_setting_set_gps_color(uint32_t rgb_color)
+#define GPS_TEXT_BUF_SIZE 32
+static char gps_text_buf[GPS_TEXT_BUF_SIZE];
+
+void ui_setting_update_gps_status(bool valid, uint8_t satellite_count)
 {
+    uint32_t color;
+    const char *status_text;
+    
+    /* Determine color and status text based on GPS validity and satellite count */
+    if (!valid) {
+        /* GPS invalid - searching for fix */
+        color = 0xFF0000;              /* Red */
+        status_text = "GPS 正在定位...";
+        satellite_count = 0;            /* Show 0 satellites when invalid */
+    } else if (satellite_count < 10) {
+        /* GPS valid but insufficient satellites */
+        color = 0xFFA500;              /* Orange */
+        status_text = "GPS 状态";
+    } else {
+        /* GPS valid with good satellite count */
+        color = 0x00FF00;              /* Green */
+        status_text = "GPS 状态";
+    }
+    
+    /* Update GPS icon color */
     if (ui_image_gps != NULL) {
-        lv_obj_set_style_image_recolor(ui_image_gps, lv_color_hex(rgb_color), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_image_recolor(ui_image_gps, lv_color_hex(color), LV_PART_MAIN | LV_STATE_DEFAULT);
         lv_obj_set_style_image_recolor_opa(ui_image_gps, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
     }
     
+    /* Update GPS status label */
     if (ui_label_gps != NULL) {
-        lv_obj_set_style_text_color(ui_label_gps, lv_color_hex(rgb_color), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_color(ui_label_gps, lv_color_hex(color), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_label_set_text(ui_label_gps, status_text);
     }
-}
-
-/**
- * @brief Update GPS satellite count
- * @param count Number of satellites
- */
-#define GPS_COUNT_BUF_SIZE 32
-static char gps_count_buf[GPS_COUNT_BUF_SIZE];
-void ui_setting_set_gps_count(uint8_t count)
-{
+    
+    /* Update satellite count label */
     if (ui_label_gps__number != NULL) {
-        memset(gps_count_buf, 0, GPS_COUNT_BUF_SIZE);
-        snprintf(gps_count_buf, GPS_COUNT_BUF_SIZE, "%u 颗卫星", count);
-        lv_label_set_text(ui_label_gps__number, gps_count_buf);
-
-        if (count == 0) {
-            // hide ui_label_gps__number
-            lv_obj_add_flag(ui_label_gps__number, LV_OBJ_FLAG_HIDDEN);
-        } else {
-            lv_obj_clear_flag(ui_label_gps__number, LV_OBJ_FLAG_HIDDEN);
-        }
+        memset(gps_text_buf, 0, GPS_TEXT_BUF_SIZE);
+        snprintf(gps_text_buf, GPS_TEXT_BUF_SIZE, "%u 颗卫星", satellite_count);
+        lv_label_set_text(ui_label_gps__number, gps_text_buf);
+        lv_obj_set_style_text_color(ui_label_gps__number, lv_color_hex(color), LV_PART_MAIN | LV_STATE_DEFAULT);
+        
+        /* Always show satellite count */
+        lv_obj_clear_flag(ui_label_gps__number, LV_OBJ_FLAG_HIDDEN);
     }
 }
 

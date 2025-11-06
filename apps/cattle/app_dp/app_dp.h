@@ -38,6 +38,10 @@ OPERATE_RET app_dp_sos_set(bool sos_status);
 OPERATE_RET app_dp_switch_set(bool switch_status);
 OPERATE_RET app_dp_battery_upload(uint8_t is_charging, uint8_t battery_percentage);
 
+// GPS DP update functions
+OPERATE_RET app_dp_gps_position_upload(double latitude, double longitude);
+OPERATE_RET app_dp_gps_height_upload(int height_m);
+
 #ifdef __cplusplus
 }
 #endif
