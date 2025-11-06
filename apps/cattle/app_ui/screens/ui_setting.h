@@ -66,7 +66,14 @@ void ui_setting_set_volume(uint8_t volume);
  * @param network_type Network type (0: 4G, 1: WiFi, 2: Wired)
  * @param status Network status (0: No network, 1: 1 bar, 2: 2 bars, 3: 3 bars, 4: 4 bars)
  */
- void ui_setting_set_network(uint8_t network_type, uint8_t status);
+void ui_setting_set_network(uint8_t network_type, uint8_t status);
+
+/**
+ * @brief Set battery icon
+ * @param percentage Battery percentage (0-100)
+ * @param is_charging Is charging (true: charging, false: not charging)
+ */
+void ui_setting_set_battery(uint8_t percentage, uint8_t is_charging);
 
 #ifdef __cplusplus
 } /*extern "C"*/

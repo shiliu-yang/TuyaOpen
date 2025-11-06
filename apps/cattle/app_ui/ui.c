@@ -209,7 +209,7 @@ void ui_init(void)
                                                false, LV_FONT_DEFAULT);
     lv_disp_set_theme(dispp, theme);
     // ui_ai_chat_screen_init();
-    // ui_setting_screen_init();
+    ui_setting_screen_init();
     // ui_SOS_screen_init();
     // ui_tracker_screen_init();
     // ui_tracker_close_screen_init();

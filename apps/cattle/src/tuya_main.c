@@ -48,6 +48,9 @@
 #include "app_system_info.h"
 #include "app_dp.h"
 #include "app_volume.h"
+#include "app_battery.h"
+
+#include "cloud_api.h"
 
 #if defined(ENABLE_QRCODE) && (ENABLE_QRCODE == 1)
 #include "qrencode_print.h"
@@ -272,6 +275,9 @@ void user_main(void)
     TUYA_CALL_ERR_LOG(app_chat_bot_init());
 
     app_volume_init();
+    TUYA_CALL_ERR_LOG(app_battery_init());
+
+    TUYA_CALL_ERR_LOG(cloud_api_init());
 
     app_system_info();
 

@@ -394,3 +394,25 @@ void ui_setting_set_network(uint8_t network_type, uint8_t status)
         // Nothing to do
     }
 }
+
+void ui_setting_set_battery(uint8_t percentage, uint8_t is_charging)
+{
+    if (NULL == ui_image_battery) {
+        return;
+    }
+
+    if (is_charging) {
+        lv_image_set_src(ui_image_battery, &ui_img_image_battercharging_png);
+        return;
+    } 
+    
+    if (percentage <= 20) {
+        lv_image_set_src(ui_image_battery, &ui_img_image_battery20_png);
+    } else if (percentage <= 50) {
+        lv_image_set_src(ui_image_battery, &ui_img_image_battery50_png);
+    } else if (percentage <= 60) {
+        lv_image_set_src(ui_image_battery, &ui_img_image_battery60_png);
+    } else if (percentage <= 100) {
+        lv_image_set_src(ui_image_battery, &ui_img_image_battery100_png);
+    }
+}

@@ -47,7 +47,12 @@ void app_ui_setting_volume_update(uint8_t volume);
  */
  void app_ui_setting_network_update(uint8_t network_type, uint8_t status);
 
-void app_ui_setting_battery_update(uint8_t battery_level);
+/**
+ * @brief Set battery icon
+ * @param percentage Battery percentage (0-100)
+ * @param is_charging Is charging (true: charging, false: not charging)
+ */
+void app_ui_setting_battery_update(uint8_t percentage, uint8_t is_charging);
 
 void app_ui_ai_chat_set_red_ring_visible(bool visible);
 

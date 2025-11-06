@@ -173,6 +173,13 @@ void app_ui_setting_volume_update(uint8_t volume)
     tuya_lvgl_mutex_unlock();
 }
 
+void app_ui_setting_battery_update(uint8_t percentage, uint8_t is_charging)
+{
+    tuya_lvgl_mutex_lock();
+    ui_setting_set_battery(percentage, is_charging);
+    tuya_lvgl_mutex_unlock();
+}
+
 /**
  * @brief Set network icon
  * @param network_type Network type (0: 4G, 1: WiFi, 2: Wired)

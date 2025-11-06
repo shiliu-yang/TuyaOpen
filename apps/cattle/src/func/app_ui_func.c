@@ -9,6 +9,7 @@
 
 #include "app_volume.h"
 #include "app_ui_main.h"
+#include "app_battery.h"
 
 #include "tal_api.h"
 #include "tal_event_info.h"
@@ -38,6 +39,8 @@ static POSIX_TM_S setting_last_tm = {0};
 static bool network_event_subscribed = false;
 
 static bool volume_synced = false;
+
+static bool battery_synced = false;
 
 /***********************************************************
 ***********************function define**********************
@@ -105,17 +108,26 @@ static OPERATE_RET __network_link_change_cb(void *data)
 static void __setting_battery_update(void)
 {
     // update battery
+    uint8_t percentage = 0;
+    bool is_charging = false;
+    app_battery_get_status(&percentage, &is_charging);
+    app_ui_setting_battery_update(percentage, is_charging);
     return;
 }
 
 void setting_load_timer_cb(TIMER_ID timer_id, void *arg)
 {
+    OPERATE_RET rt = OPRT_OK;
+
     // Update gps
     // update datetime
     __setting_get_date_time();
 
-    // Update battery
-    __setting_battery_update();
+    // Update battery, only once
+    if (!battery_synced) {
+        __setting_battery_update();
+        battery_synced = true;
+    }
     
     /* Sync volume from hardware to UI (only once) */
     if (!volume_synced) {
@@ -126,22 +138,12 @@ void setting_load_timer_cb(TIMER_ID timer_id, void *arg)
         volume_synced = true;
         PR_INFO("Volume synced to UI: %d", volume);
     }
-    // Note: Network update is handled by event subscription, no need to poll
-    
-    PR_DEBUG("Setting screen load timer callback");
-}
-
-void app_ui_func_setting_load_callback(void)
-{
-    PR_DEBUG("Setting screen loaded");
 
     /* Subscribe to network events (only once) */
     if (!network_event_subscribed) {
-        OPERATE_RET rt = OPRT_OK;
-        
         /* Trigger initial network update only once after subscription */
         __network_link_change_cb(NULL);
-        
+
         rt = tal_event_subscribe(EVENT_LINK_TYPE_CHG, "ui_setting", __network_link_change_cb, SUBSCRIBE_TYPE_NORMAL);
         if (rt == OPRT_OK) {
             PR_INFO("Network link type change event subscribed");
@@ -159,7 +161,12 @@ void app_ui_func_setting_load_callback(void)
         network_event_subscribed = true;
     }
     
+    PR_DEBUG("Setting screen load timer callback");
+}
 
+void app_ui_func_setting_load_callback(void)
+{
+    PR_DEBUG("Setting screen loaded");
 
     if (setting_load_timer_hdl == NULL) {
         tal_sw_timer_create(setting_load_timer_cb, NULL, &setting_load_timer_hdl);
