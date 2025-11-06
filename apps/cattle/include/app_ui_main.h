@@ -49,6 +49,8 @@ void app_ui_setting_volume_update(uint8_t volume);
 
 void app_ui_setting_battery_update(uint8_t battery_level);
 
+void app_ui_ai_chat_set_red_ring_visible(bool visible);
+
 #ifdef __cplusplus
 }
 #endif

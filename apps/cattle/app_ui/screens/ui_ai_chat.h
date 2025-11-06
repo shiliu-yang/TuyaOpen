@@ -19,6 +19,11 @@ extern lv_obj_t * ui_left_eye;
 extern lv_obj_t * ui_right_eye;
 extern lv_obj_t * ui_chat_text;
 extern lv_obj_t * ui_red_ring;
+extern lv_obj_t * ui_mic_icon;
+
+// CUSTOM FUNCTIONS
+void ui_ai_chat_set_red_ring_visible(bool visible);
+
 // CUSTOM VARIABLES
 
 #ifdef __cplusplus

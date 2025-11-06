@@ -35,6 +35,8 @@ extern lv_anim_t *eyelookright_Animation(lv_obj_t *TargetObject, int delay);
 extern lv_obj_t *ui____initial_actions0;
 
 // IMAGES AND IMAGE SETS
+extern const lv_image_dsc_t mic_red_icon;       // assets/image/volume.png
+
 extern const lv_image_dsc_t ui_img_image_volume_png;       // assets/image/volume.png
 
 extern const lv_image_dsc_t ui_img_image_wififill_png;     // assets/image/wifiFill.png

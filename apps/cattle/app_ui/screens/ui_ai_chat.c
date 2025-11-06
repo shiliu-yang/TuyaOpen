@@ -11,6 +11,7 @@ lv_obj_t *ui_left_eye = NULL;
 lv_obj_t *ui_right_eye = NULL;
 lv_obj_t *ui_chat_text = NULL;
 lv_obj_t *ui_red_ring = NULL;
+lv_obj_t *ui_mic_icon = NULL;
 
 /* Animation timer for random eye animations */
 static lv_timer_t *eye_animation_timer = NULL;
@@ -104,6 +105,15 @@ void ui_ai_chat_screen_init(void)
     lv_obj_set_style_border_side(ui_red_ring, LV_BORDER_SIDE_FULL, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_blend_mode(ui_red_ring, LV_BLEND_MODE_NORMAL, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_opa(ui_red_ring, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_add_flag(ui_red_ring, LV_OBJ_FLAG_HIDDEN);  /* Hidden by default */
+
+    /* Create red microphone icon image at top (hidden by default) */
+    ui_mic_icon = lv_img_create(ui_ai_chat);
+    lv_img_set_src(ui_mic_icon, &mic_red_icon);  /* Use custom red microphone icon */
+    lv_obj_align(ui_mic_icon, LV_ALIGN_TOP_MID, 0, 30);  /* Top center, 30px from edge */
+    lv_obj_clear_flag(ui_mic_icon, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_clear_flag(ui_mic_icon, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(ui_mic_icon, LV_OBJ_FLAG_HIDDEN);  /* Hidden by default */
 
     lv_obj_add_event_cb(ui_ai_chat, ui_event_ai_chat, LV_EVENT_GESTURE, NULL);
 
@@ -215,4 +225,26 @@ void ui_ai_chat_screen_destroy(void)
     ui_right_eye = NULL;
     ui_chat_text = NULL;
     ui_red_ring = NULL;
+    ui_mic_icon = NULL;
+}
+
+/**
+ * Sets the red ring indicator and microphone icon visibility
+ * @param visible: true to show red ring and microphone icon, false to hide
+ */
+void ui_ai_chat_set_red_ring_visible(bool visible)
+{
+    if (!ui_red_ring) return;  /* Safety check */
+
+    if (visible) {
+        lv_obj_clear_flag(ui_red_ring, LV_OBJ_FLAG_HIDDEN);
+        if (ui_mic_icon) {
+            lv_obj_clear_flag(ui_mic_icon, LV_OBJ_FLAG_HIDDEN);
+        }
+    } else {
+        lv_obj_add_flag(ui_red_ring, LV_OBJ_FLAG_HIDDEN);
+        if (ui_mic_icon) {
+            lv_obj_add_flag(ui_mic_icon, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
 }

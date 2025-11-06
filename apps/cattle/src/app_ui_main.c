@@ -29,6 +29,11 @@
 ***********************************************************/
 
 /***********************************************************
+***********************variable define**********************
+***********************************************************/
+static bool s_red_ring_visible = false;
+
+/***********************************************************
 ********************function declaration********************
 ***********************************************************/
 
@@ -179,4 +184,24 @@ void app_ui_setting_network_update(uint8_t network_type, uint8_t status)
     tuya_lvgl_mutex_lock();
     ui_setting_set_network(network_type, status);
     tuya_lvgl_mutex_unlock();
+}
+
+
+// AI chat screen
+static void __ai_chat_red_ring_workq_cb(void *data)
+{
+    (void)data;
+    bool visible = s_red_ring_visible;
+    
+    tuya_lvgl_mutex_lock();
+    ui_ai_chat_set_red_ring_visible(visible);
+    tuya_lvgl_mutex_unlock();
+    
+    PR_DEBUG("AI chat red ring visibility set to: %d", visible);
+}
+
+void app_ui_ai_chat_set_red_ring_visible(bool visible)
+{
+    s_red_ring_visible = visible;
+    tal_workq_schedule(WORKQ_SYSTEM, __ai_chat_red_ring_workq_cb, NULL);
 }

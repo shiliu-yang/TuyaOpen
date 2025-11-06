@@ -25,6 +25,8 @@
 #include "app_chat_bot.h"
 #include "media_src_zh.h"
 
+#include "app_ui_main.h"
+
 /***********************************************************
 ************************macro define************************
 ***********************************************************/
@@ -242,12 +244,15 @@ static void __app_button_function_cb(char *name, TDL_BUTTON_TOUCH_EVENT_E event,
         if (work_mode == APP_CHAT_MODE_KEY_PRESS_HOLD_SINGLE) {
             ai_audio_player_stop();
 
+            app_ui_ai_chat_set_red_ring_visible(true);
+
             PR_DEBUG("button press down, listen start");
             ai_audio_manual_start_single_talk();
         }
     } break;
     case TDL_BUTTON_PRESS_UP: {
         if (work_mode == APP_CHAT_MODE_KEY_PRESS_HOLD_SINGLE) {
+            app_ui_ai_chat_set_red_ring_visible(false);
             PR_DEBUG("button press up, listen end");
             ai_audio_manual_stop_single_talk();
         }
