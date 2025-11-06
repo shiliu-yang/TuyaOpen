@@ -31,18 +31,12 @@ lv_obj_t * ui_label_time = NULL;
 static void volume_slider_event_handler(lv_event_t * e)
 {
     lv_event_code_t code = lv_event_get_code(e);
-    lv_obj_t * slider = lv_event_get_target(e);
     
 #ifdef DEBUG_VOLUME_SLIDER
     PR_DEBUG("Volume slider event: %d", code);
 #endif
-    
-    if (code == LV_EVENT_VALUE_CHANGED) {
-        /* Force immediate refresh to ensure smooth dragging */
-        lv_obj_invalidate(slider);
-        lv_refr_now(NULL);
-    }
-    else if (code == LV_EVENT_RELEASED) {
+
+    if (code == LV_EVENT_RELEASED) {
         /* User released the slider, report current value */
 #ifdef DEBUG_VOLUME_SLIDER
         int32_t volume = lv_slider_get_value(slider);
@@ -60,6 +54,8 @@ void ui_event_setting(lv_event_t * e)
 
     if(event_code == LV_EVENT_GESTURE) {
         lv_indev_wait_release(lv_indev_active());
+        setting_event_callback(e);
+    } else if (event_code == LV_EVENT_SCREEN_LOADED || event_code == LV_EVENT_SCREEN_UNLOADED) {
         setting_event_callback(e);
     }
 }
@@ -132,7 +128,6 @@ void ui_setting_screen_init(void)
     lv_obj_remove_flag(ui_slider_volume, LV_OBJ_FLAG_GESTURE_BUBBLE);
     
     /* Register event callbacks: VALUE_CHANGED for smooth dragging, RELEASED for final value report */
-    lv_obj_add_event_cb(ui_slider_volume, volume_slider_event_handler, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_add_event_cb(ui_slider_volume, volume_slider_event_handler, LV_EVENT_RELEASED, NULL);
 
     ui_container_network = lv_obj_create(ui_setting);
@@ -154,6 +149,8 @@ void ui_setting_screen_init(void)
     lv_obj_set_height(ui_image_network, LV_SIZE_CONTENT);    /// 1
     lv_obj_set_align(ui_image_network, LV_ALIGN_CENTER);
     lv_obj_remove_flag(ui_image_network, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
+    
+    ui_setting_set_network(1, 0);
 
     ui_container_battery = lv_obj_create(ui_setting);
     lv_obj_remove_style_all(ui_container_battery);
@@ -252,7 +249,8 @@ void ui_setting_screen_init(void)
     lv_obj_set_style_text_font(ui_label_time, &ui_font_mont_82, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     lv_obj_add_event_cb(ui_setting, ui_event_setting, LV_EVENT_GESTURE, NULL);
-
+    lv_obj_add_event_cb(ui_setting, ui_event_setting, LV_EVENT_SCREEN_LOADED, NULL);
+    lv_obj_add_event_cb(ui_setting, ui_event_setting, LV_EVENT_SCREEN_UNLOADED, NULL);
 }
 
 void ui_setting_screen_destroy(void)
@@ -355,5 +353,44 @@ void ui_setting_set_volume(uint8_t volume)
         
         /* Set slider value with animation */
         lv_slider_set_value(ui_slider_volume, clamped_volume, LV_ANIM_ON);
+    }
+}
+
+/**
+ * @brief Set network icon
+ * @param network_type Network type (0: 4G, 1: WiFi, 2: Wired)
+ * @param status Network status (0: No network, 1: 1 bar, 2: 2 bars, 3: 3 bars, 4: 4 bars)
+ */
+void ui_setting_set_network(uint8_t network_type, uint8_t status)
+{
+    if (ui_image_network == NULL) {
+        return;
+    }
+
+    if (network_type == 0) {
+        // 4G
+        if (status == 1) {
+            lv_image_set_src(ui_image_network, &ui_img_image_4gsignal1_png);
+        } else if (status == 2) {
+            lv_image_set_src(ui_image_network, &ui_img_image_4gsignal2_png);
+        } else if (status == 3) {
+            lv_image_set_src(ui_image_network, &ui_img_image_4gsignal3_png);
+        } else if (status == 4) {
+            lv_image_set_src(ui_image_network, &ui_img_image_4gfill_png);
+        } else {
+            lv_image_set_src(ui_image_network, &ui_img_image_4glost_png);
+        }
+    } else if (network_type == 1) {
+        // WiFi
+        lv_image_set_src(ui_image_network, &ui_img_image_wififill_png);
+        if (status == 0) {
+            /* No network - dim the icon by reducing opacity */
+            lv_obj_set_style_opa(ui_image_network, LV_OPA_30, LV_PART_MAIN | LV_STATE_DEFAULT);
+        } else {
+            /* Network connected - full opacity */
+            lv_obj_set_style_opa(ui_image_network, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
+        }
+    } else {
+        // Nothing to do
     }
 }

@@ -36,6 +36,19 @@ OPERATE_RET app_ui_main_init(void);
 
 void app_ui_SOS_screen_load(uint8_t load);
 
+void app_ui_setting_date_time_update(const char *date, const char *time);
+
+void app_ui_setting_volume_update(uint8_t volume);
+
+/**
+ * @brief Set network icon
+ * @param network_type Network type (0: 4G, 1: WiFi, 2: Wired)
+ * @param status Network status (0: No network, 1: 1 bar, 2: 2 bars, 3: 3 bars, 4: 4 bars)
+ */
+ void app_ui_setting_network_update(uint8_t network_type, uint8_t status);
+
+void app_ui_setting_battery_update(uint8_t battery_level);
+
 #ifdef __cplusplus
 }
 #endif

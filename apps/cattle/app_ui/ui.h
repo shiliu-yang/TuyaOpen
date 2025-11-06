@@ -36,8 +36,22 @@ extern lv_obj_t *ui____initial_actions0;
 
 // IMAGES AND IMAGE SETS
 extern const lv_image_dsc_t ui_img_image_volume_png;       // assets/image/volume.png
+
 extern const lv_image_dsc_t ui_img_image_wififill_png;     // assets/image/wifiFill.png
+
+extern const lv_image_dsc_t ui_img_image_4gfill_png;     // assets/image/4gFill.png
+extern const lv_image_dsc_t ui_img_image_4glost_png;     // assets/image/4gLost.png
+extern const lv_image_dsc_t ui_img_image_4gsignal1_png;     // assets/image/4gSignal1.png
+extern const lv_image_dsc_t ui_img_image_4gsignal2_png;     // assets/image/4gSignal2.png
+extern const lv_image_dsc_t ui_img_image_4gsignal3_png;     // assets/image/4gSignal3.png
+
+
+extern const lv_image_dsc_t ui_img_image_battercharging_png;   // assets/image/batterCharging.png
+extern const lv_image_dsc_t ui_img_image_battery20_png;   // assets/image/battery20.png
+extern const lv_image_dsc_t ui_img_image_battery50_png;   // assets/image/battery50.png
+extern const lv_image_dsc_t ui_img_image_battery60_png;   // assets/image/battery60.png
 extern const lv_image_dsc_t ui_img_image_battery100_png;   // assets/image/battery100.png
+
 extern const lv_image_dsc_t ui_img_image_gps_png;          // assets/image/GPS.png
 extern const lv_image_dsc_t ui_img_image_search_scope_png; // assets/image/search_scope.png
 extern const lv_image_dsc_t ui_img_image_cattle_icon_png;  // assets/image/cattle_icon.png

@@ -61,6 +61,13 @@ void ui_setting_set_date(const char *date_str);
  */
 void ui_setting_set_volume(uint8_t volume);
 
+/**
+ * @brief Set network icon
+ * @param network_type Network type (0: 4G, 1: WiFi, 2: Wired)
+ * @param status Network status (0: No network, 1: 1 bar, 2: 2 bars, 3: 3 bars, 4: 4 bars)
+ */
+ void ui_setting_set_network(uint8_t network_type, uint8_t status);
+
 #ifdef __cplusplus
 } /*extern "C"*/
 #endif

@@ -44,8 +44,10 @@
 
 #include "app_encoder.h"
 
+#include "reset_netcfg.h"
 #include "app_system_info.h"
 #include "app_dp.h"
+#include "app_volume.h"
 
 #if defined(ENABLE_QRCODE) && (ENABLE_QRCODE == 1)
 #include "qrencode_print.h"
@@ -60,6 +62,8 @@ tuya_iot_client_t client;
 
 /* Tuya license information (uuid authkey) */
 tuya_iot_license_t license;
+
+static uint8_t _need_reset = 0;
 
 /**
  * @brief user defined log output api, in this demo, it will use uart0 as log-tx
@@ -106,6 +110,10 @@ void user_event_handler_on(tuya_iot_client_t *client, tuya_event_msg_t *event)
     switch (event->id) {
     case TUYA_EVENT_BIND_START: {
         PR_INFO("Device Bind Start!");
+        if (_need_reset == 1) {
+            PR_INFO("Device Reset!");
+            tal_system_reset();
+        }
     } break;
     /* Print the QRCode for Tuya APP bind */
     case TUYA_EVENT_DIRECT_MQTT_CONNECTED: {
@@ -138,6 +146,8 @@ void user_event_handler_on(tuya_iot_client_t *client, tuya_event_msg_t *event)
     } break;
     case TUYA_EVENT_RESET: {
         PR_INFO("Device Reset:%d", event->value.asInteger);
+
+        _need_reset = 1;
     } break;
     /* RECV OBJ DP */
     case TUYA_EVENT_DP_RECEIVE_OBJ: {
@@ -217,7 +227,7 @@ void user_main(void)
 
     tuya_authorize_init();
 
-    // reset_netconfig_start();
+    reset_netconfig_start();
 
     if (OPRT_OK != tuya_authorize_read(&license)) {
         license.uuid = TUYA_OPENSDK_UUID;
@@ -252,7 +262,7 @@ void user_main(void)
 // #if defined(ENABLE_CELLULAR) && (ENABLE_CELLULAR == 1)
 //     type |= NETCONN_CELLULAR;
 // #endif
-    // netmgr_init(type);
+    netmgr_init(type);
 
 #if defined(ENABLE_WIFI) && (ENABLE_WIFI == 1)
     netmgr_conn_set(NETCONN_WIFI, NETCONN_CMD_NETCFG, &(netcfg_args_t){.type = NETCFG_TUYA_BLE | NETCFG_TUYA_WIFI_AP});
@@ -260,6 +270,8 @@ void user_main(void)
 
     TUYA_CALL_ERR_LOG(board_register_hardware());
     TUYA_CALL_ERR_LOG(app_chat_bot_init());
+
+    app_volume_init();
 
     app_system_info();
 
@@ -270,7 +282,8 @@ void user_main(void)
     /* Start tuya iot task */
     tuya_iot_start(&client);
 
-    // reset_netconfig_check();
+    reset_netconfig_check();
+
 #if defined(ENABLE_APP_UI) && (ENABLE_APP_UI == 1)
     TUYA_CALL_ERR_LOG(app_ui_main_init());
 #endif

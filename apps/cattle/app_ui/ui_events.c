@@ -6,6 +6,8 @@
 #include "ui.h"
 
 #include "app_ui_main.h"
+#include "app_ui_func.h"
+#include "app_volume.h"
 #include "tal_api.h"
 
 void sos_countdown_start(lv_event_t * e)
@@ -32,9 +34,17 @@ void ai_chat_event_callback(lv_event_t * e)
 
 void setting_event_callback(lv_event_t * e)
 {
-    lv_dir_t dir = lv_indev_get_gesture_dir(lv_indev_get_act());
-    if (dir == LV_DIR_TOP) {
-        app_page_back(LV_SCR_LOAD_ANIM_MOVE_TOP, 0);
+    lv_event_code_t event_code = lv_event_get_code(e);
+
+    if (event_code == LV_EVENT_SCREEN_LOADED) {
+        app_ui_func_setting_load_callback();
+    } else if (event_code == LV_EVENT_SCREEN_UNLOADED) {
+        app_ui_func_setting_unload_callback();
+    } else if (event_code == LV_EVENT_GESTURE) {
+        lv_dir_t dir = lv_indev_get_gesture_dir(lv_indev_get_act());
+        if (dir == LV_DIR_TOP) {
+            app_page_back(LV_SCR_LOAD_ANIM_MOVE_TOP, 0);
+        }
     }
 }
 
@@ -45,11 +55,8 @@ void volume_changed_callback(lv_event_t * e)
     
     PR_DEBUG("Volume changed: %d", (int)volume);
     
-    // TODO: Add your volume control logic here
-    // For example:
-    // - Update system volume
-    // - Send volume change event to audio module
-    // - Save volume to persistent storage
+    /* Call app_volume_set which handles async execution internally */
+    app_volume_set((uint8_t)volume);
 }
 
 void tracker_event_callback(lv_event_t * e)

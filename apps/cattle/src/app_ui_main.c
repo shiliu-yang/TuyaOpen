@@ -166,3 +166,17 @@ void app_ui_setting_volume_update(uint8_t volume)
     ui_setting_set_volume(volume);
     tuya_lvgl_mutex_unlock();
 }
+
+/**
+ * @brief Set network icon
+ * @param network_type Network type (0: 4G, 1: WiFi, 2: Wired)
+ * @param status Network status (0: No network, 1: 1 bar, 2: 2 bars, 3: 3 bars, 4: 4 bars)
+ */
+void app_ui_setting_network_update(uint8_t network_type, uint8_t status)
+{
+    PR_DEBUG("app_ui_setting_network_update: network_type: %d, status: %d", network_type, status);
+
+    tuya_lvgl_mutex_lock();
+    ui_setting_set_network(network_type, status);
+    tuya_lvgl_mutex_unlock();
+}

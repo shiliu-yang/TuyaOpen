@@ -72,7 +72,7 @@ static TIMER_ID sg_lan_init_timer = NULL;
  *
  * @return netconn_type_t: the connection should be used
  */
-static netmgr_type_e __get_active_conn()
+netmgr_type_e __get_active_conn()
 {
     netmgr_type_e active_type = NETCONN_AUTO;
     netmgr_conn_base_t *cur_conn = s_netmgr.conn;
