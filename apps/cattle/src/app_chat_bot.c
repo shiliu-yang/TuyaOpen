@@ -31,7 +31,7 @@
 ************************macro define************************
 ***********************************************************/
 #define AI_AUDIO_TEXT_BUFF_LEN (1024)
-#define AI_AUDIO_TEXT_SHOW_LEN (60 * 3)
+#define AI_AUDIO_TEXT_SHOW_LEN (100 * 3)
 
 typedef uint8_t APP_CHAT_MODE_E;
 /*Press and hold button to start a single conversation.*/
@@ -140,6 +140,48 @@ static TDL_BUTTON_HANDLE sg_button_hdl = NULL;
 ***********************************************************/
 static uint8_t *p_ai_text = NULL;
 static uint32_t ai_text_len = 0;
+static bool first_sentence_sent = false;
+
+/**
+ * @brief Check if the text contains sentence ending punctuation
+ * 
+ * @param text The text buffer to check
+ * @param len Length of the text
+ * @return true if sentence ending punctuation is found, false otherwise
+ * 
+ * Supports Chinese punctuation (。？！) and English punctuation (. ? !)
+ */
+static bool __is_sentence_ending(const uint8_t *text, uint32_t len)
+{
+    if (text == NULL || len == 0) {
+        return false;
+    }
+
+    for (uint32_t i = 0; i < len; i++) {
+        /* Chinese punctuation is multi-byte UTF-8 */
+        if (i + 2 < len) {
+            /* 。 (Chinese period) = 0xE3 0x80 0x82 */
+            if (text[i] == 0xE3 && text[i+1] == 0x80 && text[i+2] == 0x82) {
+                return true;
+            }
+            /* ？ (Chinese question mark) = 0xEF 0xBC 0x9F */
+            if (text[i] == 0xEF && text[i+1] == 0xBC && text[i+2] == 0x9F) {
+                return true;
+            }
+            /* ！ (Chinese exclamation mark) = 0xEF 0xBC 0x81 */
+            if (text[i] == 0xEF && text[i+1] == 0xBC && text[i+2] == 0x81) {
+                return true;
+            }
+        }
+        
+        /* English punctuation: . ? ! */
+        if (text[i] == '.' || text[i] == '?' || text[i] == '!') {
+            return true;
+        }
+    }
+
+    return false;
+}
 
 static void __app_ai_audio_evt_inform_cb(AI_AUDIO_EVENT_E event, uint8_t *data, uint32_t len, void *arg)
 {
@@ -159,6 +201,7 @@ static void __app_ai_audio_evt_inform_cb(AI_AUDIO_EVENT_E event, uint8_t *data, 
         }
 
         ai_text_len = 0;
+        first_sentence_sent = false;  /* Reset flag for new conversation */
     } break;
     case AI_AUDIO_EVT_AI_REPLIES_TEXT_DATA: {
         if (NULL == p_ai_text) {
@@ -171,11 +214,23 @@ static void __app_ai_audio_evt_inform_cb(AI_AUDIO_EVENT_E event, uint8_t *data, 
         }
 
         memcpy(p_ai_text + ai_text_len, data, len);
-
         ai_text_len += len;
-        if (ai_text_len >= AI_AUDIO_TEXT_SHOW_LEN) {
-            app_ui_ai_chat_set_assistant_msg((char *)p_ai_text);
-            ai_text_len = 0;
+        p_ai_text[ai_text_len] = '\0';  /* Ensure null termination */
+
+        /* Check if we haven't sent the first sentence yet */
+        if (!first_sentence_sent) {
+            /* If found ending punctuation, send immediately */
+            if (__is_sentence_ending(p_ai_text, ai_text_len)) {
+                app_ui_ai_chat_set_assistant_msg((char *)p_ai_text);
+                first_sentence_sent = true;
+            }
+        } else {
+            /* After first sentence, use length-based logic */
+            if (ai_text_len >= AI_AUDIO_TEXT_SHOW_LEN) {
+                app_ui_ai_chat_set_assistant_msg((char *)p_ai_text);
+                ai_text_len = 0;
+                memset(p_ai_text, 0, AI_AUDIO_TEXT_BUFF_LEN);
+            }
         }
     } break;
     case AI_AUDIO_EVT_AI_REPLIES_TEXT_END: {
