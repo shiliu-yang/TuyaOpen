@@ -139,3 +139,30 @@ void app_ui_SOS_screen_load(uint8_t load)
 
     tal_workq_schedule(WORKQ_SYSTEM, __SOS_screen_load_cb, NULL);
 }
+
+void app_ui_setting_gps_count_update(uint8_t count)
+{
+    tuya_lvgl_mutex_lock();
+    if (count > 0) {
+        ui_setting_set_gps_color(0x2DDA86);
+    } else {
+        ui_setting_set_gps_color(0xFF0000);
+    }
+    ui_setting_set_gps_count(count);
+    tuya_lvgl_mutex_unlock();
+}
+
+void app_ui_setting_date_time_update(const char *date, const char *time)
+{
+    tuya_lvgl_mutex_lock();
+    ui_setting_set_date(date);
+    ui_setting_set_time(time);
+    tuya_lvgl_mutex_unlock();
+}
+
+void app_ui_setting_volume_update(uint8_t volume)
+{
+    tuya_lvgl_mutex_lock();
+    ui_setting_set_volume(volume);
+    tuya_lvgl_mutex_unlock();
+}

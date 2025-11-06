@@ -77,7 +77,7 @@
 /*Default display refresh, input device read and animation step period.*/
 #define LV_DEF_REFR_PERIOD  10      /*[ms]*/
 
-#define LV_INDEV_REFR_PERIOD  30    /*[ms]*/
+#define LV_INDEV_REFR_PERIOD  50    /*[ms]*/  /* Balanced: 50ms for good balance between smoothness and CPU usage */
 
 /*Default Dot Per Inch. Used to initialize default sizes such as widgets sized, style paddings.
  *(Not so important, you can adjust it to modify default sizes and spaces)*/

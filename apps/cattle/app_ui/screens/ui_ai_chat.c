@@ -82,7 +82,7 @@ void ui_ai_chat_screen_init(void)
     lv_obj_set_style_text_color(ui_chat_text, lv_color_hex(0xAAAAAA), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(ui_chat_text, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_align(ui_chat_text, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(ui_chat_text, &lv_font_montserrat_16, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(ui_chat_text, &font_puhui_18_2, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_pad_left(ui_chat_text, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_pad_right(ui_chat_text, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_pad_top(ui_chat_text, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -105,7 +105,7 @@ void ui_ai_chat_screen_init(void)
     lv_obj_set_style_blend_mode(ui_red_ring, LV_BLEND_MODE_NORMAL, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_opa(ui_red_ring, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-    lv_obj_add_event_cb(ui_ai_chat, ui_event_ai_chat, LV_EVENT_ALL, NULL);
+    lv_obj_add_event_cb(ui_ai_chat, ui_event_ai_chat, LV_EVENT_GESTURE, NULL);
 
     /* Add screen load/unload event handlers for animation control */
     lv_obj_add_event_cb(ui_ai_chat, ui_ai_chat_screen_loaded_cb, LV_EVENT_SCREEN_LOADED, NULL);

@@ -172,7 +172,7 @@ void ui_tracker_screen_init(void)
     lv_obj_set_style_text_font(heading_text, &lv_font_montserrat_20, LV_PART_MAIN);
     lv_obj_center(heading_text);
 
-    lv_obj_add_event_cb(ui_tracker, ui_event_tracker, LV_EVENT_ALL, NULL);
+    lv_obj_add_event_cb(ui_tracker, ui_event_tracker, LV_EVENT_GESTURE, NULL);
 
 #if UI_TRACKER_TEST_MODE
     /* Create test timer: update every 3 seconds */

@@ -252,7 +252,7 @@ void user_main(void)
 // #if defined(ENABLE_CELLULAR) && (ENABLE_CELLULAR == 1)
 //     type |= NETCONN_CELLULAR;
 // #endif
-    netmgr_init(type);
+    // netmgr_init(type);
 
 #if defined(ENABLE_WIFI) && (ENABLE_WIFI == 1)
     netmgr_conn_set(NETCONN_WIFI, NETCONN_CMD_NETCFG, &(netcfg_args_t){.type = NETCFG_TUYA_BLE | NETCFG_TUYA_WIFI_AP});

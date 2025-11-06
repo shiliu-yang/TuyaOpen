@@ -45,8 +45,6 @@ void __encoder_timer_cb(TIMER_ID timer_id, void *arg)
     int32_t current_angle = encoder_get_angle();
     uint8_t button_pressed = encoder_get_pressed();
 
-    // PR_DEBUG("encoder timer callback, angle: %d, button pressed: %d", current_angle, button_pressed);
-
     if (button_pressed) {
         app_ui_SOS_screen_load(1);
     } else if (current_angle > 10) {

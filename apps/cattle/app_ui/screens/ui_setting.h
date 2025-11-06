@@ -30,6 +30,37 @@ extern lv_obj_t * ui_label_gps;
 extern lv_obj_t * ui_label_gps__number;
 // CUSTOM VARIABLES
 
+// CUSTOM FUNCTIONS
+/**
+ * @brief Set GPS color (both icon and label)
+ * @param rgb_color 24-bit RGB color (e.g., 0xFF0000 for red, 0x00FF00 for green)
+ */
+void ui_setting_set_gps_color(uint32_t rgb_color);
+
+/**
+ * @brief Update GPS satellite count
+ * @param count Number of satellites
+ */
+void ui_setting_set_gps_count(uint8_t count);
+
+/**
+ * @brief Set time label text
+ * @param time_str Time string (e.g., "12:34")
+ */
+void ui_setting_set_time(const char *time_str);
+
+/**
+ * @brief Set date label text
+ * @param date_str Date string (e.g., "2025/11/05")
+ */
+void ui_setting_set_date(const char *date_str);
+
+/**
+ * @brief Set volume slider value
+ * @param volume Volume level (0-100)
+ */
+void ui_setting_set_volume(uint8_t volume);
+
 #ifdef __cplusplus
 } /*extern "C"*/
 #endif

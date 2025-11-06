@@ -4,10 +4,11 @@
 // Project name: cattle_Project
 
 #include "../ui.h"
+#include <stdio.h>
+
+#include "tal_api.h"
 
 lv_obj_t * ui_setting = NULL;
-lv_obj_t * ui_label_date = NULL;
-lv_obj_t * ui_label_time = NULL;
 lv_obj_t * ui_image_volume = NULL;
 lv_obj_t * ui_label_volume = NULL;
 lv_obj_t * ui_slider_volume = NULL;
@@ -19,6 +20,39 @@ lv_obj_t * ui_container_gps = NULL;
 lv_obj_t * ui_image_gps = NULL;
 lv_obj_t * ui_label_gps = NULL;
 lv_obj_t * ui_label_gps__number = NULL;
+lv_obj_t * ui_container_datetime = NULL;
+lv_obj_t * ui_label_date = NULL;
+lv_obj_t * ui_label_time = NULL;
+
+/* Debug control macro for volume slider */
+// #define DEBUG_VOLUME_SLIDER
+
+/* Internal volume slider event handler */
+static void volume_slider_event_handler(lv_event_t * e)
+{
+    lv_event_code_t code = lv_event_get_code(e);
+    lv_obj_t * slider = lv_event_get_target(e);
+    
+#ifdef DEBUG_VOLUME_SLIDER
+    PR_DEBUG("Volume slider event: %d", code);
+#endif
+    
+    if (code == LV_EVENT_VALUE_CHANGED) {
+        /* Force immediate refresh to ensure smooth dragging */
+        lv_obj_invalidate(slider);
+        lv_refr_now(NULL);
+    }
+    else if (code == LV_EVENT_RELEASED) {
+        /* User released the slider, report current value */
+#ifdef DEBUG_VOLUME_SLIDER
+        int32_t volume = lv_slider_get_value(slider);
+        PR_DEBUG("Volume released: %d", (int)volume);
+#endif
+        
+        volume_changed_callback(e);
+    }
+}
+
 // event funtions
 void ui_event_setting(lv_event_t * e)
 {
@@ -46,30 +80,6 @@ void ui_setting_screen_init(void)
     lv_obj_set_style_text_color(ui_setting, lv_color_hex(0x1C90FC), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(ui_setting, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-    ui_label_date = lv_label_create(ui_setting);
-    lv_obj_set_width(ui_label_date, LV_SIZE_CONTENT);   /// 1
-    lv_obj_set_height(ui_label_date, LV_SIZE_CONTENT);    /// 1
-    lv_obj_set_x(ui_label_date, 58);
-    lv_obj_set_y(ui_label_date, 130);
-    lv_label_set_text(ui_label_date, "1999/01/01");
-    lv_obj_remove_flag(ui_label_date, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM |
-                       LV_OBJ_FLAG_SCROLL_CHAIN);     /// Flags
-    lv_obj_set_style_text_color(ui_label_date, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_opa(ui_label_date, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(ui_label_date, &lv_font_montserrat_24, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-    ui_label_time = lv_label_create(ui_setting);
-    lv_obj_set_width(ui_label_time, LV_SIZE_CONTENT);   /// 1
-    lv_obj_set_height(ui_label_time, LV_SIZE_CONTENT);    /// 1
-    lv_obj_set_x(ui_label_time, 58);
-    lv_obj_set_y(ui_label_time, 166);
-    lv_label_set_text(ui_label_time, "00:00");
-    lv_obj_remove_flag(ui_label_time, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM |
-                       LV_OBJ_FLAG_SCROLL_CHAIN);     /// Flags
-    lv_obj_set_style_text_color(ui_label_time, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_opa(ui_label_time, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(ui_label_time, &ui_font_mont_82, LV_PART_MAIN | LV_STATE_DEFAULT);
-
     ui_image_volume = lv_image_create(ui_setting);
     lv_image_set_src(ui_image_volume, &ui_img_image_volume_png);
     lv_obj_set_width(ui_image_volume, LV_SIZE_CONTENT);   /// 1
@@ -77,39 +87,54 @@ void ui_setting_screen_init(void)
     lv_obj_set_x(ui_image_volume, 103);
     lv_obj_set_y(ui_image_volume, 312);
     lv_obj_add_flag(ui_image_volume, LV_OBJ_FLAG_CLICKABLE);     /// Flags
-    lv_obj_remove_flag(ui_image_volume, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
+    // lv_obj_remove_flag(ui_image_volume, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
 
     ui_label_volume = lv_label_create(ui_setting);
     lv_obj_set_width(ui_label_volume, LV_SIZE_CONTENT);   /// 1
     lv_obj_set_height(ui_label_volume, LV_SIZE_CONTENT);    /// 1
     lv_obj_set_x(ui_label_volume, 127);
     lv_obj_set_y(ui_label_volume, 310);
-    lv_label_set_text(ui_label_volume, "volume");
-    lv_obj_remove_flag(ui_label_volume, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM |
-                       LV_OBJ_FLAG_SCROLL_CHAIN);     /// Flags
-    lv_obj_set_style_text_font(ui_label_volume, &lv_font_montserrat_22, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_label_set_text(ui_label_volume, "音量");
+    // lv_obj_remove_flag(ui_label_volume, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM |
+    //                    LV_OBJ_FLAG_SCROLL_CHAIN);     /// Flags
+    lv_obj_set_style_text_font(ui_label_volume, &font_puhui_18_2, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     ui_slider_volume = lv_slider_create(ui_setting);
+    lv_slider_set_range(ui_slider_volume, 0, 100);
     lv_slider_set_value(ui_slider_volume, 50, LV_ANIM_OFF);
-    if(lv_slider_get_mode(ui_slider_volume) == LV_SLIDER_MODE_RANGE) lv_slider_set_left_value(ui_slider_volume, 50,
-                                                                                                  LV_ANIM_OFF);
     lv_obj_set_width(ui_slider_volume, 261);
     lv_obj_set_height(ui_slider_volume, 32);
     lv_obj_set_x(ui_slider_volume, 103);
     lv_obj_set_y(ui_slider_volume, 340);
 
-    lv_obj_set_style_bg_color(ui_slider_volume, lv_color_hex(0xFFFFFF), LV_PART_KNOB | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_opa(ui_slider_volume, 255, LV_PART_KNOB | LV_STATE_DEFAULT);
-    lv_obj_set_style_pad_left(ui_slider_volume, -2, LV_PART_KNOB | LV_STATE_DEFAULT);
-    lv_obj_set_style_pad_right(ui_slider_volume, -2, LV_PART_KNOB | LV_STATE_DEFAULT);
-    lv_obj_set_style_pad_top(ui_slider_volume, -2, LV_PART_KNOB | LV_STATE_DEFAULT);
-    lv_obj_set_style_pad_bottom(ui_slider_volume, -2, LV_PART_KNOB | LV_STATE_DEFAULT);
-    lv_obj_set_style_pad_row(ui_slider_volume, 0, LV_PART_KNOB | LV_STATE_DEFAULT);
-    lv_obj_set_style_pad_column(ui_slider_volume, 0, LV_PART_KNOB | LV_STATE_DEFAULT);
+    /* Style for the main track (background/unfilled part) */
+    lv_obj_set_style_bg_opa(ui_slider_volume, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(ui_slider_volume, lv_color_hex(0x2D3E50), LV_PART_MAIN);
+    lv_obj_set_style_radius(ui_slider_volume, LV_RADIUS_CIRCLE, LV_PART_MAIN);
+    lv_obj_set_style_pad_ver(ui_slider_volume, -2, LV_PART_MAIN); /* Makes indicator slightly larger */
 
-    //Compensating for LVGL9.1 draw crash with bar/slider max value when top-padding is nonzero and right-padding is 0
-    if(lv_obj_get_style_pad_top(ui_slider_volume, LV_PART_MAIN) > 0) lv_obj_set_style_pad_right(ui_slider_volume,
-                                                                                                    lv_obj_get_style_pad_right(ui_slider_volume, LV_PART_MAIN) + 1, LV_PART_MAIN);
+    /* Style for the indicator (filled/blue part) */
+    lv_obj_set_style_bg_opa(ui_slider_volume, LV_OPA_COVER, LV_PART_INDICATOR);
+    lv_obj_set_style_bg_color(ui_slider_volume, lv_color_hex(0x1E90FF), LV_PART_INDICATOR);
+    lv_obj_set_style_radius(ui_slider_volume, LV_RADIUS_CIRCLE, LV_PART_INDICATOR);
+
+    /* Style for the knob (circular white handle) */
+    lv_obj_set_style_bg_opa(ui_slider_volume, LV_OPA_COVER, LV_PART_KNOB);
+    lv_obj_set_style_bg_color(ui_slider_volume, lv_color_white(), LV_PART_KNOB);
+    lv_obj_set_style_border_width(ui_slider_volume, 0, LV_PART_KNOB);
+    lv_obj_set_style_radius(ui_slider_volume, LV_RADIUS_CIRCLE, LV_PART_KNOB);
+    lv_obj_set_style_pad_all(ui_slider_volume, 10, LV_PART_KNOB); /* Makes knob larger */
+    lv_obj_set_style_shadow_width(ui_slider_volume, 8, LV_PART_KNOB);
+    lv_obj_set_style_shadow_color(ui_slider_volume, lv_color_black(), LV_PART_KNOB);
+    lv_obj_set_style_shadow_opa(ui_slider_volume, LV_OPA_20, LV_PART_KNOB);
+
+    /* Stop gesture events from bubbling to parent (which might consume RELEASED event) */
+    lv_obj_remove_flag(ui_slider_volume, LV_OBJ_FLAG_GESTURE_BUBBLE);
+    
+    /* Register event callbacks: VALUE_CHANGED for smooth dragging, RELEASED for final value report */
+    lv_obj_add_event_cb(ui_slider_volume, volume_slider_event_handler, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_add_event_cb(ui_slider_volume, volume_slider_event_handler, LV_EVENT_RELEASED, NULL);
+
     ui_container_network = lv_obj_create(ui_setting);
     lv_obj_remove_style_all(ui_container_network);
     lv_obj_set_width(ui_container_network, 66);
@@ -171,10 +196,10 @@ void ui_setting_screen_init(void)
     lv_obj_set_height(ui_label_gps, LV_SIZE_CONTENT);    /// 1
     lv_obj_set_x(ui_label_gps, 24);
     lv_obj_set_y(ui_label_gps, 0);
-    lv_label_set_text(ui_label_gps, "GPS STATUS");
+    lv_label_set_text(ui_label_gps, "GPS 状态");
     lv_obj_set_style_text_color(ui_label_gps, lv_color_hex(0x2DDA86), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(ui_label_gps, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(ui_label_gps, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(ui_label_gps, &font_puhui_18_2, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     ui_label_gps__number = lv_label_create(ui_container_gps);
     lv_obj_set_width(ui_label_gps__number, LV_SIZE_CONTENT);   /// 1
@@ -182,15 +207,51 @@ void ui_setting_screen_init(void)
     lv_obj_set_x(ui_label_gps__number, 0);
     lv_obj_set_y(ui_label_gps__number, 30);
     lv_obj_set_align(ui_label_gps__number, LV_ALIGN_TOP_MID);
-    lv_label_set_text(ui_label_gps__number, "GPS NUMBER");
+    lv_label_set_text(ui_label_gps__number, "0 颗卫星");
     lv_obj_remove_flag(ui_label_gps__number,
                        LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM |
                        LV_OBJ_FLAG_SCROLL_CHAIN);     /// Flags
     lv_obj_set_style_text_color(ui_label_gps__number, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(ui_label_gps__number, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(ui_label_gps__number, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(ui_label_gps__number, &font_puhui_18_2, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-    lv_obj_add_event_cb(ui_setting, ui_event_setting, LV_EVENT_ALL, NULL);
+    ui_container_datetime = lv_obj_create(ui_setting);
+    lv_obj_remove_style_all(ui_container_datetime);
+    lv_obj_set_width(ui_container_datetime, 268);
+    lv_obj_set_height(ui_container_datetime, 140);
+    lv_obj_set_x(ui_container_datetime, 58);
+    lv_obj_set_y(ui_container_datetime, 130);
+    lv_obj_remove_flag(ui_container_datetime,
+                       LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_PRESS_LOCK | LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE |
+                       LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM |
+                       LV_OBJ_FLAG_SCROLL_CHAIN);     /// Flags
+
+    ui_label_date = lv_label_create(ui_container_datetime);
+    lv_obj_set_width(ui_label_date, LV_SIZE_CONTENT);   /// 1
+    lv_obj_set_height(ui_label_date, LV_SIZE_CONTENT);    /// 1
+    lv_obj_set_x(ui_label_date, 0);
+    lv_obj_set_y(ui_label_date, 10);
+    lv_label_set_text(ui_label_date, "1999/01/01");
+    lv_obj_remove_flag(ui_label_date, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM |
+                       LV_OBJ_FLAG_SCROLL_CHAIN);     /// Flags
+    lv_obj_set_style_text_color(ui_label_date, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_opa(ui_label_date, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(ui_label_date, &lv_font_montserrat_24, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    ui_label_time = lv_label_create(ui_container_datetime);
+    lv_obj_set_width(ui_label_time, LV_SIZE_CONTENT);   /// 1
+    lv_obj_set_height(ui_label_time, LV_SIZE_CONTENT);    /// 1
+    lv_obj_set_x(ui_label_time, 0);
+    lv_obj_set_y(ui_label_time, -10);
+    lv_obj_set_align(ui_label_time, LV_ALIGN_BOTTOM_LEFT);
+    lv_label_set_text(ui_label_time, "00:00");
+    lv_obj_remove_flag(ui_label_time, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM |
+                       LV_OBJ_FLAG_SCROLL_CHAIN);     /// Flags
+    lv_obj_set_style_text_color(ui_label_time, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_opa(ui_label_time, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(ui_label_time, &ui_font_mont_82, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    lv_obj_add_event_cb(ui_setting, ui_event_setting, LV_EVENT_GESTURE, NULL);
 
 }
 
@@ -200,8 +261,6 @@ void ui_setting_screen_destroy(void)
 
     // NULL screen variables
     ui_setting = NULL;
-    ui_label_date = NULL;
-    ui_label_time = NULL;
     ui_image_volume = NULL;
     ui_label_volume = NULL;
     ui_slider_volume = NULL;
@@ -213,5 +272,88 @@ void ui_setting_screen_destroy(void)
     ui_image_gps = NULL;
     ui_label_gps = NULL;
     ui_label_gps__number = NULL;
+    ui_container_datetime = NULL;
+    ui_label_date = NULL;
+    ui_label_time = NULL;
 
+}
+
+///////////////////// CUSTOM FUNCTIONS ////////////////////
+
+/**
+ * @brief Set GPS color (both icon and label)
+ * @param rgb_color 24-bit RGB color (e.g., 0xFF0000 for red, 0x00FF00 for green, 0x2DDA86 for default green)
+ */
+void ui_setting_set_gps_color(uint32_t rgb_color)
+{
+    if (ui_image_gps != NULL) {
+        lv_obj_set_style_image_recolor(ui_image_gps, lv_color_hex(rgb_color), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_image_recolor_opa(ui_image_gps, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
+    }
+    
+    if (ui_label_gps != NULL) {
+        lv_obj_set_style_text_color(ui_label_gps, lv_color_hex(rgb_color), LV_PART_MAIN | LV_STATE_DEFAULT);
+    }
+}
+
+/**
+ * @brief Update GPS satellite count
+ * @param count Number of satellites
+ */
+#define GPS_COUNT_BUF_SIZE 32
+static char gps_count_buf[GPS_COUNT_BUF_SIZE];
+void ui_setting_set_gps_count(uint8_t count)
+{
+    if (ui_label_gps__number != NULL) {
+        memset(gps_count_buf, 0, GPS_COUNT_BUF_SIZE);
+        snprintf(gps_count_buf, GPS_COUNT_BUF_SIZE, "%u 颗卫星", count);
+        lv_label_set_text(ui_label_gps__number, gps_count_buf);
+
+        if (count == 0) {
+            // hide ui_label_gps__number
+            lv_obj_add_flag(ui_label_gps__number, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_clear_flag(ui_label_gps__number, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+}
+
+/**
+ * @brief Set time label text
+ * @param time_str Time string (e.g., "12:34")
+ */
+void ui_setting_set_time(const char *time_str)
+{
+    if (ui_label_time != NULL && time_str != NULL) {
+        lv_label_set_text(ui_label_time, time_str);
+    }
+}
+
+/**
+ * @brief Set date label text
+ * @param date_str Date string (e.g., "2025/11/05")
+ */
+void ui_setting_set_date(const char *date_str)
+{
+    if (ui_label_date != NULL && date_str != NULL) {
+        lv_label_set_text(ui_label_date, date_str);
+    }
+}
+
+/**
+ * @brief Set volume slider value
+ * @param volume Volume level (0-100)
+ */
+void ui_setting_set_volume(uint8_t volume)
+{
+    if (ui_slider_volume != NULL) {
+        /* Clamp volume to 0-100 range */
+        uint8_t clamped_volume = volume;
+        if (clamped_volume > 100) {
+            clamped_volume = 100;
+        }
+        
+        /* Set slider value with animation */
+        lv_slider_set_value(ui_slider_volume, clamped_volume, LV_ANIM_ON);
+    }
 }

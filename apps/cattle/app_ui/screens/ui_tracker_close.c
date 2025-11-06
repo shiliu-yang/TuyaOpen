@@ -30,7 +30,7 @@ void ui_tracker_close_screen_init(void)
     lv_obj_set_style_bg_color(ui_tracker_close, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(ui_tracker_close, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-    lv_obj_add_event_cb(ui_tracker_close, ui_event_tracker_close, LV_EVENT_ALL, NULL);
+    lv_obj_add_event_cb(ui_tracker_close, ui_event_tracker_close, LV_EVENT_GESTURE, NULL);
 
 }
 

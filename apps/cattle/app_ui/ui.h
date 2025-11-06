@@ -44,6 +44,8 @@ extern const lv_image_dsc_t ui_img_image_cattle_icon_png;  // assets/image/cattl
 
 // FONTS
 LV_FONT_DECLARE(ui_font_mont_82);
+LV_FONT_DECLARE(font_puhui_30_4);
+LV_FONT_DECLARE(font_puhui_18_2);
 
 // UI INIT
 void ui_init(void);

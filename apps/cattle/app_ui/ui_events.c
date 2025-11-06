@@ -38,6 +38,20 @@ void setting_event_callback(lv_event_t * e)
     }
 }
 
+void volume_changed_callback(lv_event_t * e)
+{
+    lv_obj_t * slider = lv_event_get_target(e);
+    int32_t volume = lv_slider_get_value(slider);
+    
+    PR_DEBUG("Volume changed: %d", (int)volume);
+    
+    // TODO: Add your volume control logic here
+    // For example:
+    // - Update system volume
+    // - Send volume change event to audio module
+    // - Save volume to persistent storage
+}
+
 void tracker_event_callback(lv_event_t * e)
 {
     lv_dir_t dir = lv_indev_get_gesture_dir(lv_indev_get_act());

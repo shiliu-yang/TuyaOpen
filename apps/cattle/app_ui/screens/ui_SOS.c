@@ -241,7 +241,7 @@ void ui_SOS_screen_init(void)
     lv_obj_set_style_text_font(cancel_label, &lv_font_montserrat_22, LV_PART_MAIN | LV_STATE_DEFAULT);
     PR_DEBUG("ui_SOS_screen_init: cancel_label created");
     /* Add event callback */
-    lv_obj_add_event_cb(ui_SOS, ui_event_SOS, LV_EVENT_ALL, NULL);
+    lv_obj_add_event_cb(ui_SOS, ui_event_SOS, LV_EVENT_GESTURE, NULL);
     PR_DEBUG("ui_SOS_screen_init: ui_SOS created");
 }
 
