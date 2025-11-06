@@ -19,6 +19,7 @@
 #include "tuya_lvgl.h"
 
 #include "tal_api.h"
+#include <string.h>
 
 /***********************************************************
 ************************macro define************************
@@ -188,6 +189,9 @@ void app_ui_setting_network_update(uint8_t network_type, uint8_t status)
 
 
 // AI chat screen
+static char *s_user_msg_text = NULL;
+static char *s_assistant_msg_text = NULL;
+
 static void __ai_chat_red_ring_workq_cb(void *data)
 {
     (void)data;
@@ -204,4 +208,94 @@ void app_ui_ai_chat_set_red_ring_visible(bool visible)
 {
     s_red_ring_visible = visible;
     tal_workq_schedule(WORKQ_SYSTEM, __ai_chat_red_ring_workq_cb, NULL);
+}
+
+static void __ai_chat_user_msg_workq_cb(void *data)
+{
+    (void)data;
+    
+    if (s_user_msg_text == NULL) {
+        return;
+    }
+    
+    tuya_lvgl_mutex_lock();
+    ui_ai_chat_update_text(s_user_msg_text);
+    tuya_lvgl_mutex_unlock();
+    
+    // PR_DEBUG("AI chat user message updated: %.30s...", s_user_msg_text);
+    
+    /* Free the allocated text */
+    tal_psram_free(s_user_msg_text);
+    s_user_msg_text = NULL;
+}
+
+void app_ui_ai_chat_set_user_msg(const char *text)
+{
+    if (text == NULL || strlen(text) == 0 || strlen(text) > 2*1024) {
+        return;
+    }
+    
+    /* Free previous text if exists */
+    if (s_user_msg_text != NULL) {
+        tal_psram_free(s_user_msg_text);
+        s_user_msg_text = NULL;
+    }
+    
+    /* Allocate and copy text */
+    size_t len = strlen(text);
+    s_user_msg_text = tal_psram_malloc(len + 1);
+    if (s_user_msg_text == NULL) {
+        PR_ERR("Failed to allocate memory for user message");
+        return;
+    }
+    memset(s_user_msg_text, 0, len + 1);
+    strncpy(s_user_msg_text, text, len);
+    
+    /* Schedule async update */
+    tal_workq_schedule(WORKQ_SYSTEM, __ai_chat_user_msg_workq_cb, NULL);
+}
+
+static void __ai_chat_assistant_msg_workq_cb(void *data)
+{
+    (void)data;
+    
+    if (s_assistant_msg_text == NULL) {
+        return;
+    }
+    
+    tuya_lvgl_mutex_lock();
+    ui_ai_chat_update_text(s_assistant_msg_text);
+    tuya_lvgl_mutex_unlock();
+    
+    // PR_DEBUG("AI chat assistant message updated: %.30s...", s_assistant_msg_text);
+    
+    /* Free the allocated text */
+    tal_psram_free(s_assistant_msg_text);
+    s_assistant_msg_text = NULL;
+}
+
+void app_ui_ai_chat_set_assistant_msg(const char *text)
+{
+    if (text == NULL || strlen(text) == 0 || strlen(text) > 2*1024) {
+        return;
+    }
+    
+    /* Free previous text if exists */
+    if (s_assistant_msg_text != NULL) {
+        tal_psram_free(s_assistant_msg_text);
+        s_assistant_msg_text = NULL;
+    }
+    
+    /* Allocate and copy text */
+    size_t len = strlen(text);
+    s_assistant_msg_text = tal_psram_malloc(len + 1);
+    if (s_assistant_msg_text == NULL) {
+        PR_ERR("Failed to allocate memory for assistant message");
+        return;
+    }
+    memset(s_assistant_msg_text, 0, len + 1);
+    strncpy(s_assistant_msg_text, text, len);
+    
+    /* Schedule async update */
+    tal_workq_schedule(WORKQ_SYSTEM, __ai_chat_assistant_msg_workq_cb, NULL);
 }

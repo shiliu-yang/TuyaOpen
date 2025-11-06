@@ -5,6 +5,8 @@
 
 #include "../ui.h"
 #include <stdlib.h>
+#include <string.h>
+#include "tal_api.h"
 
 lv_obj_t *ui_ai_chat = NULL;
 lv_obj_t *ui_left_eye = NULL;
@@ -16,11 +18,20 @@ lv_obj_t *ui_mic_icon = NULL;
 /* Animation timer for random eye animations */
 static lv_timer_t *eye_animation_timer = NULL;
 
+/* Typewriter animation state */
+static char *typewriter_full_text = NULL;
+static int typewriter_char_index = 0;
+static int typewriter_window_start = 0;
+static lv_timer_t *typewriter_timer = NULL;
+static bool typewriter_active = false;
+
 /* Forward declarations */
 static void eye_animation_timer_cb(lv_timer_t *timer);
 static void play_random_eye_animation(void);
 static void ui_ai_chat_screen_loaded_cb(lv_event_t *e);
 static void ui_ai_chat_screen_unloaded_cb(lv_event_t *e);
+static void typewriter_timer_cb(lv_timer_t *timer);
+static int utf8_next_char_size(const char *text, int pos);
 
 // event funtions
 void ui_event_ai_chat(lv_event_t *e)
@@ -78,8 +89,9 @@ void ui_ai_chat_screen_init(void)
     lv_obj_set_height(ui_chat_text, 83);
     lv_obj_set_x(ui_chat_text, 3);
     lv_obj_set_y(ui_chat_text, 135);
-    lv_obj_set_align(ui_chat_text, LV_ALIGN_CENTER);
-    lv_label_set_text(ui_chat_text, "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
+    lv_label_set_long_mode(ui_chat_text, LV_LABEL_LONG_WRAP);
+    lv_obj_align(ui_chat_text, LV_ALIGN_BOTTOM_MID, 0, -20);
+
     lv_obj_set_style_text_color(ui_chat_text, lv_color_hex(0xAAAAAA), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(ui_chat_text, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_align(ui_chat_text, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -90,6 +102,8 @@ void ui_ai_chat_screen_init(void)
     lv_obj_set_style_pad_bottom(ui_chat_text, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_pad_row(ui_chat_text, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_pad_column(ui_chat_text, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_line_space(ui_chat_text, 2, 0);
+
 
     ui_red_ring = lv_obj_create(ui_ai_chat);
     lv_obj_remove_style_all(ui_red_ring);
@@ -120,6 +134,8 @@ void ui_ai_chat_screen_init(void)
     /* Add screen load/unload event handlers for animation control */
     lv_obj_add_event_cb(ui_ai_chat, ui_ai_chat_screen_loaded_cb, LV_EVENT_SCREEN_LOADED, NULL);
     lv_obj_add_event_cb(ui_ai_chat, ui_ai_chat_screen_unloaded_cb, LV_EVENT_SCREEN_UNLOADED, NULL);
+
+    ui_ai_chat_update_text("你好，今天怎么帮你找牛？");
 }
 
 /**
@@ -216,6 +232,21 @@ void ui_ai_chat_screen_destroy(void)
         eye_animation_timer = NULL;
     }
 
+    /* Clean up typewriter timer and memory */
+    if (typewriter_timer) {
+        lv_timer_del(typewriter_timer);
+        typewriter_timer = NULL;
+    }
+    
+    if (typewriter_full_text) {
+        tal_psram_free(typewriter_full_text);
+        typewriter_full_text = NULL;
+    }
+    
+    typewriter_active = false;
+    typewriter_char_index = 0;
+    typewriter_window_start = 0;
+
     if (ui_ai_chat)
         lv_obj_del(ui_ai_chat);
 
@@ -247,4 +278,179 @@ void ui_ai_chat_set_red_ring_visible(bool visible)
             lv_obj_add_flag(ui_mic_icon, LV_OBJ_FLAG_HIDDEN);
         }
     }
+}
+
+/* Helper function to get the size of the next UTF-8 character */
+static int utf8_next_char_size(const char *text, int pos)
+{
+    unsigned char c = text[pos];
+    if ((c & 0x80) == 0) return 1;           // ASCII
+    else if ((c & 0xE0) == 0xC0) return 2;   // 2-byte UTF-8
+    else if ((c & 0xF0) == 0xE0) return 3;   // 3-byte UTF-8 (Chinese)
+    else if ((c & 0xF8) == 0xF0) return 4;   // 4-byte UTF-8
+    else return 1;                            // Invalid, skip one byte
+}
+
+/* Typewriter animation timer callback */
+static void typewriter_timer_cb(lv_timer_t *timer)
+{
+    (void)timer;
+    
+    if (!typewriter_active || !typewriter_full_text) {
+        return;
+    }
+
+    int text_len = strlen(typewriter_full_text);
+    const int MAX_DISPLAY_CHARS = 50; // Adjust based on ui_chat_text size
+
+    /* Count how many characters we've displayed so far */
+    int displayed_chars = 0;
+    int pos = typewriter_window_start;
+    while (pos < typewriter_char_index && pos < text_len) {
+        if ((typewriter_full_text[pos] & 0xC0) != 0x80) {
+            displayed_chars++;
+        }
+        pos++;
+    }
+
+    /* Check if we're in scrolling mode (display window is full) */
+    bool is_scrolling = (displayed_chars >= MAX_DISPLAY_CHARS);
+
+    /* Check if the last displayed character was Chinese punctuation for extra pause */
+    bool just_displayed_punctuation = false;
+    if (typewriter_char_index >= 3) {
+        /* Check for "，" (E3 80 81) or "。" (E3 80 82) */
+        const unsigned char *text_bytes = (const unsigned char *)typewriter_full_text;
+        int prev_pos = typewriter_char_index - 3;
+
+        if (prev_pos >= 0 && prev_pos < text_len - 2) {
+            /* Chinese comma "，" is 0xE3 0x80 0x81 */
+            /* Chinese period "。" is 0xE3 0x80 0x82 */
+            if (text_bytes[prev_pos] == 0xE3 && text_bytes[prev_pos + 1] == 0x80) {
+                if (text_bytes[prev_pos + 2] == 0x81 || text_bytes[prev_pos + 2] == 0x82) {
+                    just_displayed_punctuation = true;
+                }
+            }
+        }
+    }
+
+    /* Adjust timer period based on mode and punctuation */
+    if (just_displayed_punctuation && !is_scrolling) {
+        lv_timer_set_period(typewriter_timer, 600); // Extra pause at punctuation
+    } else if (is_scrolling) {
+        lv_timer_set_period(typewriter_timer, 200); // Slower scroll
+    } else {
+        lv_timer_set_period(typewriter_timer, 100);  // Fast typewriter
+    }
+
+    /* Extract window of text to display */
+    static char window_text[500];
+    int window_size = 0;
+    int byte_pos = typewriter_window_start;
+    int char_count = 0;
+
+    /* Build the window text character by character up to current index */
+    while (byte_pos < text_len && byte_pos <= typewriter_char_index && char_count < MAX_DISPLAY_CHARS) {
+        int char_size = utf8_next_char_size(typewriter_full_text, byte_pos);
+
+        if (window_size + char_size < sizeof(window_text) - 1) {
+            memcpy(&window_text[window_size], &typewriter_full_text[byte_pos], char_size);
+            window_size += char_size;
+            char_count++;
+        }
+
+        byte_pos += char_size;
+    }
+    window_text[window_size] = '\0';
+
+    /* Update display with current window */
+    if (ui_chat_text) {
+        lv_label_set_text(ui_chat_text, window_text);
+    }
+
+    /* Advance to next character */
+    if (typewriter_char_index < text_len) {
+        int char_size = utf8_next_char_size(typewriter_full_text, typewriter_char_index);
+        typewriter_char_index += char_size;
+
+        /* Recalculate displayed characters after advance */
+        displayed_chars = 0;
+        pos = typewriter_window_start;
+        while (pos < typewriter_char_index && pos < text_len) {
+            if ((typewriter_full_text[pos] & 0xC0) != 0x80) {
+                displayed_chars++;
+            }
+            pos++;
+        }
+
+        /* Slide window forward if we exceed display capacity */
+        if (displayed_chars > MAX_DISPLAY_CHARS) {
+            /* Move window start forward by one character */
+            int skip_size = utf8_next_char_size(typewriter_full_text, typewriter_window_start);
+            typewriter_window_start += skip_size;
+        }
+    } else {
+        /* Animation complete - pause briefly, then restart */
+        static int pause_counter = 0;
+        pause_counter++;
+
+        if (pause_counter >= 20) { // Pause for ~2 seconds (20 * 100ms)
+            /* Clear display */
+            if (ui_chat_text) {
+                lv_label_set_text(ui_chat_text, "");
+            }
+
+            /* Reset animation to start from beginning */
+            typewriter_char_index = 0;
+            typewriter_window_start = 0;
+            pause_counter = 0;
+
+            /* Reset timer to fast speed for typewriter effect */
+            lv_timer_set_period(typewriter_timer, 100);
+        }
+    }
+}
+
+/**
+ * Update chat text with typewriter animation
+ * @param text: Text to display with typewriter effect
+ */
+void ui_ai_chat_update_text(const char *text)
+{
+    /* Stop any existing animation */
+    if (typewriter_timer) {
+        lv_timer_del(typewriter_timer);
+        typewriter_timer = NULL;
+    }
+
+    if (typewriter_full_text) {
+        tal_psram_free(typewriter_full_text);
+        typewriter_full_text = NULL;
+    }
+
+    if (text == NULL || text[0] == '\0') {
+        typewriter_active = false;
+        if (ui_chat_text) {
+            lv_label_set_text(ui_chat_text, "");
+        }
+        return;
+    }
+
+    /* Store the full text */
+    typewriter_full_text = tal_psram_malloc(strlen(text) + 1);
+    if (typewriter_full_text == NULL) {
+        typewriter_active = false;
+        PR_ERR("Failed to allocate memory for typewriter text");
+        return;
+    }
+    memset(typewriter_full_text, 0, strlen(text) + 1);
+    strncpy(typewriter_full_text, text, strlen(text));
+    typewriter_char_index = 0;
+    typewriter_window_start = 0;
+    typewriter_active = true;
+
+    /* Create timer for animation - 100ms per character */
+    typewriter_timer = lv_timer_create(typewriter_timer_cb, 100, NULL);
+    
+    // PR_DEBUG("Typewriter animation started for text: %.30s...", text);
 }

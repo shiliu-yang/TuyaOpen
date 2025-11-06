@@ -138,19 +138,54 @@ static TDL_BUTTON_HANDLE sg_button_hdl = NULL;
 /***********************************************************
 ***********************function define**********************
 ***********************************************************/
+static uint8_t *p_ai_text = NULL;
+static uint32_t ai_text_len = 0;
+
 static void __app_ai_audio_evt_inform_cb(AI_AUDIO_EVENT_E event, uint8_t *data, uint32_t len, void *arg)
 {
     switch (event) {
     case AI_AUDIO_EVT_HUMAN_ASR_TEXT: {
         if (len > 0 && data) {
             // send asr text to display
+            app_ui_ai_chat_set_user_msg((char *)data);
         }
     } break;
     case AI_AUDIO_EVT_AI_REPLIES_TEXT_START: {
+        if (NULL == p_ai_text) {
+            p_ai_text = tal_psram_malloc(AI_AUDIO_TEXT_BUFF_LEN);
+            if (NULL == p_ai_text) {
+                return;
+            }
+        }
+
+        ai_text_len = 0;
     } break;
     case AI_AUDIO_EVT_AI_REPLIES_TEXT_DATA: {
+        if (NULL == p_ai_text) {
+            return;
+        }
+
+        if (ai_text_len + len + 1 > AI_AUDIO_TEXT_BUFF_LEN) {
+            ai_text_len = 0;
+            memset(p_ai_text, 0, AI_AUDIO_TEXT_BUFF_LEN);
+        }
+
+        memcpy(p_ai_text + ai_text_len, data, len);
+
+        ai_text_len += len;
+        if (ai_text_len >= AI_AUDIO_TEXT_SHOW_LEN) {
+            app_ui_ai_chat_set_assistant_msg((char *)p_ai_text);
+            ai_text_len = 0;
+        }
     } break;
     case AI_AUDIO_EVT_AI_REPLIES_TEXT_END: {
+        if (NULL == p_ai_text) {
+            return;
+        }
+
+        app_ui_ai_chat_set_assistant_msg((char *)p_ai_text);
+        ai_text_len = 0;
+        memset(p_ai_text, 0, AI_AUDIO_TEXT_BUFF_LEN);
     } break;
     case AI_AUDIO_EVT_AI_REPLIES_TEXT_INTERUPT: {
     } break;

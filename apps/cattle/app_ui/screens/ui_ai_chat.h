@@ -23,6 +23,7 @@ extern lv_obj_t * ui_mic_icon;
 
 // CUSTOM FUNCTIONS
 void ui_ai_chat_set_red_ring_visible(bool visible);
+void ui_ai_chat_update_text(const char *text);
 
 // CUSTOM VARIABLES
 

@@ -51,6 +51,10 @@ void app_ui_setting_battery_update(uint8_t battery_level);
 
 void app_ui_ai_chat_set_red_ring_visible(bool visible);
 
+void app_ui_ai_chat_set_user_msg(const char *text);
+
+void app_ui_ai_chat_set_assistant_msg(const char *text);
+
 #ifdef __cplusplus
 }
 #endif
