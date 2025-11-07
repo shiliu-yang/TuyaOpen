@@ -50,6 +50,7 @@
 #include "app_volume.h"
 #include "app_battery.h"
 #include "app_gps.h"
+#include "app_sensor_uart.h"
 
 #include "cloud_api.h"
 
@@ -228,6 +229,7 @@ void user_main(void)
     tal_sw_timer_init();
     tal_workq_init();
     tal_time_service_init();
+    tal_cli_init();
 
     tuya_authorize_init();
 
@@ -285,18 +287,21 @@ void user_main(void)
     // init encoder
     TUYA_CALL_ERR_LOG(app_encoder_init());
 
-    TUYA_CALL_ERR_LOG(app_gps_init());
-    TUYA_CALL_ERR_LOG(app_gps_start());
+#if defined(ENABLE_APP_UI) && (ENABLE_APP_UI == 1)
+    TUYA_CALL_ERR_LOG(app_ui_main_init());
+#endif
+
+    // TUYA_CALL_ERR_LOG(app_gps_init());
+    // TUYA_CALL_ERR_LOG(app_gps_start());
+
+    TUYA_CALL_ERR_LOG(app_sensor_uart_init(SENSOR_UART_PORT));
+    app_sensor_uart_start();
 
     PR_DEBUG("tuya_iot_init success");
     /* Start tuya iot task */
     tuya_iot_start(&client);
 
     reset_netconfig_check();
-
-#if defined(ENABLE_APP_UI) && (ENABLE_APP_UI == 1)
-    TUYA_CALL_ERR_LOG(app_ui_main_init());
-#endif
 
     for (;;) {
         /* Loop to receive packets, and handles client keepalive */

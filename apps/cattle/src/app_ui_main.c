@@ -129,7 +129,7 @@ static void __SOS_screen_load_cb(void *data)
         /* Call sos_cancel before going back to clean up state */
         tuya_lvgl_mutex_lock();
         sos_cancel();
-        tuya_lvgl_mutex_unlock();        
+        tuya_lvgl_mutex_unlock();
         /* app_page_back will call ui_SOS_screen_destroy automatically */
         app_page_back(LV_SCR_LOAD_ANIM_NONE, 1);
     }

@@ -130,7 +130,7 @@ void ui_tracker_screen_init(void)
         // PR_DEBUG("Compass canvas created successfully (466x466)");
     }
 
-    ui_tracker_target_update(10000, 0.0f, 0.0f);
+    ui_tracker_target_update(1000, 0.0f, 0.0f);
 
     ui_image_search_scope = lv_image_create(ui_tracker);
     lv_image_set_src(ui_image_search_scope, &ui_img_image_search_scope_png);
@@ -773,8 +773,8 @@ void ui_tracker_target_update(uint32_t total_distance, float heading_degrees, fl
         lv_anim_set_var(&heading_anim, NULL);
         lv_anim_set_values(&heading_anim, (int32_t)(current_heading * 10.0f), (int32_t)(anim_target * 10.0f));
         lv_anim_set_exec_cb(&heading_anim, on_heading_anim_update);
-        lv_anim_set_time(&heading_anim, 800); /* 800ms smooth rotation */
-        lv_anim_set_path_cb(&heading_anim, lv_anim_path_ease_in_out);
+        lv_anim_set_time(&heading_anim, 200); /* 200ms quick rotation (was 800ms) */
+        lv_anim_set_path_cb(&heading_anim, lv_anim_path_linear);
         lv_anim_start(&heading_anim);
     } else {
         /* No animation needed, update immediately */

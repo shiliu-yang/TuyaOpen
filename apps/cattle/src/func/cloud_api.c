@@ -158,7 +158,7 @@ int cloud_api_cattle_id_get(void)
 static void cloud_api_thread_cb(void *args)
 {
     while (1) {
-        tal_system_sleep(5*1000);
+        tal_system_sleep(10*1000);
         cattle_location_t location = {0};
         OPERATE_RET rt = __get_cattle_location(&location, 0);
         if (rt != OPRT_OK) {
