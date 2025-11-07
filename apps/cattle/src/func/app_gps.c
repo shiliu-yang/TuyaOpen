@@ -252,8 +252,7 @@ static void gps_task(void *param)
         /* Read NMEA data from UART */
         rt = gps_read_nmea(buffer, GPS_BUFFER_SIZE);
 
-// #if defined(ENABLE_DEBUG_VIRTUAL_SIMULATION) && (ENABLE_DEBUG_VIRTUAL_SIMULATION == 1)
-#if 1
+#if defined(ENABLE_DEBUG_VIRTUAL_SIMULATION) && (ENABLE_DEBUG_VIRTUAL_SIMULATION == 1)
         strncpy((char *)buffer, "$GNGGA,051746.000,3018.024840,N,12004.092300,E,1,22,0.66,709.565,M,-14.256,M,,*5D\r\n$GNRMC,075546.000,A,3018.024840,N,12004.092300,E,0.94,292.56,151025,,,A,V*05\r\n",
         GPS_BUFFER_SIZE);
         rt = OPRT_OK;

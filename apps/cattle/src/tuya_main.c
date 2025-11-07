@@ -37,6 +37,7 @@
 
 #include "board_com_api.h"
 #include "app_chat_bot.h"
+#include "app_dp.h"
 
 #if defined(ENABLE_APP_UI) && (ENABLE_APP_UI == 1)
 #include "app_ui_main.h"
@@ -132,7 +133,7 @@ void user_event_handler_on(tuya_iot_client_t *client, tuya_event_msg_t *event)
     case TUYA_EVENT_MQTT_CONNECTED: {
         PR_INFO("Device MQTT Connected!");
         tal_event_publish(EVENT_MQTT_CONNECTED, NULL);
-        ai_audio_player_play_alert(AI_AUDIO_ALERT_NETWORK_CONNECTED);
+        // ai_audio_player_play_alert(AI_AUDIO_ALERT_NETWORK_CONNECTED);
     } break;
     /* MQTT with tuya cloud is disconnected, device offline */
     case TUYA_EVENT_MQTT_DISCONNECT: {
@@ -188,6 +189,16 @@ void user_event_handler_on(tuya_iot_client_t *client, tuya_event_msg_t *event)
     default: {
     } break;
     }
+}
+
+static OPERATE_RET __ai_trigger_switch_on(void *data)
+{
+    (void)data;
+
+    app_dp_switch_set(false);
+    app_dp_switch_set(true);
+
+    return OPRT_OK;
 }
 
 /**
@@ -302,6 +313,9 @@ void user_main(void)
     tuya_iot_start(&client);
 
     reset_netconfig_check();
+
+    // ai trigger switch on
+    tal_event_subscribe("ai.session.new", "ai_init", __ai_trigger_switch_on, SUBSCRIBE_TYPE_ONETIME);
 
     for (;;) {
         /* Loop to receive packets, and handles client keepalive */

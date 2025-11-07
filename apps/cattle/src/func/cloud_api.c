@@ -40,7 +40,7 @@
 #define CLOUD_API_TASK_PRIORITY THREAD_PRIO_4
 #define CLOUD_API_TASK_STACK_SIZE 4096
 
-#define ENABLE_DEBUG_VIRTUAL_SIMULATION 1
+#define ENABLE_DEBUG_VIRTUAL_SIMULATION 0
 
 /***********************************************************
 ***********************typedef define***********************
@@ -162,7 +162,7 @@ static void cloud_api_thread_cb(void *args)
         cattle_location_t location = {0};
         OPERATE_RET rt = __get_cattle_location(&location, 0);
         if (rt != OPRT_OK) {
-            PR_ERR("get cattle location failed, rt: %d", rt);
+            // PR_ERR("get cattle location failed, rt: %d", rt);
             continue;
         }
         memcpy(&sg_cattle_location, &location, sizeof(cattle_location_t));

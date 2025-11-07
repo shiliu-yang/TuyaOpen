@@ -26,6 +26,7 @@
 #include "media_src_zh.h"
 
 #include "app_ui_main.h"
+#include "app_ui_page_manage.h"
 
 /***********************************************************
 ************************macro define************************
@@ -312,6 +313,15 @@ uint8_t app_chat_bot_get_enable(void)
 }
 
 #if defined(ENABLE_BUTTON) && (ENABLE_BUTTON == 1)
+/**
+ * @brief Workqueue callback for back to bottom page
+ */
+static void __back_to_bottom_workq_cb(void *data)
+{
+    PR_DEBUG("Back to bottom page from button press");
+    app_page_back_to_bottom(LV_SCR_LOAD_ANIM_MOVE_RIGHT, 1);
+}
+
 static void __app_button_function_cb(char *name, TDL_BUTTON_TOUCH_EVENT_E event, void *argc)
 {
     APP_CHAT_MODE_E work_mode = sg_chat_bot.work->mode;
@@ -338,6 +348,9 @@ static void __app_button_function_cb(char *name, TDL_BUTTON_TOUCH_EVENT_E event,
 
             PR_DEBUG("button press down, listen start");
             ai_audio_manual_start_single_talk();
+
+            /* Schedule async back to bottom page */
+            tal_workq_schedule(WORKQ_SYSTEM, __back_to_bottom_workq_cb, NULL);
         }
     } break;
     case TDL_BUTTON_PRESS_UP: {
