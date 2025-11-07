@@ -14,7 +14,7 @@
 #endif
 
 /* Enable test mode: auto-rotate compass and change distance every 3 seconds */
-#define UI_TRACKER_TEST_MODE 1
+#define UI_TRACKER_TEST_MODE 0
 
 /* Enable detailed debug logging */
 #define UI_TRACKER_DEBUG_POSITION 0
@@ -713,6 +713,10 @@ static void on_heading_anim_update(void *var, int32_t value)
 
 void ui_tracker_target_update(uint32_t total_distance, float heading_degrees, float bearing_degrees)
 {
+    if (NULL == ui_tracker) {
+        return;
+    }
+
     ui_total_distance = total_distance;
     ui_heading_degrees = heading_degrees;
 

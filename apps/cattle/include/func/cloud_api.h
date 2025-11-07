@@ -75,7 +75,16 @@ void cloud_api_reset_error_state(void);
 
 void cloud_api_cattle_id_set(int cattle_id);
 
-void cloud_api_update_cattle_location_ui(uint8_t force_update);
+int cloud_api_cattle_id_get(void);
+
+/**
+ * @brief Get cattle location from cloud
+ * 
+ * @param location Pointer to cattle_location_t structure to store result
+ * @return OPERATE_RET OPRT_OK on success
+ */
+OPERATE_RET cloud_api_get_cattle_location(cattle_location_t *location);
+
 
 #ifdef __cplusplus
 }

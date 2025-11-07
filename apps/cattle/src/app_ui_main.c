@@ -301,3 +301,10 @@ void app_ui_ai_chat_set_assistant_msg(const char *text)
     /* Schedule async update */
     tal_workq_schedule(WORKQ_SYSTEM, __ai_chat_assistant_msg_workq_cb, NULL);
 }
+
+void app_ui_tracker_target_update(uint32_t total_distance, float heading_degrees, float bearing_degrees)
+{
+    tuya_lvgl_mutex_lock();
+    ui_tracker_target_update(total_distance, heading_degrees, bearing_degrees);
+    tuya_lvgl_mutex_unlock();
+}

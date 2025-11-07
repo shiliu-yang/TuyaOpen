@@ -16,6 +16,7 @@
 #include "tuya_iot.h"
 
 #include "app_dp.h"
+#include "app_system_info.h"
 
 #if defined(ENABLE_GUI_TRACKER) && (ENABLE_GUI_TRACKER == 1)
 #include "cattle_ai_tracker_app.h"
@@ -36,10 +37,16 @@
 
 #define KEY_CATTLE_ID "cattleId"
 
+#define CLOUD_API_TASK_PRIORITY THREAD_PRIO_4
+#define CLOUD_API_TASK_STACK_SIZE 4096
+
+#define ENABLE_DEBUG_VIRTUAL_SIMULATION 1
+
 /***********************************************************
 ***********************typedef define***********************
 ***********************************************************/
 typedef struct {
+    THREAD_HANDLE thread;
     MUTEX_HANDLE mutex;
     SEM_HANDLE sem;
     int cattle_id;
@@ -53,11 +60,13 @@ typedef struct {
 /***********************************************************
 ********************function declaration********************
 ***********************************************************/
+static OPERATE_RET __get_cattle_location(cattle_location_t *location, uint8_t force_update);
 
 /***********************************************************
 ***********************variable define**********************
 ***********************************************************/
 static cloud_api_ctx_t sg_cloud_api_ctx = {
+    .thread = NULL,
     .mutex = NULL,
     .sem = NULL,
     .cattle_id = 1,
@@ -80,6 +89,8 @@ static SYS_TIME_T sg_request_interval_ms[] = {
     3 * 60 * 1000,               // 3 minutes   - error_count 7
     5 * 60 * 1000,               // 5 minutes   - error_count 8+
 };
+
+static cattle_location_t sg_cattle_location = {0};
 
 /***********************************************************
 ***********************function define**********************
@@ -144,6 +155,21 @@ int cloud_api_cattle_id_get(void)
     return sg_cloud_api_ctx.cattle_id;
 }
 
+static void cloud_api_thread_cb(void *args)
+{
+    while (1) {
+        tal_system_sleep(5*1000);
+        cattle_location_t location = {0};
+        OPERATE_RET rt = __get_cattle_location(&location, 0);
+        if (rt != OPRT_OK) {
+            PR_ERR("get cattle location failed, rt: %d", rt);
+            continue;
+        }
+        memcpy(&sg_cattle_location, &location, sizeof(cattle_location_t));
+        PR_DEBUG("cattle location: %lf, %lf", location.lat, location.lon);
+    }
+}
+
 OPERATE_RET cloud_api_init(void)
 {
     OPERATE_RET rt = OPRT_OK;
@@ -172,6 +198,15 @@ OPERATE_RET cloud_api_init(void)
     sg_cloud_api_ctx.last_query_time = 0;
     sg_cloud_api_ctx.is_getting = 0;
     sg_cloud_api_ctx.api_rt = OPRT_OK;
+
+    if (sg_cloud_api_ctx.thread == NULL) {
+        THREAD_CFG_T task_cfg = {
+            .priority = CLOUD_API_TASK_PRIORITY,
+            .stackDepth = CLOUD_API_TASK_STACK_SIZE,
+            .thrdname = "cattle_api"
+        };
+        TUYA_CALL_ERR_RETURN(tal_thread_create_and_start(&sg_cloud_api_ctx.thread, NULL, NULL, cloud_api_thread_cb, NULL, &task_cfg));
+    }
 
     PR_INFO("Cloud API initialized with default interval: %u ms", DEFAULT_REQUEST_INTERVAL_MS);
 
@@ -362,7 +397,7 @@ __EXIT:
     return;
 }
 
-OPERATE_RET cloud_api_get_cattle_location(cattle_location_t *location, uint8_t force_update)
+static OPERATE_RET __get_cattle_location(cattle_location_t *location, uint8_t force_update)
 {
     OPERATE_RET rt = OPRT_OK;
 
@@ -380,8 +415,7 @@ OPERATE_RET cloud_api_get_cattle_location(cattle_location_t *location, uint8_t f
     }
 
     // check network is ready
-    extern bool app_check_network_ready(void);
-    if (!app_check_network_ready()) {
+    if (!app_network_is_ready()) {
         PR_WARN("network not ready");
         return OPRT_COM_ERROR;
     }
@@ -430,21 +464,11 @@ void cloud_api_reset_error_state(void)
     }
 }
 
-void cloud_api_update_cattle_location_ui(uint8_t force_update)
+OPERATE_RET cloud_api_get_cattle_location(cattle_location_t *location)
 {
-    OPERATE_RET rt = OPRT_OK;
-    // get cloud cattle position
-    cattle_location_t loc = {0};
-    rt = cloud_api_get_cattle_location(&loc, force_update);
-    if (OPRT_OK == rt) {
-        static double last_lat = 0, last_lon = 0;
-        if (last_lat != loc.lat || last_lon != loc.lon) {
-            last_lat = loc.lat;
-            last_lon = loc.lon;
-            PR_INFO("[CLOUD] Cattle position updated: %.6f, %.6f", loc.lat, loc.lon);
-            // gps_clear_all_targets();
-            // gps_add_target(loc.lat, loc.lon, TARGET_COLOR_COW);
-        }
+    if (location == NULL) {
+        return OPRT_INVALID_PARM;
     }
-    return;
+    memcpy(location, &sg_cattle_location, sizeof(cattle_location_t));
+    return OPRT_OK;
 }

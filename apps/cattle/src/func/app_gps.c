@@ -14,6 +14,10 @@
 
 #include "app_gps.h"
 #include "app_dp.h"
+#include "BNO08x.h"
+#include "app_gps_calc.h"
+#include "cloud_api.h"
+#include "app_ui_main.h"
 #include "tal_api.h"
 #include <string.h>
 #include <stdlib.h>
@@ -28,7 +32,7 @@
 #define GPS_UART_BAUDRATE    115200
 #define GPS_RESET_PIN        9              /* GPIO9 for GPS reset */
 #define GPS_BUFFER_SIZE      2048           /* UART read buffer */
-#define GPS_UPDATE_INTERVAL  10000          /* 10 seconds */
+#define GPS_UPDATE_INTERVAL  5000          /* 5 seconds */
 #define GPS_TASK_STACK_SIZE  4096
 #define GPS_TASK_PRIORITY    THREAD_PRIO_3
 
@@ -53,6 +57,7 @@ static void gps_parse_rmc(const char *sentence);
 static double gps_convert_latlon(const char *value, const char *hemisphere, bool is_latitude);
 static void gps_extract_time(const char *time_str);
 static void gps_upload_workq_cb(void *data);
+static void gps_calc_workq_cb(void *data);
 
 /***********************************************************
 ***********************variable define**********************
@@ -69,7 +74,15 @@ typedef struct {
     int altitude_m;
 } gps_upload_data_t;
 
+typedef struct {
+    double tracker_lat;
+    double tracker_lon;
+    double cattle_lat;
+    double cattle_lon;
+} gps_calc_data_t;
+
 static gps_upload_data_t sg_gps_upload_data = {0};
+static gps_calc_data_t sg_gps_calc_data = {0};
 
 /***********************************************************
 ***********************function define**********************
@@ -220,6 +233,8 @@ OPERATE_RET app_gps_get_status(bool *valid, uint8_t *satellite_count)
 static void gps_task(void *param)
 {
     (void)param;
+
+    OPERATE_RET rt = OPRT_OK;
     
     char *buffer = NULL;
     uint32_t error_count = 0;
@@ -235,8 +250,15 @@ static void gps_task(void *param)
     
     while (1) {
         /* Read NMEA data from UART */
-        OPERATE_RET rt = gps_read_nmea(buffer, GPS_BUFFER_SIZE);
-        
+        rt = gps_read_nmea(buffer, GPS_BUFFER_SIZE);
+
+// #if defined(ENABLE_DEBUG_VIRTUAL_SIMULATION) && (ENABLE_DEBUG_VIRTUAL_SIMULATION == 1)
+#if 1
+        strncpy((char *)buffer, "$GNGGA,051746.000,3018.024840,N,12004.092300,E,1,22,0.66,709.565,M,-14.256,M,,*5D\r\n$GNRMC,075546.000,A,3018.024840,N,12004.092300,E,0.94,292.56,151025,,,A,V*05\r\n",
+        GPS_BUFFER_SIZE);
+        rt = OPRT_OK;
+#endif
+
         if (rt == OPRT_OK) {
             /* Parse NMEA sentences */
             gps_parse_nmea(buffer, strlen(buffer));
@@ -272,6 +294,21 @@ static void gps_task(void *param)
                     tal_workq_schedule(WORKQ_SYSTEM, gps_upload_workq_cb, NULL);
                     
                     PR_DEBUG("[GPS] Scheduled async upload (sats: %d)", sats);
+                    
+                    /* Store tracker position for async GPS calculation */
+                    sg_gps_calc_data.tracker_lat = lat;
+                    sg_gps_calc_data.tracker_lon = lon;
+
+                    cattle_location_t cattle_loc = {0};
+                    rt = cloud_api_get_cattle_location(&cattle_loc);
+                    if (rt == OPRT_OK) {
+                        sg_gps_calc_data.cattle_lat = cattle_loc.lat;
+                        sg_gps_calc_data.cattle_lon = cattle_loc.lon;
+                    }
+                    /* Schedule async GPS calculation via workqueue */
+                    tal_workq_schedule(WORKQ_SYSTEM, gps_calc_workq_cb, NULL);
+                    
+                    PR_DEBUG("[GPS] Scheduled async GPS calculation");
                 } else {
                     PR_DEBUG("[GPS] Skip upload - insufficient satellites (sats: %d < 10)", sats);
                 }
@@ -283,7 +320,7 @@ static void gps_task(void *param)
             PR_ERR("[GPS] Failed to read GPS data (error: %d, count: %d)", rt, error_count);
         }
         
-        /* Sleep for 10 seconds */
+        /* Sleep for 5 seconds */
         tal_system_sleep(GPS_UPDATE_INTERVAL);
     }
     
@@ -880,4 +917,55 @@ static void gps_upload_workq_cb(void *data)
     app_dp_gps_height_upload(alt);
     
     PR_DEBUG("[GPS Upload] Async upload completed");
+}
+
+/**
+ * @brief Workqueue callback for async GPS distance and bearing calculation
+ * 
+ * This callback runs in the system workqueue thread context,
+ * calculates distance and bearing from tracker to cattle using GPS calculation module,
+ * and updates the tracker UI.
+ * 
+ * @param data Unused (data is stored in sg_gps_calc_data)
+ */
+static void gps_calc_workq_cb(void *data)
+{
+    (void)data;
+
+    OPERATE_RET rt = OPRT_OK;
+
+    /* Get tracker GPS position from global variable */
+    double tracker_lat = sg_gps_calc_data.tracker_lat;
+    double tracker_lon = sg_gps_calc_data.tracker_lon;
+
+    double cattle_lat = sg_gps_calc_data.cattle_lat;
+    double cattle_lon = sg_gps_calc_data.cattle_lon;
+    PR_DEBUG("[GPS Calc] Starting async calculation - Tracker: %.6f, %.6f, Cattle: %.6f, %.6f", tracker_lat, tracker_lon, cattle_lat, cattle_lon);
+
+    /* Calculate distance and bearing using GPS calculation module */
+    app_gps_calc_result_t calc_result;
+    rt = app_gps_calc_distance_and_bearing(
+        tracker_lat,
+        tracker_lon,
+        cattle_lat,
+        cattle_lon,
+        &calc_result
+    );
+    
+    if (rt != OPRT_OK || !calc_result.valid) {
+        PR_ERR("[GPS Calc] GPS calculation failed: rt=%d, valid=%d", rt, calc_result.valid);
+        return;
+    }
+    
+    /* Log calculation results */
+    PR_INFO("[GPS Calc] Distance: %.2f m, Bearing: %.1f°", 
+            calc_result.distance_meters, calc_result.bearing_degrees);
+
+    // get heading from compass
+    float heading_degrees = bno08x_get_yaw_degree();
+    // update ui tracker
+    app_ui_tracker_target_update((uint32_t)calc_result.distance_meters, heading_degrees, calc_result.bearing_degrees);
+
+    
+    PR_DEBUG("[GPS Calc] Async calculation completed");
 }

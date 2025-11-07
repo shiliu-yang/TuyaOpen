@@ -218,12 +218,20 @@ OPERATE_RET app_dp_gps_position_upload(double latitude, double longitude)
  * @param height_m Altitude in meters
  * @return OPERATE_RET OPRT_OK on success
  */
+static int sg_last_gps_height = 0;
 OPERATE_RET app_dp_gps_height_upload(int height_m)
 {
     if (!app_network_is_ready()) {
         PR_WARN("network not ready, skip gps height upload");
         return OPRT_COM_ERROR;
     }
+
+    if (height_m == sg_last_gps_height) {
+        PR_DEBUG("GPS height not changed: %d m, skip upload", height_m);
+        return OPRT_OK;
+    }
+
+    sg_last_gps_height = height_m;
     
     PR_DEBUG("DP upload GPS height: %d m", height_m);
     
