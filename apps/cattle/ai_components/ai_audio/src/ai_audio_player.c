@@ -302,7 +302,7 @@ OPERATE_RET ai_audio_player_init(void)
     TUYA_CALL_ERR_GOTO(tdl_audio_find(AUDIO_CODEC_NAME, &sg_player.audio_hdl), __ERR);
 
     // create queue
-    TUYA_CALL_ERR_GOTO(tal_queue_create_init(&sg_player.state_queue, sizeof(AI_AUDIO_PLAYER_STATE_E), 16), __ERR);
+    TUYA_CALL_ERR_GOTO(tal_queue_create_init(&sg_player.state_queue, sizeof(AI_AUDIO_PLAYER_STATE_E), 32), __ERR);
 
     // create mutex
     TUYA_CALL_ERR_GOTO(tal_mutex_create_init(&sg_player.mutex), __ERR);
