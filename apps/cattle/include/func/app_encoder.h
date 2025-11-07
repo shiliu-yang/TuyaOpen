@@ -30,6 +30,10 @@ extern "C" {
 
 OPERATE_RET app_encoder_init(void);
 
+void app_sos_start(void);
+
+void app_sos_stop(void);
+
 #ifdef __cplusplus
 }
 #endif

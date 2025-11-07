@@ -8,6 +8,7 @@
 #include "app_encoder.h"
 
 #include "app_ui_main.h"
+#include "app_dp.h"
 
 #include "tal_api.h"
 
@@ -33,22 +34,51 @@
 ***********************************************************/
 static TIMER_ID encoder_timer_id = NULL;
 
+static SYS_TIME_T sg_press_start_time = 0;
+
 /***********************************************************
 ***********************function define**********************
 ***********************************************************/
+
+void app_sos_start(void)
+{
+    // DP update
+    app_dp_sos_set(true);
+
+    return;
+}
+
+void app_sos_stop(void)
+{
+    // DP update
+    app_dp_sos_set(false);
+    app_ui_SOS_screen_load(0);
+
+    sg_press_start_time = 0;
+
+    return;
+}
 
 void __encoder_timer_cb(TIMER_ID timer_id, void *arg)
 {
     (void)timer_id;
     (void)arg;
 
-    int32_t current_angle = encoder_get_angle();
+    // int32_t current_angle = encoder_get_angle();
     uint8_t button_pressed = encoder_get_pressed();
 
+    // PR_INFO("encoder current_angle: %d, button_pressed: %d", current_angle, button_pressed);
+
     if (button_pressed) {
+        if (sg_press_start_time == 0) {
+            sg_press_start_time = tal_system_get_millisecond();
+        }
         app_ui_SOS_screen_load(1);
-    } else if (current_angle > 10) {
-        app_ui_SOS_screen_load(0);
+    } else {
+        if (tal_system_get_millisecond() - sg_press_start_time < 3000 && sg_press_start_time != 0) {
+            app_ui_SOS_screen_load(0);
+            sg_press_start_time = 0;
+        }
     }
 }
 

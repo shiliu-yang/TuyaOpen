@@ -106,6 +106,9 @@ static void on_countdown_timer(lv_timer_t *timer)
         
         /* Start SOS circle animations */
         start_sos_circle_animations();
+        
+        /* Call countdown finish callback */
+        sos_countdown_finish(NULL);
     }
 }
 
@@ -214,7 +217,7 @@ void ui_SOS_screen_init(void)
     lv_obj_set_style_text_align(ui_label_bottom, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_color(ui_label_bottom, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(ui_label_bottom, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(ui_label_bottom, &lv_font_montserrat_24, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(ui_label_bottom, &font_puhui_18_2, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_add_flag(ui_label_bottom, LV_OBJ_FLAG_HIDDEN); /* Initially hidden */
     PR_DEBUG("ui_SOS_screen_init: ui_label_bottom created");
     /* Cancel button - shown after countdown */
@@ -240,8 +243,10 @@ void ui_SOS_screen_init(void)
     lv_obj_set_style_text_opa(cancel_label, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(cancel_label, &lv_font_montserrat_22, LV_PART_MAIN | LV_STATE_DEFAULT);
     PR_DEBUG("ui_SOS_screen_init: cancel_label created");
-    /* Add event callback */
+    /* Add event callbacks */
     lv_obj_add_event_cb(ui_SOS, ui_event_SOS, LV_EVENT_GESTURE, NULL);
+    lv_obj_add_event_cb(ui_SOS, ui_event_SOS, LV_EVENT_SCREEN_LOADED, NULL);
+    lv_obj_add_event_cb(ui_SOS, ui_event_SOS, LV_EVENT_SCREEN_UNLOADED, NULL);
     PR_DEBUG("ui_SOS_screen_init: ui_SOS created");
 }
 
@@ -279,19 +284,17 @@ void ui_SOS_screen_destroy(void)
 void ui_sos_screen_countdown_start(lv_event_t *e)
 {
     (void)e; /* Unused parameter */
-    
-    /* If already active, stop current countdown first */
-    if (sos_active) {
-        if (countdown_timer != NULL) {
-            lv_timer_del(countdown_timer);
-            countdown_timer = NULL;
-        }
-    }
 
     if (true == sos_active) {
         return;
     }
-    
+
+    /* If already active, stop current countdown first */
+    if (countdown_timer != NULL) {
+        lv_timer_del(countdown_timer);
+        countdown_timer = NULL;
+    }
+
     sos_active = true;
     countdown_value = 3;
     

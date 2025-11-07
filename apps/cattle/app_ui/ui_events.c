@@ -7,18 +7,21 @@
 
 #include "app_ui_main.h"
 #include "app_ui_func.h"
+#include "app_encoder.h"
 #include "app_volume.h"
 #include "tal_api.h"
 
-void sos_countdown_start(lv_event_t * e)
+void sos_countdown_finish(lv_event_t * e)
 {
     // Your code here
+    app_sos_start();
 }
 
 void sos_cancel_clicked(lv_event_t * e)
 {
     // Notify external code that cancel button was clicked
     PR_DEBUG("SOS cancel button clicked");
+    app_sos_stop();
 }
 
 void ai_chat_event_callback(lv_event_t * e)
