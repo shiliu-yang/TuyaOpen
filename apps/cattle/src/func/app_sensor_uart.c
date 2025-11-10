@@ -459,8 +459,8 @@ static void sensor_uart_task(void *args)
     // tal_system_sleep(100);
 
     // /* Start GPS sensor with 10000ms interval */
-    // app_sensor_uart_send_cmd(SENSOR_TYPE_GPS, 10000, SENSOR_CMD_START);
-    // tal_system_sleep(100);
+    app_sensor_uart_send_cmd(SENSOR_TYPE_GPS, 10000, SENSOR_CMD_START);
+    tal_system_sleep(100);
 
     while (1) {
         if (NULL == rx_buffer) {
@@ -555,7 +555,7 @@ static void sensor_uart_task(void *args)
                 if (app_sensor_uart_parse_gnss(line, &gnss_data) == OPRT_OK) {
                     if (gnss_data.valid) {
                         /* GNSS data parsed successfully with valid fix */
-                        // PR_INFO("[SENSOR_UART] GNSS data: %s", line);
+                        PR_INFO("[SENSOR_UART] GNSS data: %s", line);
                         // PR_INFO("[SENSOR_UART] GNSS latitude: %.6f", gnss_data.latitude);
                         // PR_INFO("[SENSOR_UART] GNSS longitude: %.6f", gnss_data.longitude);
                         // PR_INFO("[SENSOR_UART] GNSS altitude: %.1fm", gnss_data.altitude);
@@ -615,9 +615,9 @@ static void sensor_uart_send_start_cmd_work(void *data)
     app_sensor_uart_send_cmd(SENSOR_TYPE_BNO, 200, SENSOR_CMD_START);
     tal_system_sleep(100);
     
-    /* Start GPS sensor with 10000ms interval */
-    app_sensor_uart_send_cmd(SENSOR_TYPE_GPS, 10000, SENSOR_CMD_START);
-    tal_system_sleep(100);
+    // /* Start GPS sensor with 10000ms interval */
+    // app_sensor_uart_send_cmd(SENSOR_TYPE_GPS, 10000, SENSOR_CMD_START);
+    // tal_system_sleep(100);
     
     PR_INFO("[SENSOR_UART] Sensor start commands sent successfully");
 }
@@ -666,9 +666,9 @@ static void sensor_uart_send_stop_cmd_work(void *data)
     app_sensor_uart_send_cmd(SENSOR_TYPE_BNO, 0, SENSOR_CMD_STOP);
     tal_system_sleep(100);
     
-    /* Stop GPS sensor */
-    app_sensor_uart_send_cmd(SENSOR_TYPE_GPS, 0, SENSOR_CMD_STOP);
-    tal_system_sleep(100);
+    // /* Stop GPS sensor */
+    // app_sensor_uart_send_cmd(SENSOR_TYPE_GPS, 0, SENSOR_CMD_STOP);
+    // tal_system_sleep(100);
     
     PR_INFO("[SENSOR_UART] Sensor stop commands sent successfully");
 }

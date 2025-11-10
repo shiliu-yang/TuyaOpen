@@ -232,7 +232,7 @@ static void __ai_audio_player_task(void *arg)
                 tal_mutex_lock(sg_player.spk_rb_mutex);
                 uint32_t rb_used_len_t = tuya_ring_buff_used_size_get(ctx->rb_hdl);
                 tal_mutex_unlock(sg_player.spk_rb_mutex);
-                if (rb_used_len_t >= 30 * 1024 || tal_system_get_millisecond() - play_start_time >= 2000) {
+                if (rb_used_len_t >= 60 * 1024 || tal_system_get_millisecond() - play_start_time >= 2000) {
                     PR_DEBUG("waiting mp3 data, len=%d", rb_used_len_t);
                     PR_DEBUG("time wait ms=%llu", tal_system_get_millisecond() - play_start_time);
                     is_first_play = 0;
