@@ -108,7 +108,7 @@ OPERATE_RET app_ui_main_init(void)
 
     THREAD_CFG_T cfg = {
         .thrdname = "tracker_ui",
-        .priority = THREAD_PRIO_2,
+        .priority = THREAD_PRIO_4,
         .stackDepth = 1024 * 4,
     };
     TUYA_CALL_ERR_RETURN(tal_thread_create_and_start(&ui_thrd_hdl, NULL, NULL, __chat_bot_ui_task, NULL, &cfg));
@@ -189,7 +189,6 @@ void app_ui_setting_network_update(uint8_t network_type, uint8_t status)
     tuya_lvgl_mutex_unlock();
 }
 
-
 // AI chat screen
 static char *s_user_msg_text = NULL;
 static char *s_assistant_msg_text = NULL;
@@ -198,11 +197,11 @@ static void __ai_chat_red_ring_workq_cb(void *data)
 {
     (void)data;
     bool visible = s_red_ring_visible;
-    
+
     tuya_lvgl_mutex_lock();
     ui_ai_chat_set_red_ring_visible(visible);
     tuya_lvgl_mutex_unlock();
-    
+
     PR_DEBUG("AI chat red ring visibility set to: %d", visible);
 }
 
@@ -215,17 +214,17 @@ void app_ui_ai_chat_set_red_ring_visible(bool visible)
 static void __ai_chat_user_msg_workq_cb(void *data)
 {
     (void)data;
-    
+
     if (s_user_msg_text == NULL) {
         return;
     }
-    
+
     tuya_lvgl_mutex_lock();
     ui_ai_chat_update_text(s_user_msg_text);
     tuya_lvgl_mutex_unlock();
-    
+
     // PR_DEBUG("AI chat user message updated: %.30s...", s_user_msg_text);
-    
+
     /* Free the allocated text */
     tal_psram_free(s_user_msg_text);
     s_user_msg_text = NULL;
@@ -233,16 +232,16 @@ static void __ai_chat_user_msg_workq_cb(void *data)
 
 void app_ui_ai_chat_set_user_msg(const char *text)
 {
-    if (text == NULL || strlen(text) == 0 || strlen(text) > 2*1024) {
+    if (text == NULL || strlen(text) == 0 || strlen(text) > 2 * 1024) {
         return;
     }
-    
+
     /* Free previous text if exists */
     if (s_user_msg_text != NULL) {
         tal_psram_free(s_user_msg_text);
         s_user_msg_text = NULL;
     }
-    
+
     /* Allocate and copy text */
     size_t len = strlen(text);
     s_user_msg_text = tal_psram_malloc(len + 1);
@@ -252,7 +251,7 @@ void app_ui_ai_chat_set_user_msg(const char *text)
     }
     memset(s_user_msg_text, 0, len + 1);
     strncpy(s_user_msg_text, text, len);
-    
+
     /* Schedule async update */
     tal_workq_schedule(WORKQ_SYSTEM, __ai_chat_user_msg_workq_cb, NULL);
 }
@@ -260,17 +259,17 @@ void app_ui_ai_chat_set_user_msg(const char *text)
 static void __ai_chat_assistant_msg_workq_cb(void *data)
 {
     (void)data;
-    
+
     if (s_assistant_msg_text == NULL) {
         return;
     }
-    
+
     tuya_lvgl_mutex_lock();
     ui_ai_chat_update_text(s_assistant_msg_text);
     tuya_lvgl_mutex_unlock();
-    
+
     // PR_DEBUG("AI chat assistant message updated: %.30s...", s_assistant_msg_text);
-    
+
     /* Free the allocated text */
     tal_psram_free(s_assistant_msg_text);
     s_assistant_msg_text = NULL;
@@ -278,16 +277,16 @@ static void __ai_chat_assistant_msg_workq_cb(void *data)
 
 void app_ui_ai_chat_set_assistant_msg(const char *text)
 {
-    if (text == NULL || strlen(text) == 0 || strlen(text) > 2*1024) {
+    if (text == NULL || strlen(text) == 0 || strlen(text) > 2 * 1024) {
         return;
     }
-    
+
     /* Free previous text if exists */
     if (s_assistant_msg_text != NULL) {
         tal_psram_free(s_assistant_msg_text);
         s_assistant_msg_text = NULL;
     }
-    
+
     /* Allocate and copy text */
     size_t len = strlen(text);
     s_assistant_msg_text = tal_psram_malloc(len + 1);
@@ -297,7 +296,7 @@ void app_ui_ai_chat_set_assistant_msg(const char *text)
     }
     memset(s_assistant_msg_text, 0, len + 1);
     strncpy(s_assistant_msg_text, text, len);
-    
+
     /* Schedule async update */
     tal_workq_schedule(WORKQ_SYSTEM, __ai_chat_assistant_msg_workq_cb, NULL);
 }

@@ -144,17 +144,17 @@ static OPERATE_RET __ai_audio_player_mp3_playing(void)
 
     int samples = mp3dec_decode_frame(ctx->mp3_dec, ctx->mp3_raw_head, ctx->mp3_raw_used_len,
                                       (mp3d_sample_t *)ctx->mp3_pcm, &ctx->mp3_frame_info);
-    if (samples == 0) {
-        ctx->mp3_raw_used_len = 0;
-        ctx->mp3_raw_head = ctx->mp3_raw;
-        rt = OPRT_COM_ERROR;
+    if (samples <= 0 && ctx->mp3_frame_info.frame_bytes == 0) {
+        // need more data
         goto __EXIT;
     }
 
     ctx->mp3_raw_used_len -= ctx->mp3_frame_info.frame_bytes;
     ctx->mp3_raw_head += ctx->mp3_frame_info.frame_bytes;
 
-    tdl_audio_play(ctx->audio_hdl, ctx->mp3_pcm, samples * 2);
+    if (samples) {
+        tdl_audio_play(ctx->audio_hdl, ctx->mp3_pcm, samples * 2);
+    }
 
 __EXIT:
     return rt;
@@ -196,6 +196,8 @@ static void __ai_audio_player_task(void *arg)
     static AI_AUDIO_PLAYER_STATE_E last_state = 0xFF;
     uint32_t delay_ms = 5;
 
+    SYS_TIME_T play_start_time = 0;
+
     ctx->stat = AI_AUDIO_PLAYER_STAT_IDLE;
 
     for (;;) {
@@ -221,8 +223,23 @@ static void __ai_audio_player_task(void *arg)
             } else {
                 ctx->stat = AI_AUDIO_PLAYER_STAT_PLAY;
             }
+            play_start_time = tal_system_get_millisecond();
         } break;
         case AI_AUDIO_PLAYER_STAT_PLAY: {
+            // first wait mp3 data
+            static uint32_t is_first_play = 1;
+            if (is_first_play) {
+                tal_mutex_lock(sg_player.spk_rb_mutex);
+                uint32_t rb_used_len_t = tuya_ring_buff_used_size_get(ctx->rb_hdl);
+                tal_mutex_unlock(sg_player.spk_rb_mutex);
+                if (rb_used_len_t >= 30 * 1024 || tal_system_get_millisecond() - play_start_time >= 2000) {
+                    PR_DEBUG("waiting mp3 data, len=%d", rb_used_len_t);
+                    PR_DEBUG("time wait ms=%llu", tal_system_get_millisecond() - play_start_time);
+                    is_first_play = 0;
+                }
+                break;
+            }
+
             rt = __ai_audio_player_mp3_playing();
             if (OPRT_RECV_DA_NOT_ENOUGH == rt) {
                 tal_sw_timer_start(ctx->tm_id, PLAYING_NO_DATA_TIMEOUT_MS, TAL_TIMER_ONCE);
@@ -230,6 +247,8 @@ static void __ai_audio_player_task(void *arg)
                 if (tal_sw_timer_is_running(ctx->tm_id)) {
                     tal_sw_timer_stop(ctx->tm_id);
                 }
+            } else {
+                PR_ERR("ai audio player mp3 playing error");
             }
             tal_mutex_lock(ctx->spk_rb_mutex);
             uint32_t rb_used_len = tuya_ring_buff_used_size_get(ctx->rb_hdl);
@@ -237,6 +256,7 @@ static void __ai_audio_player_task(void *arg)
             if (rb_used_len == 0 && 0 == ctx->mp3_raw_used_len && ctx->is_eof) {
                 PR_DEBUG("app player end");
                 ctx->stat = AI_AUDIO_PLAYER_STAT_FINISH;
+                is_first_play = 1;
             }
         } break;
         case AI_AUDIO_PLAYER_STAT_FINISH: {
@@ -318,7 +338,7 @@ OPERATE_RET ai_audio_player_init(void)
 
     // thread init
     TUYA_CALL_ERR_GOTO(
-        tkl_thread_create(&sg_player.thrd_hdl, "ai_player", 1024 * 4, THREAD_PRIO_0, __ai_audio_player_task, NULL),
+        tkl_thread_create(&sg_player.thrd_hdl, "ai_player", 1024 * 6, THREAD_PRIO_0, __ai_audio_player_task, NULL),
         __ERR);
 
     PR_DEBUG("app player init success");
@@ -425,11 +445,11 @@ OPERATE_RET ai_audio_player_data_write(char *id, uint8_t *data, uint32_t len, ui
         return OPRT_COM_ERROR;
     }
 
-    tal_mutex_lock(sg_player.mutex);
+    // tal_mutex_lock(sg_player.mutex);
 
     if (false == __app_player_compare_id(id, sg_player.id)) {
         PR_NOTICE("the id:%s is not match... curr id:%s", id, sg_player.id);
-        tal_mutex_unlock(sg_player.mutex);
+        // tal_mutex_unlock(sg_player.mutex);
         return OPRT_INVALID_PARM;
     }
 
@@ -462,6 +482,7 @@ OPERATE_RET ai_audio_player_data_write(char *id, uint8_t *data, uint32_t len, ui
         sg_player.is_writing = false;
     }
 
+    tal_mutex_lock(sg_player.mutex);
     sg_player.is_eof = is_eof;
     tal_mutex_unlock(sg_player.mutex);
 

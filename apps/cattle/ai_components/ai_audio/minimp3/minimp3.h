@@ -561,7 +561,7 @@ static int L3_read_side_info(bs_t *bs, L3_gr_info_t *gr, const uint8_t *hdr)
         }
         gr->table_select[0] = (uint8_t)(tables >> 10);
         gr->table_select[1] = (uint8_t)((tables >> 5) & 31);
-        gr->table_select[2] = (uint8_t)((tables)&31);
+        gr->table_select[2] = (uint8_t)((tables) & 31);
         gr->preflag = HDR_TEST_MPEG1(hdr) ? get_bits(bs, 1) : (gr->scalefac_compress >= 500);
         gr->scalefac_scale = (uint8_t)get_bits(bs, 1);
         gr->count1_table = (uint8_t)get_bits(bs, 1);
@@ -1442,7 +1442,7 @@ static void mp3d_DCT_II(float *grbuf, int n)
 #endif /* HAVE_SIMD */
 #ifdef MINIMP3_ONLY_SIMD
     {
-    }  /* for HAVE_SIMD=1, MINIMP3_ONLY_SIMD=1 case we do not need non-intrinsic "else" branch */
+    } /* for HAVE_SIMD=1, MINIMP3_ONLY_SIMD=1 case we do not need non-intrinsic "else" branch */
 #else  /* MINIMP3_ONLY_SIMD */
     for (; k < n; k++) {
         float t[4][8], *x, *y = grbuf + k;
@@ -1735,7 +1735,9 @@ static void mp3d_synth(float *xl, mp3d_sample_t *dstl, int nch, float *lins)
 
         S0(0)
         S2(1)
-        S1(2) S2(3) S1(4) S2(5) S1(6) S2(7)
+        S1(2)
+        S2(3)
+        S1(4) S2(5) S1(6) S2(7)
 
             dstr[(15 - i) * nch] = mp3d_scale_pcm(a[1]);
         dstr[(17 + i) * nch] = mp3d_scale_pcm(b[1]);
@@ -1812,6 +1814,13 @@ static int mp3d_find_frame(const uint8_t *mp3, int mp3_bytes, int *free_format_b
                 *ptr_frame_bytes = frame_and_padding;
                 return i;
             }
+            /* streaming optimization: if we found a valid header but not enough data,
+               and buffer is reasonably small, return current position for potential retry */
+            if (frame_bytes > 0 && i + frame_and_padding > mp3_bytes && mp3_bytes <= MAX_FREE_FORMAT_FRAME_SIZE) {
+                *ptr_frame_bytes = frame_and_padding; /* return expected frame size */
+                return i;                             /* return header position for upper layer to decide */
+            }
+
             *free_format_bytes = 0;
         }
     }
@@ -1840,6 +1849,11 @@ int mp3dec_decode_frame(mp3dec_t *dec, const uint8_t *mp3, int mp3_bytes, mp3d_s
         memset(dec, 0, sizeof(mp3dec_t));
         i = mp3d_find_frame(mp3, mp3_bytes, &dec->free_format_bytes, &frame_size);
         if (!frame_size || i + frame_size > mp3_bytes) {
+            /* check if mp3d_find_frame found a header but not enough data */
+            if (frame_size > 0 && i + frame_size > mp3_bytes && mp3_bytes <= MAX_FREE_FORMAT_FRAME_SIZE) {
+                info->frame_bytes = 0; /* needs more data, don't advance */
+                return 0;
+            }
             info->frame_bytes = i;
             return 0;
         }
