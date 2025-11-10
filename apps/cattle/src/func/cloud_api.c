@@ -92,6 +92,8 @@ static SYS_TIME_T sg_request_interval_ms[] = {
 
 static cattle_location_t sg_cattle_location = {0};
 
+static uint8_t sg_need_force_update = 0;
+
 /***********************************************************
 ***********************function define**********************
 ***********************************************************/
@@ -148,6 +150,7 @@ void cloud_api_cattle_id_set(int cattle_id)
 {
     sg_cloud_api_ctx.cattle_id = cattle_id;
     tal_kv_set(KEY_CATTLE_ID, (uint8_t *)&cattle_id, sizeof(cattle_id));
+    sg_need_force_update = 1;
 }
 
 int cloud_api_cattle_id_get(void)
@@ -157,16 +160,26 @@ int cloud_api_cattle_id_get(void)
 
 static void cloud_api_thread_cb(void *args)
 {
+    uint32_t time_tick = 0;
+
     while (1) {
-        tal_system_sleep(10*1000);
-        cattle_location_t location = {0};
-        OPERATE_RET rt = __get_cattle_location(&location, 0);
-        if (rt != OPRT_OK) {
-            // PR_ERR("get cattle location failed, rt: %d", rt);
-            continue;
+        tal_system_sleep(1000);
+        time_tick++;
+
+        if (time_tick >= 10 || sg_need_force_update) {
+            cattle_location_t location = {0};
+            OPERATE_RET rt = __get_cattle_location(&location, sg_need_force_update);
+            if (rt != OPRT_OK) {
+                // PR_ERR("get cattle location failed, rt: %d", rt);
+                continue;
+            }
+            memcpy(&sg_cattle_location, &location, sizeof(cattle_location_t));
+            PR_DEBUG("cattle location: %lf, %lf", location.lat, location.lon);
+            time_tick = 0;
+            sg_need_force_update = 0;
         }
-        memcpy(&sg_cattle_location, &location, sizeof(cattle_location_t));
-        PR_DEBUG("cattle location: %lf, %lf", location.lat, location.lon);
+
+
     }
 }
 

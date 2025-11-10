@@ -10,6 +10,8 @@
 #include "app_system_info.h"
 #include "app_volume.h"
 #include "app_ui_main.h"
+#include "cloud_api.h"
+#include "app_ui_main.h"
 
 #include "tal_api.h"
 
@@ -259,6 +261,9 @@ void app_dp_process(uint8_t id, dp_prop_tp_t type, dp_value_t value)
     } break;
     case DP_ID_START_TRACKING_ID: {
         PR_DEBUG("DP_ID_START_TRACKING_ID: %d", value.dp_value);
+        cloud_api_cattle_id_set(value.dp_value);
+        app_ui_tracker_show();
+        
     } break;
     default: {
         PR_ERR("Invalid DP ID: %d", id);

@@ -307,3 +307,14 @@ void app_ui_tracker_target_update(uint32_t total_distance, float heading_degrees
     ui_tracker_target_update(total_distance, heading_degrees, bearing_degrees);
     tuya_lvgl_mutex_unlock();
 }
+
+static void __tracker_show_workq_cb(void *data)
+{
+    (void)data;
+    app_page_load(&tracker_page, LV_SCR_LOAD_ANIM_MOVE_LEFT, 1);
+}
+
+void app_ui_tracker_show(void)
+{
+    tal_workq_schedule(WORKQ_SYSTEM, __tracker_show_workq_cb, NULL);
+}

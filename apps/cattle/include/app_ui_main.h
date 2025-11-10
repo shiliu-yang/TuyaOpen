@@ -64,6 +64,8 @@ void app_ui_ai_chat_set_assistant_msg(const char *text);
 
 void app_ui_tracker_target_update(uint32_t total_distance, float heading_degrees, float bearing_degrees);
 
+void app_ui_tracker_show(void);
+
 #ifdef __cplusplus
 }
 #endif
