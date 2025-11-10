@@ -318,3 +318,17 @@ void app_ui_tracker_show(void)
 {
     tal_workq_schedule(WORKQ_SYSTEM, __tracker_show_workq_cb, NULL);
 }
+
+void app_ui_tracker_zoom_in(void)
+{
+    tuya_lvgl_mutex_lock();
+    ui_tracker_zoom_in();
+    tuya_lvgl_mutex_unlock();
+}
+
+void app_ui_tracker_zoom_out(void)
+{
+    tuya_lvgl_mutex_lock();
+    ui_tracker_zoom_out();
+    tuya_lvgl_mutex_unlock();
+}

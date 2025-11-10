@@ -481,7 +481,14 @@ static void sensor_uart_task(void *args)
         }
 
         memset(rx_buffer, 0, available);
+        #if 1
         int bytes = tkl_uart_read(sg_uart_port, rx_buffer, available > SENSOR_UART_BUFFER_SIZE ? SENSOR_UART_BUFFER_SIZE : available);
+        #else
+        // gnss:30.300515,120.068617,50.00,10
+        tal_system_sleep(10*1000);
+        strncpy((char *)rx_buffer, "gnss:30.300515,120.068617,50.00,10", available > SENSOR_UART_BUFFER_SIZE ? SENSOR_UART_BUFFER_SIZE : available);
+        int bytes = strlen((char *)rx_buffer);
+        #endif
         if (bytes <= 0) {
             PR_ERR("[SENSOR_UART] Read error: %d", bytes);
             tal_system_sleep(100);

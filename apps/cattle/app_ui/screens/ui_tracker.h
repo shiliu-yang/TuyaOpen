@@ -6,6 +6,8 @@
 #ifndef UI_TRACKER_H
 #define UI_TRACKER_H
 
+#include <stdbool.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -24,6 +26,41 @@ extern lv_obj_t *ui_tracker;
  * @param bearing_degrees Target bearing angle in degrees (0-360, 0=North, relative to true north)
  */
 void ui_tracker_target_update(uint32_t total_distance, float heading_degrees, float bearing_degrees);
+
+/**
+ * Animate distance scale to target value with smooth transition
+ * @param target_scale Target distance scale in meters
+ */
+void ui_tracker_animate_distance_scale(int target_scale);
+
+/**
+ * Zoom in (decrease distance scale)
+ * @return true if zoom successful, false if already at minimum zoom
+ */
+bool ui_tracker_zoom_in(void);
+
+/**
+ * Zoom out (increase distance scale)
+ * @return true if zoom successful, false if already at maximum zoom
+ */
+bool ui_tracker_zoom_out(void);
+
+/**
+ * Reset zoom to default level (200m)
+ */
+void ui_tracker_zoom_reset(void);
+
+/**
+ * Get current zoom level index
+ * @return Current zoom level index (0 to 8)
+ */
+int ui_tracker_get_zoom_index(void);
+
+/**
+ * Get current distance scale in meters
+ * @return Current distance scale in meters
+ */
+int ui_tracker_get_distance_scale(void);
 
 #ifdef __cplusplus
 } /*extern "C"*/

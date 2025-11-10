@@ -66,6 +66,10 @@ void app_ui_tracker_target_update(uint32_t total_distance, float heading_degrees
 
 void app_ui_tracker_show(void);
 
+void app_ui_tracker_zoom_in(void);
+
+void app_ui_tracker_zoom_out(void);
+
 #ifdef __cplusplus
 }
 #endif

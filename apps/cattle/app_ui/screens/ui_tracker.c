@@ -8,6 +8,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdbool.h>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -43,11 +44,32 @@ static float target_bearing = 0.0f;      /* Target bearing */
 static lv_anim_t heading_anim;           /* Heading animation object */
 static bool animations_initialized = false;
 
+/* Zoom level control */
+static const int ZOOM_LEVELS[] = {
+    50,    /* Level 0: 50m */
+    100,   /* Level 1: 100m */
+    200,   /* Level 2: 200m */
+    500,   /* Level 3: 500m */
+    1000,  /* Level 4: 1km */
+    2000,  /* Level 5: 2km */
+    5000,  /* Level 6: 5km */
+    10000, /* Level 7: 10km */
+    20000  /* Level 8: 20km */
+};
+#define ZOOM_LEVEL_COUNT (sizeof(ZOOM_LEVELS) / sizeof(ZOOM_LEVELS[0]))
+static int current_zoom_index = 2;           /* Start at 200m (index 2) */
+static int distance_scale_meters = 200;      /* Current distance scale */
+static int target_distance_scale = 200;      /* Target distance scale for animation */
+static lv_anim_t distance_anim;              /* Distance scale animation object */
+static lv_anim_t *distance_anim_ptr = NULL;  /* Pointer to track active animation */
+
 /* Forward declarations */
 static void draw_compass_and_intervals(lv_obj_t *canvas, float heading, uint32_t distance);
 static void update_canvas(float heading, uint32_t distance);
 static void update_cattle_position(uint32_t distance, float heading, float bearing);
 static void on_heading_anim_update(void *var, int32_t value);
+static void on_distance_anim_update(void *var, int32_t value);
+static void on_distance_anim_ready(lv_anim_t *anim);
 static float normalize_angle(float angle);
 static float calculate_shortest_rotation(float from, float to);
 
@@ -150,6 +172,12 @@ void ui_tracker_screen_init(void)
     lv_obj_add_flag(ui_image_cattle, LV_OBJ_FLAG_CLICKABLE); /// Flags
     lv_obj_remove_flag(ui_image_cattle, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC |
                                             LV_OBJ_FLAG_SCROLL_MOMENTUM | LV_OBJ_FLAG_SCROLL_CHAIN); /// Flags
+    
+    /* Initialize with no border and transparent background */
+    lv_obj_set_style_border_width(ui_image_cattle, 0, 0);
+    lv_obj_set_style_border_opa(ui_image_cattle, 0, 0);
+    lv_obj_set_style_bg_opa(ui_image_cattle, 0, 0);
+    lv_obj_set_style_pad_all(ui_image_cattle, 0, 0);
 
     /* Create heading display label at position (179, 338) */
     ui_heading_label = lv_obj_create(ui_tracker);
@@ -237,13 +265,14 @@ static void draw_compass_and_intervals(lv_obj_t *canvas, float heading, uint32_t
         {999999999.0f, 50000.0f} /* 50km steps for huge scales */
     };
 
-    /* Find appropriate step size and max_distance for the current distance */
+    /* Use the dynamic distance_scale_meters instead of calculating from distance */
+    float current_max_distance = (float)distance_scale_meters;
+    
+    /* Find appropriate step size for the current scale */
     float step_size = 50000.0f;
-    float current_max_distance = 200000.0f;
     for (int i = 0; i < 9; i++) {
-        if (distance <= step_lookup[i].max_distance) {
+        if (current_max_distance <= step_lookup[i].max_distance) {
             step_size = step_lookup[i].step_size;
-            current_max_distance = step_lookup[i].max_distance;
             break;
         }
     }
@@ -516,7 +545,7 @@ static void draw_compass_and_intervals(lv_obj_t *canvas, float heading, uint32_t
     lv_draw_label_dsc_init(&distance_lbl_dsc);
     distance_lbl_dsc.color = lv_color_hex(0xFFFFFF);
     distance_lbl_dsc.align = LV_TEXT_ALIGN_CENTER;
-    distance_lbl_dsc.font = &lv_font_montserrat_12;
+    distance_lbl_dsc.font = &lv_font_montserrat_20;
     distance_lbl_dsc.text = distance_text;
 
     /* Position label below ruler line, centered between left and right */
@@ -565,22 +594,8 @@ static void update_cattle_position(uint32_t distance, float heading, float beari
     const int32_t RULER_RIGHT_X = 390;
     const float SCREEN_RADIUS = (float)(RULER_RIGHT_X - CENTER_X); /* 157px */
 
-    /* Step size lookup table - same as in draw_compass_and_intervals */
-    static const struct {
-        float max_distance;
-        float step_size;
-    } step_lookup[] = {{100.0f, 20.0f},     {200.0f, 50.0f},       {500.0f, 100.0f},
-                       {1000.0f, 200.0f},   {2000.0f, 200.0f},     {10000.0f, 1000.0f},
-                       {50000.0f, 5000.0f}, {200000.0f, 20000.0f}, {999999999.0f, 50000.0f}};
-
-    /* Find current max_distance for map scale */
-    float current_max_distance = 200000.0f;
-    for (int i = 0; i < 9; i++) {
-        if (distance <= step_lookup[i].max_distance) {
-            current_max_distance = step_lookup[i].max_distance;
-            break;
-        }
-    }
+    /* Use the dynamic distance_scale_meters for map scale calculation */
+    float current_max_distance = (float)distance_scale_meters;
 
     /* Calculate map scale: same as in draw_compass_and_intervals */
     float map_scale = (current_max_distance > 0) ? (float)current_max_distance / SCREEN_RADIUS : 1.0f;
@@ -620,15 +635,17 @@ static void update_cattle_position(uint32_t distance, float heading, float beari
         screen_y = CENTER_Y + boundary_y - ICON_HALF_SIZE;
 
         /* Add border for targets beyond circle */
-        lv_obj_set_style_border_width(ui_image_cattle, 3, 0);
-        lv_obj_set_style_border_color(ui_image_cattle, lv_color_white(), 0);
+        // lv_obj_set_style_border_width(ui_image_cattle, 3, 0);
+        // lv_obj_set_style_border_color(ui_image_cattle, lv_color_white(), 0);
+        // lv_obj_set_style_border_opa(ui_image_cattle, LV_OPA_COVER, 0);
     } else {
         /* Target is within circle - normal positioning */
         screen_x = CENTER_X + x_pixels - ICON_HALF_SIZE;
         screen_y = CENTER_Y + y_pixels - ICON_HALF_SIZE;
 
         /* No border for targets within circle */
-        lv_obj_set_style_border_width(ui_image_cattle, 0, 0);
+        // lv_obj_set_style_border_width(ui_image_cattle, 0, 0);
+        // lv_obj_set_style_border_opa(ui_image_cattle, 0, 0);
     }
 
     /* Update position */
@@ -801,6 +818,138 @@ void ui_tracker_target_update(uint32_t total_distance, float heading_degrees, fl
     }
 }
 
+/**
+ * Distance scale animation update callback
+ */
+static void on_distance_anim_update(void *var, int32_t value)
+{
+    (void)var; /* Unused */
+    
+    /* Update the distance scale with the animated value */
+    distance_scale_meters = (int)value;
+    
+    /* Redraw canvas with new scale */
+    update_canvas(current_heading, current_distance);
+    
+    /* Update cattle position with new scale */
+    update_cattle_position(target_distance, target_heading, current_bearing);
+}
+
+/**
+ * Distance scale animation ready callback
+ */
+static void on_distance_anim_ready(lv_anim_t *anim)
+{
+    (void)anim;
+    /* Animation complete - clean up */
+    distance_anim_ptr = NULL;
+}
+
+/**
+ * Animate distance scale to target value with smooth transition
+ * @param target_scale Target distance scale in meters
+ */
+void ui_tracker_animate_distance_scale(int target_scale)
+{
+    if (NULL == ui_tracker) {
+        return;
+    }
+    
+    /* Clamp target_scale to valid zoom levels */
+    if (target_scale < ZOOM_LEVELS[0]) {
+        target_scale = ZOOM_LEVELS[0];
+    } else if (target_scale > ZOOM_LEVELS[ZOOM_LEVEL_COUNT - 1]) {
+        target_scale = ZOOM_LEVELS[ZOOM_LEVEL_COUNT - 1];
+    }
+    
+    /* Stop any existing animation */
+    if (distance_anim_ptr) {
+        lv_anim_del(distance_anim_ptr, NULL);
+        distance_anim_ptr = NULL;
+    }
+    
+    /* Set target scale */
+    target_distance_scale = target_scale;
+    
+    /* Create new animation */
+    distance_anim_ptr = &distance_anim;
+    lv_anim_init(distance_anim_ptr);
+    lv_anim_set_var(distance_anim_ptr, NULL);
+    lv_anim_set_values(distance_anim_ptr, distance_scale_meters, target_scale);
+    lv_anim_set_exec_cb(distance_anim_ptr, on_distance_anim_update);
+    lv_anim_set_time(distance_anim_ptr, 500); /* 500ms animation duration */
+    lv_anim_set_ready_cb(distance_anim_ptr, on_distance_anim_ready);
+    lv_anim_set_path_cb(distance_anim_ptr, lv_anim_path_ease_in_out);
+    lv_anim_start(distance_anim_ptr);
+}
+
+/**
+ * Zoom in (decrease distance scale)
+ * @return true if zoom successful, false if already at minimum zoom
+ */
+bool ui_tracker_zoom_in(void)
+{
+    if (NULL == ui_tracker) {
+        return false;
+    }
+    
+    if (current_zoom_index > 0) {
+        current_zoom_index--;
+        ui_tracker_animate_distance_scale(ZOOM_LEVELS[current_zoom_index]);
+        return true;
+    }
+    return false; /* Already at minimum zoom */
+}
+
+/**
+ * Zoom out (increase distance scale)
+ * @return true if zoom successful, false if already at maximum zoom
+ */
+bool ui_tracker_zoom_out(void)
+{
+    if (NULL == ui_tracker) {
+        return false;
+    }
+    
+    if (current_zoom_index < (int)ZOOM_LEVEL_COUNT - 1) {
+        current_zoom_index++;
+        ui_tracker_animate_distance_scale(ZOOM_LEVELS[current_zoom_index]);
+        return true;
+    }
+    return false; /* Already at maximum zoom */
+}
+
+/**
+ * Reset zoom to default level (200m)
+ */
+void ui_tracker_zoom_reset(void)
+{
+    if (NULL == ui_tracker) {
+        return;
+    }
+    
+    current_zoom_index = 2; /* 200m default */
+    ui_tracker_animate_distance_scale(ZOOM_LEVELS[current_zoom_index]);
+}
+
+/**
+ * Get current zoom level index
+ * @return Current zoom level index (0 to ZOOM_LEVEL_COUNT-1)
+ */
+int ui_tracker_get_zoom_index(void)
+{
+    return current_zoom_index;
+}
+
+/**
+ * Get current distance scale in meters
+ * @return Current distance scale in meters
+ */
+int ui_tracker_get_distance_scale(void)
+{
+    return distance_scale_meters;
+}
+
 void ui_tracker_screen_destroy(void)
 {
 #if UI_TRACKER_TEST_MODE
@@ -813,6 +962,10 @@ void ui_tracker_screen_destroy(void)
 
     /* Stop and clean up animations */
     lv_anim_del(&heading_anim, NULL);
+    if (distance_anim_ptr) {
+        lv_anim_del(distance_anim_ptr, NULL);
+        distance_anim_ptr = NULL;
+    }
     animations_initialized = false;
 
     if (ui_tracker)

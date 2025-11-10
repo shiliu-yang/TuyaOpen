@@ -36,6 +36,8 @@ static TIMER_ID encoder_timer_id = NULL;
 
 static SYS_TIME_T sg_press_start_time = 0;
 
+static int32_t sg_last_angle = 0;
+
 /***********************************************************
 ***********************function define**********************
 ***********************************************************/
@@ -64,7 +66,7 @@ void __encoder_timer_cb(TIMER_ID timer_id, void *arg)
     (void)timer_id;
     (void)arg;
 
-    // int32_t current_angle = encoder_get_angle();
+    int32_t current_angle = encoder_get_angle();
     uint8_t button_pressed = encoder_get_pressed();
 
     // PR_INFO("encoder current_angle: %d, button_pressed: %d", current_angle, button_pressed);
@@ -79,6 +81,18 @@ void __encoder_timer_cb(TIMER_ID timer_id, void *arg)
             app_ui_SOS_screen_load(0);
             sg_press_start_time = 0;
         }
+    }
+
+    if (current_angle != sg_last_angle) {
+        int32_t angle_delta = current_angle - sg_last_angle;
+        if (angle_delta > 0) {
+            app_ui_tracker_zoom_out();
+            PR_INFO("encoder zoom out");
+        } else {
+            app_ui_tracker_zoom_in();
+            PR_INFO("encoder zoom in");
+        }
+        sg_last_angle = current_angle;
     }
 }
 
