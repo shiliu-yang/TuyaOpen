@@ -9,6 +9,7 @@
 #include "app_ui_func.h"
 #include "app_encoder.h"
 #include "app_volume.h"
+#include "app_sensor_uart.h"
 #include "tal_api.h"
 
 void sos_countdown_finish(lv_event_t * e)
@@ -69,6 +70,17 @@ void tracker_event_callback(lv_event_t * e)
         app_page_back(LV_SCR_LOAD_ANIM_MOVE_RIGHT, 0);
     } else if (dir == LV_DIR_BOTTOM) {
         app_page_load(&setting_page, LV_SCR_LOAD_ANIM_MOVE_BOTTOM, 0);
+    }
+}
+
+void tracker_screen_event_callback(lv_event_t * e)
+{
+    lv_event_code_t event_code = lv_event_get_code(e);
+
+    if (event_code == LV_EVENT_SCREEN_LOADED) {
+        app_sensor_uart_recv_start();
+    } else if (event_code == LV_EVENT_SCREEN_UNLOADED) {
+        app_sensor_uart_recv_stop();
     }
 }
 

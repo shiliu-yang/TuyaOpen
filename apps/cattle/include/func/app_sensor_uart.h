@@ -93,6 +93,28 @@ OPERATE_RET app_sensor_uart_deinit(void);
 OPERATE_RET app_sensor_uart_start(void);
 
 /**
+ * @brief Start receiving sensor data asynchronously
+ * 
+ * This function schedules a work queue task to send sensor start commands
+ * (BNO and GPS) without blocking the caller. The commands are sent in the
+ * system work queue context.
+ * 
+ * @return OPERATE_RET OPRT_OK on success, error code otherwise
+ */
+OPERATE_RET app_sensor_uart_recv_start(void);
+
+/**
+ * @brief Stop receiving sensor data asynchronously
+ * 
+ * This function schedules a work queue task to send sensor stop commands
+ * (BNO and GPS) without blocking the caller. The commands are sent in the
+ * system work queue context.
+ * 
+ * @return OPERATE_RET OPRT_OK on success, error code otherwise
+ */
+OPERATE_RET app_sensor_uart_recv_stop(void);
+
+/**
  * @brief Sensor type enumeration
  */
 typedef enum {

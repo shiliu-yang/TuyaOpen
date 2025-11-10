@@ -16,6 +16,7 @@ void volume_changed_callback(lv_event_t * e);
 void sos_countdown_finish(lv_event_t * e);
 void sos_cancel_clicked(lv_event_t * e);
 void tracker_event_callback(lv_event_t * e);
+void tracker_screen_event_callback(lv_event_t * e);
 void tracker_close_event_callback(lv_event_t * e);
 
 #ifdef __cplusplus

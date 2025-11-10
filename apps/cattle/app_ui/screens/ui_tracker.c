@@ -90,6 +90,15 @@ void ui_event_tracker(lv_event_t *e)
     }
 }
 
+void ui_event_tracker_screen(lv_event_t *e)
+{
+    lv_event_code_t event_code = lv_event_get_code(e);
+
+    if (event_code == LV_EVENT_SCREEN_LOADED || event_code == LV_EVENT_SCREEN_UNLOADED) {
+        tracker_screen_event_callback(e);
+    }
+}
+
 // build funtions
 
 void ui_tracker_screen_init(void)
@@ -201,6 +210,8 @@ void ui_tracker_screen_init(void)
     lv_obj_center(heading_text);
 
     lv_obj_add_event_cb(ui_tracker, ui_event_tracker, LV_EVENT_GESTURE, NULL);
+    lv_obj_add_event_cb(ui_tracker, ui_event_tracker_screen, LV_EVENT_SCREEN_LOADED, NULL);
+    lv_obj_add_event_cb(ui_tracker, ui_event_tracker_screen, LV_EVENT_SCREEN_UNLOADED, NULL);
 
 #if UI_TRACKER_TEST_MODE
     /* Create test timer: update every 3 seconds */

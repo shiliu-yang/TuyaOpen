@@ -37,6 +37,8 @@
 ********************function declaration********************
 ***********************************************************/
 static void sensor_uart_task(void *args);
+static void sensor_uart_send_start_cmd_work(void *data);
+static void sensor_uart_send_stop_cmd_work(void *data);
 
 /***********************************************************
 ***********************variable define**********************
@@ -451,17 +453,14 @@ static void sensor_uart_task(void *args)
     // uint32_t last_send_time = 0;
     
     PR_INFO("[SENSOR_UART] Task started");
-    
-    /* Wait a bit for system to stabilize */
-    tal_system_sleep(1000);
 
     // /* Start BNO sensor with 2000ms interval */
-    app_sensor_uart_send_cmd(SENSOR_TYPE_BNO, 200, SENSOR_CMD_START);
-    tal_system_sleep(100);
+    // app_sensor_uart_send_cmd(SENSOR_TYPE_BNO, 200, SENSOR_CMD_START);
+    // tal_system_sleep(100);
 
-    /* Start GPS sensor with 10000ms interval */
-    app_sensor_uart_send_cmd(SENSOR_TYPE_GPS, 10000, SENSOR_CMD_START);
-    tal_system_sleep(100);
+    // /* Start GPS sensor with 10000ms interval */
+    // app_sensor_uart_send_cmd(SENSOR_TYPE_GPS, 10000, SENSOR_CMD_START);
+    // tal_system_sleep(100);
 
     while (1) {
         if (NULL == rx_buffer) {
@@ -596,6 +595,108 @@ static void sensor_uart_task(void *args)
         /* Sleep for a short interval */
         tal_system_sleep(100);
     }
+}
+
+/**
+ * @brief Work queue callback to send sensor start commands
+ */
+static void sensor_uart_send_start_cmd_work(void *data)
+{
+    (void)data; /* Unused parameter */
+    
+    if (!sg_uart_initialized) {
+        PR_ERR("[SENSOR_UART] Not initialized, cannot send start commands");
+        return;
+    }
+    
+    PR_INFO("[SENSOR_UART] Sending sensor start commands via work queue");
+    
+    /* Start BNO sensor with 200ms interval */
+    app_sensor_uart_send_cmd(SENSOR_TYPE_BNO, 200, SENSOR_CMD_START);
+    tal_system_sleep(100);
+    
+    /* Start GPS sensor with 10000ms interval */
+    app_sensor_uart_send_cmd(SENSOR_TYPE_GPS, 10000, SENSOR_CMD_START);
+    tal_system_sleep(100);
+    
+    PR_INFO("[SENSOR_UART] Sensor start commands sent successfully");
+}
+
+/**
+ * @brief Start receiving sensor data by sending start commands asynchronously
+ * 
+ * This function schedules a work queue task to send sensor start commands
+ * without blocking the caller.
+ */
+OPERATE_RET app_sensor_uart_recv_start(void)
+{
+    if (!sg_uart_initialized) {
+        PR_ERR("[SENSOR_UART] Not initialized, call app_sensor_uart_init first");
+        return OPRT_COM_ERROR;
+    }
+    
+    PR_INFO("[SENSOR_UART] Scheduling sensor start commands via work queue");
+    
+    /* Schedule work to send start commands asynchronously */
+    OPERATE_RET rt = tal_workq_schedule(WORKQ_SYSTEM, sensor_uart_send_start_cmd_work, NULL);
+    if (rt != OPRT_OK) {
+        PR_ERR("[SENSOR_UART] Failed to schedule work: %d", rt);
+        return rt;
+    }
+    
+    PR_DEBUG("[SENSOR_UART] Work scheduled successfully");
+    return OPRT_OK;
+}
+
+/**
+ * @brief Work queue callback to send sensor stop commands
+ */
+static void sensor_uart_send_stop_cmd_work(void *data)
+{
+    (void)data; /* Unused parameter */
+    
+    if (!sg_uart_initialized) {
+        PR_ERR("[SENSOR_UART] Not initialized, cannot send stop commands");
+        return;
+    }
+    
+    PR_INFO("[SENSOR_UART] Sending sensor stop commands via work queue");
+    
+    /* Stop BNO sensor */
+    app_sensor_uart_send_cmd(SENSOR_TYPE_BNO, 0, SENSOR_CMD_STOP);
+    tal_system_sleep(100);
+    
+    /* Stop GPS sensor */
+    app_sensor_uart_send_cmd(SENSOR_TYPE_GPS, 0, SENSOR_CMD_STOP);
+    tal_system_sleep(100);
+    
+    PR_INFO("[SENSOR_UART] Sensor stop commands sent successfully");
+}
+
+/**
+ * @brief Stop receiving sensor data by sending stop commands asynchronously
+ * 
+ * This function schedules a work queue task to send sensor stop commands
+ * without blocking the caller.
+ */
+OPERATE_RET app_sensor_uart_recv_stop(void)
+{
+    if (!sg_uart_initialized) {
+        PR_ERR("[SENSOR_UART] Not initialized, call app_sensor_uart_init first");
+        return OPRT_COM_ERROR;
+    }
+    
+    PR_INFO("[SENSOR_UART] Scheduling sensor stop commands via work queue");
+    
+    /* Schedule work to send stop commands asynchronously */
+    OPERATE_RET rt = tal_workq_schedule(WORKQ_SYSTEM, sensor_uart_send_stop_cmd_work, NULL);
+    if (rt != OPRT_OK) {
+        PR_ERR("[SENSOR_UART] Failed to schedule work: %d", rt);
+        return rt;
+    }
+    
+    PR_DEBUG("[SENSOR_UART] Work scheduled successfully");
+    return OPRT_OK;
 }
 
 /**
