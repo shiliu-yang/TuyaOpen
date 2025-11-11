@@ -11,6 +11,7 @@
 #include "app_ui_main.h"
 #include "app_battery.h"
 #include "app_gps.h"
+#include "app_sensor_uart.h"
 
 #include "tal_api.h"
 #include "tal_event_info.h"
@@ -64,8 +65,7 @@ static void __setting_get_date_time(void)
         tm.tm_mon == setting_last_tm.tm_mon && \
         tm.tm_mday == setting_last_tm.tm_mday && \
         tm.tm_hour == setting_last_tm.tm_hour && \
-        tm.tm_min == setting_last_tm.tm_min && \
-        tm.tm_sec == setting_last_tm.tm_sec) {
+        tm.tm_min == setting_last_tm.tm_min) {
         return;
     }
     memcpy(&setting_last_tm, &tm, sizeof(POSIX_TM_S));
@@ -128,7 +128,8 @@ void setting_load_timer_cb(TIMER_ID timer_id, void *arg)
     // Update GPS status (only if changed)
     bool valid = false;
     uint8_t satellite_count = 0;
-    app_gps_get_status(&valid, &satellite_count);
+    // app_gps_get_status(&valid, &satellite_count);
+    app_sensor_uart_gps_get_status(&valid, &satellite_count);
     
     /* Update UI only if GPS status changed or first update */
     if (gps_first_update || 

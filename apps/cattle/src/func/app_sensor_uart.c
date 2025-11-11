@@ -51,6 +51,10 @@ static uint32_t sg_ui_total_distance = 1000;
 static float sg_ui_heading_degrees = 0.0f;
 static float sg_ui_bearing_degrees = 0.0f;
 
+// gps status
+static bool sg_gps_valid = false;
+static uint8_t sg_gps_satellite_count = 0;
+
 /***********************************************************
 ***********************function define**********************
 ***********************************************************/
@@ -455,8 +459,8 @@ static void sensor_uart_task(void *args)
     PR_INFO("[SENSOR_UART] Task started");
 
     // /* Start BNO sensor with 2000ms interval */
-    // app_sensor_uart_send_cmd(SENSOR_TYPE_BNO, 200, SENSOR_CMD_START);
-    // tal_system_sleep(100);
+    app_sensor_uart_send_cmd(SENSOR_TYPE_BNO, 200, SENSOR_CMD_START);
+    tal_system_sleep(100);
 
     // /* Start GPS sensor with 10000ms interval */
     app_sensor_uart_send_cmd(SENSOR_TYPE_GPS, 10000, SENSOR_CMD_START);
@@ -556,6 +560,10 @@ static void sensor_uart_task(void *args)
                     if (gnss_data.valid) {
                         /* GNSS data parsed successfully with valid fix */
                         PR_INFO("[SENSOR_UART] GNSS data: %s", line);
+
+                        sg_gps_valid = gnss_data.valid;
+                        sg_gps_satellite_count = gnss_data.satellites;
+
                         // PR_INFO("[SENSOR_UART] GNSS latitude: %.6f", gnss_data.latitude);
                         // PR_INFO("[SENSOR_UART] GNSS longitude: %.6f", gnss_data.longitude);
                         // PR_INFO("[SENSOR_UART] GNSS altitude: %.1fm", gnss_data.altitude);
@@ -733,5 +741,21 @@ OPERATE_RET app_sensor_uart_start(void)
     }
     
     PR_INFO("[SENSOR_UART] Task started successfully");
+    return OPRT_OK;
+}
+
+OPERATE_RET app_sensor_uart_gps_get_status(bool *valid, uint8_t *satellite_count)
+{
+    if (!valid || !satellite_count) {
+        return OPRT_INVALID_PARM;
+    }
+
+    if (!sg_uart_initialized) {
+        return OPRT_COM_ERROR;
+    }
+
+    *valid = sg_gps_valid;
+    *satellite_count = sg_gps_satellite_count;
+
     return OPRT_OK;
 }

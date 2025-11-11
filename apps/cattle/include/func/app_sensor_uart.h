@@ -191,6 +191,15 @@ OPERATE_RET app_sensor_uart_parse_bno(const char *data_str, bno_sensor_data_t *b
  */
 OPERATE_RET app_sensor_uart_parse_gnss(const char *data_str, gnss_sensor_data_t *gnss_data);
 
+/**
+ * @brief Get GPS status (valid and satellite count)
+ * 
+ * @param valid Pointer to store GPS valid status (true if has fix)
+ * @param satellite_count Pointer to store number of satellites in use
+ * @return OPERATE_RET OPRT_OK on success
+ */
+OPERATE_RET app_sensor_uart_gps_get_status(bool *valid, uint8_t *satellite_count);
+
 #ifdef __cplusplus
 }
 #endif

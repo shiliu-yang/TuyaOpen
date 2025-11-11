@@ -210,8 +210,8 @@ void ui_tracker_screen_init(void)
     lv_obj_center(heading_text);
 
     lv_obj_add_event_cb(ui_tracker, ui_event_tracker, LV_EVENT_GESTURE, NULL);
-    lv_obj_add_event_cb(ui_tracker, ui_event_tracker_screen, LV_EVENT_SCREEN_LOADED, NULL);
-    lv_obj_add_event_cb(ui_tracker, ui_event_tracker_screen, LV_EVENT_SCREEN_UNLOADED, NULL);
+    // lv_obj_add_event_cb(ui_tracker, ui_event_tracker_screen, LV_EVENT_SCREEN_LOADED, NULL);
+    // lv_obj_add_event_cb(ui_tracker, ui_event_tracker_screen, LV_EVENT_SCREEN_UNLOADED, NULL);
 
 #if UI_TRACKER_TEST_MODE
     /* Create test timer: update every 3 seconds */
