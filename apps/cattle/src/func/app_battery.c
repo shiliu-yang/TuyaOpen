@@ -166,6 +166,7 @@ OPERATE_RET app_battery_init(void)
     // Create battery status timer
     TUYA_CALL_ERR_RETURN(tal_sw_timer_create(__battery_timer_cb, NULL, &sg_battery_timer_id));
     TUYA_CALL_ERR_RETURN(tal_sw_timer_start(sg_battery_timer_id, GET_BATTERY_TIME_MS, TAL_TIMER_CYCLE));
+    TUYA_CALL_ERR_RETURN(tal_sw_timer_trigger(sg_battery_timer_id));
 
     // Create charge check timer
     TUYA_CALL_ERR_RETURN(tal_sw_timer_create(__charge_check_timer_cb, NULL, &sg_charge_check_timer_id));
