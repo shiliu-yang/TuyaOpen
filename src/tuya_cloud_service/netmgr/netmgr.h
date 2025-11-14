@@ -36,6 +36,7 @@ extern "C" {
     ((type) == NETCONN_WIFI       ? "wifi"                                                                             \
      : (type) == NETCONN_WIRED    ? "wired"                                                                            \
      : (type) == NETCONN_CELLULAR ? "cellular"                                                                         \
+     : (type) == NETCONN_AT_MODEM ? "at_modem"                                                                         \
      : (type) == NETCONN_AUTO     ? "auto"                                                                             \
                                   : "unknown")
 
@@ -44,6 +45,7 @@ typedef enum {
     NETCONN_WIFI = 1 << 1,
     NETCONN_WIRED = 1 << 2,
     NETCONN_CELLULAR = 1 << 3,
+    NETCONN_AT_MODEM = 1 << 4,
 } netmgr_type_e;
 
 /**

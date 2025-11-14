@@ -35,6 +35,9 @@
 #if defined(ENABLE_WIRED) && (ENABLE_WIRED == 1)
 #include "netconn_wired.h"
 #endif
+#if defined(ENABLE_AT_MODEM) && (ENABLE_AT_MODEM == 1)
+#include "netconn_at_modem.h"
+#endif
 #if defined(ENABLE_LIBLWIP) && (ENABLE_LIBLWIP == 1)
 #include "lwip_init.h"
 #endif
@@ -330,6 +333,23 @@ void user_main(void)
 #endif
 #if defined(ENABLE_WIRED) && (ENABLE_WIRED == 1)
     type |= NETCONN_WIRED;
+#endif
+#if defined(ENABLE_AT_MODEM) && (ENABLE_AT_MODEM == 1)
+    type |= NETCONN_AT_MODEM;
+    // Initialize the AT modem connection here
+    TDD_TRANSPORT_UART_CFG_T uart_cfg = {
+        .port_id = TUYA_UART_NUM_2,
+        .cfg.rx_buffer_size = 10 * 1024,
+        .cfg.open_mode = O_BLOCK,
+        .cfg.base_cfg =
+            {
+                .baudrate = 921600,
+                .databits = TUYA_UART_DATA_LEN_8BIT,
+                .parity = TUYA_UART_PARITY_TYPE_NONE,
+                .stopbits = TUYA_UART_STOP_LEN_1BIT,
+            },
+    };
+    tdd_transport_uart_register(AT_TRANSPORT_NAME, uart_cfg);
 #endif
     netmgr_init(type);
 #if defined(ENABLE_WIFI) && (ENABLE_WIFI == 1)

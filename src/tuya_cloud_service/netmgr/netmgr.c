@@ -43,6 +43,11 @@ extern netmgr_conn_wifi_t s_netmgr_wifi;
 extern netmgr_conn_wired_t s_netmgr_wired;
 #endif
 
+#ifdef ENABLE_AT_MODEM
+#include "netconn_at_modem.h"
+extern netmgr_conn_at_modem_t s_netmgr_at_modem;
+#endif
+
 #ifdef ENABLE_CELLULAR
 #include "netconn_cellular.h"
 extern netmgr_conn_cellular_t s_netmgr_cellular;
@@ -327,6 +332,12 @@ OPERATE_RET netmgr_init(netmgr_type_e type)
     }
 #endif
 
+#ifdef ENABLE_AT_MODEM
+    if (type & NETCONN_AT_MODEM) {
+        __netmgr_conn_register(NETCONN_AT_MODEM, (netmgr_conn_base_t *)&s_netmgr_at_modem);
+    }
+#endif
+
 #ifdef ENABLE_WIFI
     if (type & NETCONN_WIFI) {
         __netmgr_conn_register(NETCONN_WIFI, (netmgr_conn_base_t *)&s_netmgr_wifi);
@@ -337,13 +348,14 @@ OPERATE_RET netmgr_init(netmgr_type_e type)
         PR_ERR("No connection available, please check your configuration");
         return OPRT_INVALID_PARM;
     }
+    tal_network_card_set_active(__get_conn_by_type(s_netmgr.active)->card_type);
 
     s_netmgr.inited = TRUE;
-
+	// TODO:
     // Cellular not support LAN
 #if !defined(ENABLE_CELLULAR) || (ENABLE_CELLULAR == 0)
-    tal_sw_timer_create(__tuya_lan_init_tm_cb, NULL, &sg_lan_init_timer);
-    tal_sw_timer_start(sg_lan_init_timer, 500, TAL_TIMER_CYCLE);
+    // tal_sw_timer_create(__tuya_lan_init_tm_cb, NULL, &sg_lan_init_timer);
+    // tal_sw_timer_start(sg_lan_init_timer, 500, TAL_TIMER_CYCLE);
 #endif
 
 #ifdef ENABLE_BLUETOOTH

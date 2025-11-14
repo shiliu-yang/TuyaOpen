@@ -46,6 +46,12 @@ if(CONFIG_ENABLE_WIRED STREQUAL "y")
     list(APPEND LIB_SRCS ${WIRED_SRCS})
 endif()
 
+if (CONFIG_ENABLE_AT_MODEM STREQUAL "y")
+    file(GLOB_RECURSE AT_MODEM_SRCS 
+        "${MODULE_PATH}/netmgr/netconn_at_modem.c")
+    list(APPEND LIB_SRCS ${AT_MODEM_SRCS})
+endif()
+
 if (CONFIG_ENABLE_CELLULAR STREQUAL "y")
     file(GLOB_RECURSE WIRED_SRCS 
         "${MODULE_PATH}/netmgr/netconn_cellular.c")
