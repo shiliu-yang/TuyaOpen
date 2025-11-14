@@ -125,36 +125,42 @@ void uart_rx_chars_in_isr(TUYA_UART_NUM_E port_num)
         return;
     }
 
-    uint8_t rx_char;
     int ret = 0;
     uint32_t rx_bytes = 0;
 
-    /*
-     * When the software buffer is full, the data read will not be written into
-     * the software buffer. However, it will continue to read the content of the
-     * hardware buffer until it is empty.
-     */
-    while (1) {
-        ret = tkl_uart_read(port_num, &rx_char, 1);
-        if (ret != 1) {
-            break;
+/*
+ * Read available data from hardware buffer.
+ * For efficiency, read in batches rather than byte-by-byte.
+ *
+ * IMPORTANT: This is called from interrupt context (or simulated interrupt).
+ * Only read ONCE per callback invocation to minimize blocking the caller thread.
+ * The callback will be invoked again if more data arrives.
+ */
+
+// Use a larger buffer for batch reading to improve efficiency
+#define UART_ISR_READ_BUFFER_SIZE 256
+    uint8_t rx_buffer[UART_ISR_READ_BUFFER_SIZE];
+
+    // Read only ONCE per callback to avoid blocking the caller
+    ret = tkl_uart_read(port_num, rx_buffer, UART_ISR_READ_BUFFER_SIZE);
+    if (ret > 0) {
+        // PR_HEXDUMP_DEBUG("uart_rx_chars_in_isr read data", rx_buffer, ret);
+
+        // Write the batch of data to ring buffer
+        int written = tuya_ring_buff_write(uart_info->rx_ring, rx_buffer, ret);
+        if (written < ret) {
+            // Ring buffer overflow
+            PR_ERR("UART rx ring buffer overflow: read %d, written %d\r\n", ret, written);
         }
 
-        ret = tuya_ring_buff_write(uart_info->rx_ring, &rx_char, 1);
-        if (ret != 1) {
-            break;
-        }
-
-        rx_bytes++;
-
-#if OPERATING_SYSTEM == SYSTEM_LINUX
-        break;
-#endif
+        rx_bytes = written;
     }
 
 #ifdef CONFIG_UART_FLOW_CONTRAL
 
 #endif
+
+    // PR_HEXDUMP_DEBUG("rx_bytes", (uint8_t *)rx_bytes, sizeof(rx_bytes));
 
     if ((rx_bytes >= 1) && (uart_info->wait_rx_flag == TRUE)) {
         uart_info->wait_rx_flag = FALSE;

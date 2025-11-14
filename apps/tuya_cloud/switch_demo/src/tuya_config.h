@@ -26,8 +26,8 @@
  */
 // clang-format off
 #define TUYA_PRODUCT_ID      "qhivvyqawogv04e4"                        // Please change your product id
-#define TUYA_OPENSDK_UUID      "uuidxxxxxxxxxxxxxxxx"                    // Please change the correct uuid
-#define TUYA_OPENSDK_AUTHKEY   "keyxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"        // Please change the correct authkey
+#define TUYA_OPENSDK_UUID      "uuid723947b359369315"                    // Please change the correct uuid
+#define TUYA_OPENSDK_AUTHKEY   "JsT44FqtVXPNOgs0njJNF6TDtO9FTL8W"        // Please change the correct authkey
 
 /**
  * @brief PINCODE for AP provisioning

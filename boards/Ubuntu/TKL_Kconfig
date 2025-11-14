@@ -5,6 +5,10 @@ config COMPILE_PREX
         The prefix of the compile command.
         For example, if you want to compile the project with the prefix "arm-none-eabi-", you can set it to "arm-none-eabi-".
 
+config ENABLE_EXT_RAM
+    bool
+    default y
+
 config ENABLE_WIRED
     bool "Enable Wired"
     default y

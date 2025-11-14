@@ -14,6 +14,13 @@
 /***********************************************************
 ************************macro define************************
 ***********************************************************/
+#if defined(BOARD_CHOICE_T5AI) && (BOARD_CHOICE_T5AI == 1)
+#define USE_UART_DMA 1
+#endif
+
+#if USE_UART_DMA
+#include "tkl_uart.h"
+#endif
 
 /***********************************************************
 ***********************typedef define***********************
@@ -42,7 +49,11 @@ static OPERATE_RET __tdd_transport_uart_open(TDD_TRANSPORT_HANDLE_T handle)
 
     TDD_TRANSPORT_UART_HANDLE_T *hdl = (TDD_TRANSPORT_UART_HANDLE_T *)handle;
 
+#if USE_UART_DMA
+    TUYA_CALL_ERR_RETURN(tkl_uart_init(hdl->cfg.port_id, &hdl->cfg.cfg.base_cfg));
+#else
     TUYA_CALL_ERR_RETURN(tal_uart_init(hdl->cfg.port_id, &hdl->cfg.cfg));
+#endif
 
     return rt;
 }
@@ -53,7 +64,11 @@ static OPERATE_RET __tdd_transport_uart_send(TDD_TRANSPORT_HANDLE_T handle, cons
 
     TDD_TRANSPORT_UART_HANDLE_T *hdl = (TDD_TRANSPORT_UART_HANDLE_T *)handle;
 
+#if USE_UART_DMA
+    return tkl_uart_write(hdl->cfg.port_id, (void *)data, len);
+#else
     return tal_uart_write(hdl->cfg.port_id, data, len);
+#endif
 }
 
 static uint32_t __tdd_transport_uart_read(TDD_TRANSPORT_HANDLE_T handle, uint8_t *data, uint32_t len)
@@ -63,7 +78,12 @@ static uint32_t __tdd_transport_uart_read(TDD_TRANSPORT_HANDLE_T handle, uint8_t
     TUYA_CHECK_NULL_RETURN(handle, 0);
     TDD_TRANSPORT_UART_HANDLE_T *hdl = (TDD_TRANSPORT_UART_HANDLE_T *)handle;
 
-    int ret = tal_uart_read(hdl->cfg.port_id, data, len);
+    int ret = 0;
+#if USE_UART_DMA
+    ret = tkl_uart_read(hdl->cfg.port_id, data, len);
+#else
+    ret = tal_uart_read(hdl->cfg.port_id, data, len);
+#endif
     if (ret < 0) {
         PR_ERR("UART read error: %d", ret);
         read_len = 0;
@@ -79,11 +99,22 @@ static uint32_t __tdd_transport_uart_available(TDD_TRANSPORT_HANDLE_T handle)
     TUYA_CHECK_NULL_RETURN(handle, 0);
     TDD_TRANSPORT_UART_HANDLE_T *hdl = (TDD_TRANSPORT_UART_HANDLE_T *)handle;
 
-    int available_len = tal_uart_get_rx_data_size(hdl->cfg.port_id);
+    int available_len = 0;
+
+#if USE_UART_DMA
+    available_len = tkl_uart_get_rxfifo_len(hdl->cfg.port_id);
+    if (available_len <= 0 || available_len > 1024 * 8) {
+        return 0;
+    } else {
+        return available_len;
+    }
+#else
+    available_len =tal_uart_get_rx_data_size(hdl->cfg.port_id);
     if (available_len < 0) {
         PR_ERR("UART available error: %d", available_len);
         return 0;
     }
+#endif
 
     return (uint32_t)available_len;
 }
@@ -119,7 +150,11 @@ static OPERATE_RET __tdd_transport_uart_close(TDD_TRANSPORT_HANDLE_T handle)
     TUYA_CHECK_NULL_RETURN(handle, OPRT_INVALID_PARM);
     TDD_TRANSPORT_UART_HANDLE_T *hdl = (TDD_TRANSPORT_UART_HANDLE_T *)handle;
 
+#if USE_UART_DMA
+    TUYA_CALL_ERR_RETURN(tkl_uart_deinit(hdl->cfg.port_id));
+#else
     TUYA_CALL_ERR_RETURN(tal_uart_deinit(hdl->cfg.port_id));
+#endif
 
     return rt;
 }
