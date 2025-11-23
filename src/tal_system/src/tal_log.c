@@ -534,6 +534,25 @@ OPERATE_RET tal_log_print_raw(const char *pFmt, ...)
 }
 
 /**
+ * @brief Variant of tal_log_print_raw that accepts a va_list.
+ *
+ * @param pFmt Format string
+ * @param ap   Initialized va_list (will not be modified except read)
+ * @return OPRT_OK on success or error code
+ */
+OPERATE_RET tal_log_vprint_raw(const char *pFmt, va_list ap)
+{
+    if (NULL == pLogManage) {
+        return OPRT_INVALID_PARM;
+    }
+    OPERATE_RET opRet = 0;
+    tal_mutex_lock(pLogManage->mutex);
+    opRet = __PrintLogVRaw(pFmt, ap);
+    tal_mutex_unlock(pLogManage->mutex);
+    return opRet;
+}
+
+/**
  * @brief Releases the memory allocated for the log management system.
  *
  * This function frees the memory allocated for the log management system and

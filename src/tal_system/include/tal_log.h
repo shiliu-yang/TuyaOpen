@@ -277,6 +277,15 @@ PRINTF_CHECK(1, 2)
 OPERATE_RET tal_log_print_raw(const char *pFmt, ...);
 
 /**
+ * @brief Variant of tal_log_print_raw that accepts a va_list.
+ *
+ * @param pFmt Format string
+ * @param ap   Initialized va_list (will not be modified except read)
+ * @return OPRT_OK on success or error code
+ */
+OPERATE_RET tal_log_vprint_raw(const char *pFmt, va_list ap);
+
+/**
  * @brief destroy log management
  *
  * @param[in] pFmt, format string
