@@ -32,7 +32,7 @@ jobs:
       - name: Copy cache
         run: |
           echo "::group::Copying cache"
-          SCRIPT_PATH="${{ github.workspace }}/../../.tuyaopoen/platform_cache_copy.py"
+          SCRIPT_PATH="${{ github.workspace }}/../../../.tuyaopen/platform_cache_copy.py"
           if [ -f "$SCRIPT_PATH" ]; then
             python3 "$SCRIPT_PATH" --output "${{ github.workspace }}/platform"
           else
