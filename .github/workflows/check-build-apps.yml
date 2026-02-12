@@ -10,7 +10,7 @@ on:
       - dev
 jobs:
   Build-Switch-Demo:
-    runs-on: 475b82e0e130
+    runs-on: [self-hosted, Linux, X64]
     env:
       OPEN_COUNTRY_CODE: "NONE"
     steps:
