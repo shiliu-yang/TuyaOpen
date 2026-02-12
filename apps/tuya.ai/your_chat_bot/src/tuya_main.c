@@ -123,6 +123,11 @@ OPERATE_RET audio_dp_obj_proc(dp_obj_recv_t *dpobj)
     return OPRT_OK;
 }
 
+/**
+ * @brief Upload the current audio volume to the cloud DP point
+ *
+ * @return Operation result, OPRT_OK indicates success, otherwise error code
+ */
 OPERATE_RET ai_audio_volume_upload(void)
 {
     tuya_iot_client_t *client = tuya_iot_client_get();
