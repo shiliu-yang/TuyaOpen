@@ -7,7 +7,7 @@ on:
       - dev
 jobs:
   Build-Switch-Demo:
-    runs-on: self-hosted
+    runs-on: 475b82e0e130
     env:
       OPEN_COUNTRY_CODE: "NONE"
     steps:
