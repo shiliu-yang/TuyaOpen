@@ -29,6 +29,16 @@ jobs:
           tos.py check
           rm -rf ${{ github.workspace }}/dist
           echo "::endgroup::"
+      - name: Copy cache
+        run: |
+          echo "::group::Copying cache"
+          SCRIPT_PATH="${{ github.workspace }}/../../.tuyaopoen/platform_cache_copy.py"
+          if [ -f "$SCRIPT_PATH" ]; then
+            python3 "$SCRIPT_PATH" --output "${{ github.workspace }}/platform"
+          else
+            echo "Cache copy script not found, skip: $SCRIPT_PATH"
+          fi
+          echo "::endgroup::"
       - name: Check [switch_demo] Build
         run: |
           echo "::group::Building switch_demo"
