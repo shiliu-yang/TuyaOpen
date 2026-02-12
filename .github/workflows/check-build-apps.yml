@@ -33,8 +33,11 @@ jobs:
         run: |
           echo "::group::Copying cache"
           SCRIPT_PATH="${{ github.workspace }}/../../../.tuyaopen/platform_cache_copy.py"
+          cd ${{ github.workspace }}
+          . ./export.sh
           if [ -f "$SCRIPT_PATH" ]; then
             $SCRIPT_PATH --output "${{ github.workspace }}/platform"
+            tos.py update
           else
             echo "Cache copy script not found, skip: $SCRIPT_PATH"
           fi
