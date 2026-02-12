@@ -60,6 +60,7 @@ int user_main()
     }
 
     PR_DEBUG("cnt is %d", cnt);
+
     while (1) {
         tal_system_sleep(10);
     }
@@ -98,7 +99,13 @@ static void tuya_app_thread(void *arg)
 
 void tuya_app_main(void)
 {
-    THREAD_CFG_T thrd_param = {4096, 4, "tuya_app_main"};
+    THREAD_CFG_T thrd_param;
+
+    memset(&thrd_param, 0, sizeof(THREAD_CFG_T));
+    thrd_param.stackDepth = 1024 * 4;
+    thrd_param.priority = THREAD_PRIO_1;
+    thrd_param.thrdname = "tuya_app_main";
+
     tal_thread_create_and_start(&ty_app_thread, NULL, NULL, tuya_app_thread, NULL, &thrd_param);
 }
 #endif

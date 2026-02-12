@@ -26,20 +26,10 @@
 /***********************************************************
 *************************micro define***********************
 ***********************************************************/
-#ifndef EXAMPLE_OUTPUT_PIN
-#define EXAMPLE_OUTPUT_PIN TUYA_GPIO_NUM_26
-#endif
+#define EXAMPLE_IRQ_MODE       TUYA_GPIO_IRQ_RISE
 
-#ifndef EXAMPLE_INPUT_PIN
-#define EXAMPLE_INPUT_PIN TUYA_GPIO_NUM_7
-#endif
-
-#ifndef EXAMPLE_IRQ_PIN
-#define EXAMPLE_IRQ_PIN TUYA_GPIO_NUM_6
-#endif
-
-#define TASK_GPIO_PRIORITY THREAD_PRIO_2
-#define TASK_GPIO_SIZE     4096
+#define TASK_GPIO_PRIORITY     THREAD_PRIO_2
+#define TASK_GPIO_SIZE         4096
 
 /***********************************************************
 ***********************typedef define***********************
@@ -94,7 +84,7 @@ static void __example_gpio_task(void *param)
     TUYA_GPIO_IRQ_T irq_cfg = {
         .cb = __gpio_irq_callback,
         .arg = NULL,
-        .mode = TUYA_GPIO_IRQ_RISE,
+        .mode = EXAMPLE_IRQ_MODE,
     };
     TUYA_CALL_ERR_LOG(tkl_gpio_irq_init(EXAMPLE_IRQ_PIN, &irq_cfg));
 
@@ -146,7 +136,10 @@ void user_main(void)
     PR_NOTICE("Platform board:      %s", PLATFORM_BOARD);
     PR_NOTICE("Platform commit-id:  %s", PLATFORM_COMMIT);
 
-    static THREAD_CFG_T thrd_param = {.priority = TASK_GPIO_PRIORITY, .stackDepth = TASK_GPIO_SIZE, .thrdname = "gpio"};
+    static THREAD_CFG_T thrd_param = {0};
+    thrd_param.stackDepth = TASK_GPIO_SIZE;
+    thrd_param.priority = TASK_GPIO_PRIORITY;
+    thrd_param.thrdname = "gpio";
     TUYA_CALL_ERR_LOG(tal_thread_create_and_start(&sg_gpio_handle, NULL, NULL, __example_gpio_task, NULL, &thrd_param));
 
     return;
@@ -189,7 +182,10 @@ static void tuya_app_thread(void *arg)
 
 void tuya_app_main(void)
 {
-    THREAD_CFG_T thrd_param = {4096, 4, "tuya_app_main"};
+    THREAD_CFG_T thrd_param = {0};
+    thrd_param.stackDepth = 1024 * 4;
+    thrd_param.priority = THREAD_PRIO_1;
+    thrd_param.thrdname = "tuya_app_main";
     tal_thread_create_and_start(&ty_app_thread, NULL, NULL, tuya_app_thread, NULL, &thrd_param);
 }
 #endif

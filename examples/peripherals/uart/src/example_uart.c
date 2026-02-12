@@ -7,7 +7,7 @@
 #include "tal_api.h"
 
 #include "tkl_output.h"
-
+#include "tkl_pinmux.h"
 /***********************************************************
 ************************macro define************************
 ***********************************************************/
@@ -57,6 +57,11 @@ void user_main(void)
     PR_NOTICE("Platform board:      %s", PLATFORM_BOARD);
     PR_NOTICE("Platform commit-id:  %s", PLATFORM_COMMIT);
 
+#if USR_UART_NUM == TUYA_UART_NUM_2
+    /* UART2 pinmux support PIN30, 31 and PIN40, 41*/
+    tkl_io_pinmux_config(TUYA_IO_PIN_40, TUYA_UART2_RX);
+    tkl_io_pinmux_config(TUYA_IO_PIN_41, TUYA_UART2_TX);
+#endif
 
     /* UART 0 init */
     TAL_UART_CFG_T cfg = {0};
@@ -123,7 +128,10 @@ static void tuya_app_thread(void *arg)
 
 void tuya_app_main(void)
 {
-    THREAD_CFG_T thrd_param = {4096, 4, "tuya_app_main"};
+    THREAD_CFG_T thrd_param = {0};
+    thrd_param.stackDepth = 1024 * 4;
+    thrd_param.priority = THREAD_PRIO_1;
+    thrd_param.thrdname = "tuya_app_main";
     tal_thread_create_and_start(&ty_app_thread, NULL, NULL, tuya_app_thread, NULL, &thrd_param);
 }
 #endif

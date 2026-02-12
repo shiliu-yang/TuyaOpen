@@ -9,6 +9,12 @@
 #include "tkl_output.h"
 #include "tkl_fs.h"
 
+#if defined(EBABLE_EXAMPLE_SD_PINMUX) && (EBABLE_EXAMPLE_SD_PINMUX == 1)
+#include "tkl_pinmux.h"
+#endif
+
+#include "board_com_api.h"
+
 /***********************************************************
 ************************macro define************************
 ***********************************************************/
@@ -91,13 +97,24 @@ __EXIT:
 static void __example_sd_task(void *param)
 {
     OPERATE_RET rt = OPRT_OK;
+    
+#if defined(EBABLE_EXAMPLE_SD_PINMUX) && (EBABLE_EXAMPLE_SD_PINMUX == 1)
+    tkl_io_pinmux_config(EXAMPLE_SD_CLK_PIN, TUYA_SDIO_HOST_CLK);
+    tkl_io_pinmux_config(EXAMPLE_SD_CMD_PIN, TUYA_SDIO_HOST_CMD);
+    tkl_io_pinmux_config(EXAMPLE_SD_D0_PIN, TUYA_SDIO_HOST_D0);
+    tkl_io_pinmux_config(EXAMPLE_SD_D1_PIN, TUYA_SDIO_HOST_D1);
+    tkl_io_pinmux_config(EXAMPLE_SD_D2_PIN, TUYA_SDIO_HOST_D2);
+    tkl_io_pinmux_config(EXAMPLE_SD_D3_PIN, TUYA_SDIO_HOST_D3);
+#endif
 
     TUYA_CALL_ERR_LOG(tkl_fs_mount(SDCARD_MOUNT_PATH, DEV_SDCARD));
     if (rt != OPRT_OK) {
         PR_ERR("Mount SD card failed: %d", rt);
-        tal_thread_delete(sg_sd_thrd_hdl);
-        sg_sd_thrd_hdl = NULL;
-        return;
+        while (1) {
+            TUYA_CALL_ERR_LOG(tkl_fs_mount(SDCARD_MOUNT_PATH, DEV_SDCARD));
+            tal_system_sleep(3 * 1000);
+        }
+
     }
 
     while (1) {
@@ -118,6 +135,9 @@ void user_main(void)
     /* basic init */
     tal_log_init(TAL_LOG_LEVEL_DEBUG, 1024, (TAL_LOG_OUTPUT_CB)tkl_log_output);
 
+    /*hardware register*/
+    board_register_hardware();
+
     PR_NOTICE("Application information:");
     PR_NOTICE("Project name:        %s", PROJECT_NAME);
     PR_NOTICE("App version:         %s", PROJECT_VERSION);
@@ -128,7 +148,10 @@ void user_main(void)
     PR_NOTICE("Platform board:      %s", PLATFORM_BOARD);
     PR_NOTICE("Platform commit-id:  %s", PLATFORM_COMMIT);
 
-    static THREAD_CFG_T thrd_param = {.priority = TASK_SD_PRIORITY, .stackDepth = TASK_SD_SIZE, .thrdname = "sd"};
+    static THREAD_CFG_T thrd_param = {0};
+    thrd_param.stackDepth = TASK_SD_SIZE;
+    thrd_param.priority = TASK_SD_PRIORITY;
+    thrd_param.thrdname = "sd";
     TUYA_CALL_ERR_LOG(tal_thread_create_and_start(&sg_sd_thrd_hdl, NULL, NULL, __example_sd_task, NULL, &thrd_param));
 
     return;
@@ -171,7 +194,10 @@ static void tuya_app_thread(void *arg)
 
 void tuya_app_main(void)
 {
-    THREAD_CFG_T thrd_param = {4096, 4, "tuya_app_main"};
+    THREAD_CFG_T thrd_param = {0};
+    thrd_param.stackDepth = 1024 * 4;
+    thrd_param.priority = THREAD_PRIO_1;
+    thrd_param.thrdname = "tuya_app_main";
     tal_thread_create_and_start(&ty_app_thread, NULL, NULL, tuya_app_thread, NULL, &thrd_param);
 }
 #endif

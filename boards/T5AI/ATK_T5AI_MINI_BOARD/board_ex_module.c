@@ -40,10 +40,12 @@ static OPERATE_RET __board_register_display(void)
     memset(&display_cfg, 0, sizeof(DISP_SPI_DEVICE_CFG_T));
 
     /* Configure the SPI0 pins */
-    tkl_io_pinmux_config(BOARD_LCD_SPI_CS_PIN, TUYA_SPI0_CS);
-    tkl_io_pinmux_config(BOARD_LCD_SPI_SCL_PIN, TUYA_SPI0_CLK);
-    tkl_io_pinmux_config(BOARD_LCD_SPI_SDA_PIN, TUYA_SPI0_MOSI);
-    tkl_io_pinmux_config(BOARD_LCD_SPI_SDI_PIN, TUYA_SPI0_MISO);
+    if(BOARD_LCD_SPI_CLK_PIN == TUYA_GPIO_NUM_44) {
+        tkl_io_pinmux_config(TUYA_GPIO_NUM_45, TUYA_SPI0_CS);
+        tkl_io_pinmux_config(TUYA_GPIO_NUM_44, TUYA_SPI0_CLK);
+        tkl_io_pinmux_config(TUYA_GPIO_NUM_46, TUYA_SPI0_MOSI);
+        tkl_io_pinmux_config(TUYA_GPIO_NUM_47, TUYA_SPI0_MISO);
+    }
 
     display_cfg.width     = BOARD_LCD_WIDTH;
     display_cfg.height    = BOARD_LCD_HEIGHT;
@@ -65,49 +67,6 @@ static OPERATE_RET __board_register_display(void)
     TUYA_CALL_ERR_RETURN(tdd_disp_spi_st7789_register(DISPLAY_NAME, &display_cfg)); 
 
     return rt;
-}
-#elif (defined(ATK_T5AI_MINI_BOARD_LCD_MD0240_8080) && (ATK_T5AI_MINI_BOARD_LCD_MD0240_8080 ==1))
-static OPERATE_RET __board_register_display(void)
-{
-    DISP_MCU8080_DEVICE_CFG_T display_cfg;
-
-    memset(&display_cfg, 0, sizeof(DISP_MCU8080_DEVICE_CFG_T));
-
-    display_cfg.width     = BOARD_LCD_WIDTH;
-    display_cfg.height    = BOARD_LCD_HEIGHT;
-    display_cfg.pixel_fmt = BOARD_LCD_PIXELS_FMT;
-    display_cfg.rotation  = BOARD_LCD_ROTATION;
-
-    display_cfg.clk       = BOARD_LCD_8080_CLK;
-    display_cfg.data_bits = BOARD_LCD_8080_BITS_DATA;
-    display_cfg.te_pin    = BOARD_LCD_8080_TE_PIN;
-
-    display_cfg.bl.type              = BOARD_LCD_BL_TYPE;
-    display_cfg.bl.gpio.pin          = BOARD_LCD_BL_PIN;
-    display_cfg.bl.gpio.active_level = BOARD_LCD_BL_ACTIVE_LV;
-
-    display_cfg.power.pin = BOARD_LCD_POWER_PIN;
-
-    return tdd_disp_mcu8080_st7789_register(DISPLAY_NAME, &display_cfg);
-}
-#elif (defined(ATK_T5AI_MINI_BOARD_LCD_MD0280_8080) && (ATK_T5AI_MINI_BOARD_LCD_MD0280_8080 ==1))
-static OPERATE_RET __board_register_display(void)
-{
-    ATK_DISP_8080_7789_CFG_T display_cfg;
-
-    memset(&display_cfg, 0, sizeof(ATK_DISP_8080_7789_CFG_T));
-
-    display_cfg.width     = BOARD_LCD_WIDTH;
-    display_cfg.height    = BOARD_LCD_HEIGHT;
-    display_cfg.rotation  = BOARD_LCD_ROTATION;
-
-    display_cfg.bl.type              = BOARD_LCD_BL_TYPE;
-    display_cfg.bl.gpio.pin          = BOARD_LCD_BL_PIN;
-    display_cfg.bl.gpio.active_level = BOARD_LCD_BL_ACTIVE_LV;
-
-    display_cfg.power.pin = BOARD_LCD_POWER_PIN;
-
-    return atk_disp_8080_md0280_register(DISPLAY_NAME, &display_cfg);
 }
 #elif (defined(ATK_T5AI_MINI_BOARD_LCD_MD0700R_RGB) && (ATK_T5AI_MINI_BOARD_LCD_MD0700R_RGB ==1))
 static OPERATE_RET __board_register_display(void)
@@ -132,12 +91,12 @@ static OPERATE_RET __board_register_display(void)
 
     TUYA_CALL_ERR_RETURN(atk_t5ai_disp_rgb_md0700r_register(DISPLAY_NAME, &display_cfg));
 
-    TDD_TOUCH_GT1151_INFO_T touch_cfg = {
+    TDD_TP_GT911_INFO_T tp_cfg = {
         .i2c_cfg =
             {
-                .port = BOARD_TOUCH_I2C_PORT,
-                .scl_pin = BOARD_TOUCH_I2C_SCL_PIN,
-                .sda_pin = BOARD_TOUCH_I2C_SDA_PIN,
+                .port = BOARD_TP_I2C_PORT,
+                .scl_pin = BOARD_TP_I2C_SCL_PIN,
+                .sda_pin = BOARD_TP_I2C_SDA_PIN,
             },
         .tp_cfg =
             {
@@ -152,10 +111,58 @@ static OPERATE_RET __board_register_display(void)
             },
     };
 
-    TUYA_CALL_ERR_RETURN(tdd_touch_i2c_gt1151_register(DISPLAY_NAME, &touch_cfg));
+    TUYA_CALL_ERR_RETURN(tdd_tp_i2c_gt911_register(DISPLAY_NAME, &tp_cfg));
 
     return rt;
 }
+#elif (defined(ATK_T5AI_MINI_BOARD_LCD_MD0430R_RGB) && (ATK_T5AI_MINI_BOARD_LCD_MD0430R_RGB ==1))
+static OPERATE_RET __board_register_display(void)
+{
+    OPERATE_RET rt = OPRT_OK;
+    ATK_T5AI_DISP_MD0430R_CFG_T display_cfg;
+
+    memset(&display_cfg, 0, sizeof(ATK_T5AI_DISP_MD0430R_CFG_T));
+
+    display_cfg.width     = BOARD_LCD_WIDTH;
+    display_cfg.height    = BOARD_LCD_HEIGHT;
+    display_cfg.rotation  = BOARD_LCD_ROTATION;
+
+    display_cfg.bl.type              = BOARD_LCD_BL_TYPE;
+    display_cfg.bl.gpio.pin          = BOARD_LCD_BL_PIN;
+    display_cfg.bl.gpio.active_level = BOARD_LCD_BL_ACTIVE_LV;
+
+    display_cfg.rst.pin          = BOARD_LCD_RST_PIN;
+    display_cfg.rst.active_level = BOARD_LCD_RST_ACTIVE_LV;
+
+    display_cfg.power.pin = BOARD_LCD_POWER_PIN;
+
+    TUYA_CALL_ERR_RETURN(atk_t5ai_disp_rgb_md0430r_register(DISPLAY_NAME, &display_cfg));
+
+    TDD_TP_GT1151_INFO_T tp_cfg = {
+        .i2c_cfg =
+            {
+                .port = BOARD_TP_I2C_PORT,
+                .scl_pin = BOARD_TP_I2C_SCL_PIN,
+                .sda_pin = BOARD_TP_I2C_SDA_PIN,
+            },
+        .tp_cfg =
+            {
+                .x_max = BOARD_LCD_WIDTH,
+                .y_max = BOARD_LCD_HEIGHT,
+                .flags =
+                    {
+                        .mirror_x = 0,
+                        .mirror_y = 0,
+                        .swap_xy = 0,
+                    },
+            },
+    };
+
+    TUYA_CALL_ERR_RETURN(tdd_tp_i2c_gt1151_register(DISPLAY_NAME, &tp_cfg));
+
+    return rt;
+}
+
 #else
 static OPERATE_RET __board_register_display(void)
 {

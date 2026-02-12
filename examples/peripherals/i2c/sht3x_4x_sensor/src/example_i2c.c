@@ -26,21 +26,9 @@
 /***********************************************************
 *************************micro define***********************
 ***********************************************************/
-#ifndef EXAMPLE_I2C_SCL_PIN
-#define EXAMPLE_I2C_SCL_PIN TUYA_GPIO_NUM_13
-#endif
+#define TASK_GPIO_PRIORITY         THREAD_PRIO_2
+#define TASK_GPIO_SIZE             4096
 
-#ifndef EXAMPLE_I2C_SDA_PIN
-#define EXAMPLE_I2C_SDA_PIN TUYA_GPIO_NUM_15
-#endif
-
-#define TASK_GPIO_PRIORITY THREAD_PRIO_2
-#define TASK_GPIO_SIZE     4096
-
-#define I2C_SENSOR_SHT3X 0
-#define I2C_SENSOR_SHT4X 1
-
-#define I2C_EXAMPLE_SENSOR_TYPE I2C_SENSOR_SHT3X
 /***********************************************************
 ***********************typedef define***********************
 ***********************************************************/
@@ -85,36 +73,39 @@ static void __example_i2c_task(void *param)
     cfg.speed = TUYA_IIC_BUS_SPEED_100K;
     cfg.addr_width = TUYA_IIC_ADDRESS_7BIT;
 
-    op_ret = tkl_i2c_init(TUYA_I2C_NUM_0, &cfg);
+    op_ret = tkl_i2c_init(EXAMPLE_I2C_PORT, &cfg);
     if (OPRT_OK != op_ret) {
         PR_ERR("i2c init fail, err<%d>!", op_ret);
     }
 
     while (1) {
         tal_system_sleep(2000);
-#if (I2C_EXAMPLE_SENSOR_TYPE == I2C_SENSOR_SHT3X)
+
+#if defined (EXAMPLE_I2C_SENSOR_SHT3X) && (EXAMPLE_I2C_SENSOR_SHT3X ==1)
         uint16_t temp = 0;
         uint16_t humi = 0;
         extern OPERATE_RET sht3x_read_temp_humi(int port, uint16_t *temp, uint16_t *humi);
 
-        op_ret = sht3x_read_temp_humi(TUYA_I2C_NUM_0, &temp, &humi);
+        op_ret = sht3x_read_temp_humi(EXAMPLE_I2C_PORT, &temp, &humi);
         if (op_ret != OPRT_OK) {
             PR_ERR("sht3x read fail, err<%d>!", op_ret);
             continue;
         }
         PR_INFO("sht3x temp:%d.%d, humi:%d.%d", temp / 1000, temp % 1000, humi / 1000, humi % 1000);
-#elif (I2C_EXAMPLE_SENSOR_TYPE == I2C_SENSOR_SHT4X)
+
+#elif defined (EXAMPLE_I2C_SENSOR_SHT4X) && (EXAMPLE_I2C_SENSOR_SHT4X ==1)
         uint16_t temp = 0;
         uint16_t humi = 0;
         extern OPERATE_RET sht4x_read_temp_humi(int port, uint16_t *temp, uint16_t *humi);
 
-        op_ret = sht4x_read_temp_humi(TUYA_I2C_NUM_0, &temp, &humi);
+        op_ret = sht4x_read_temp_humi(EXAMPLE_I2C_PORT, &temp, &humi);
         if (op_ret != OPRT_OK) {
             PR_ERR("sht4x read fail, err<%d>!", op_ret);
             continue;
         }
         PR_INFO("sht4x temp:%d.%d, humi:%d.%d", temp / 1000, temp % 1000, humi / 1000, humi % 1000);
 #endif
+
     }
 }
 
@@ -130,7 +121,10 @@ void user_main(void)
     /* basic init */
     tal_log_init(TAL_LOG_LEVEL_DEBUG, 4096, (TAL_LOG_OUTPUT_CB)tkl_log_output);
 
-    static THREAD_CFG_T thrd_param = {.priority = TASK_GPIO_PRIORITY, .stackDepth = TASK_GPIO_SIZE, .thrdname = "i2c"};
+    static THREAD_CFG_T thrd_param = {0};
+    thrd_param.stackDepth = TASK_GPIO_SIZE;
+    thrd_param.priority = TASK_GPIO_PRIORITY;
+    thrd_param.thrdname = "i2c";
     TUYA_CALL_ERR_LOG(tal_thread_create_and_start(&sg_i2c_handle, NULL, NULL, __example_i2c_task, NULL, &thrd_param));
 
     return;
@@ -173,7 +167,10 @@ static void tuya_app_thread(void *arg)
 
 void tuya_app_main(void)
 {
-    THREAD_CFG_T thrd_param = {4096, 4, "tuya_app_main"};
+    THREAD_CFG_T thrd_param = {0};
+    thrd_param.stackDepth = 1024 * 4;
+    thrd_param.priority = THREAD_PRIO_1;
+    thrd_param.thrdname = "tuya_app_main";
     tal_thread_create_and_start(&ty_app_thread, NULL, NULL, tuya_app_thread, NULL, &thrd_param);
 }
 #endif

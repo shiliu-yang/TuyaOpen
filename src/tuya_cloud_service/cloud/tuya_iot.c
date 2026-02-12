@@ -29,8 +29,15 @@
 #include "tuya_iot_dp.h"
 #include "tuya_register_center.h"
 #include "tuya_tls.h"
+#include "tuya_lan.h"
+#if defined(ENABLE_WIFI) && (ENABLE_WIFI == 1)
+#include "netcfg.h"
+#endif
 #include "netmgr.h"
 #include "tuya_health.h"
+#if defined(ENABLE_BLUETOOTH) && (ENABLE_BLUETOOTH == 1)
+#include "ble_mgr.h"
+#endif
 typedef enum {
     STATE_IDLE,
     STATE_START,
@@ -57,6 +64,8 @@ static tuya_iot_client_t *s_iot_client_solo;
 /* -------------------------------------------------------------------------- */
 /*                          Internal utils functions                          */
 /* -------------------------------------------------------------------------- */
+static int tuya_iot_token_activate_evt(void *data);
+static OPERATE_RET __tuya_iot_link_type_change_cb(void *data);
 
 static int iot_dispatch_event(tuya_iot_client_t *client)
 {
@@ -199,7 +208,7 @@ static int activate_response_parse(atop_base_response_t *response)
     const char *activate_data_key = client->config.storage_namespace;
     PR_DEBUG("result len %d :%s", (int)strlen(result_string), result_string);
     ret = tal_kv_set(activate_data_key, (const uint8_t *)result_string, strlen(result_string));
-    tal_free(result_string);
+    cJSON_free(result_string);
     if (ret != OPRT_OK) {
         PR_ERR("activate data save error:%d", ret);
         return OPRT_KVS_WR_FAIL;
@@ -722,6 +731,60 @@ int tuya_iot_reset(tuya_iot_client_t *client)
  */
 int tuya_iot_destroy(tuya_iot_client_t *client)
 {
+    if (client == NULL) {
+        return OPRT_INVALID_PARM;
+    }
+
+    tuya_lan_disable();
+#if defined(ENABLE_WIFI) && (ENABLE_WIFI == 1)
+    netcfg_stop(NETCFG_TUYA_WIFI_AP);
+#endif
+#if defined(ENABLE_BLUETOOTH) && (ENABLE_BLUETOOTH == 1)
+    netcfg_stop(NETCFG_TUYA_BLE);
+    tuya_ble_deinit();
+#endif
+
+    if (tuya_mqtt_connected(&client->mqctx)) {
+        tuya_mqtt_stop(&client->mqctx);
+    }
+    tuya_mqtt_destory(&client->mqctx);
+
+    if (client->matop.config.mqctx && client->matop.config.devid) {
+        matop_serice_destory(&client->matop);
+        memset(&client->matop, 0, sizeof(client->matop));
+    }
+
+    netmgr_conn_set(NETCONN_WIFI, NETCONN_CMD_CLOSE, NULL);
+    netmgr_conn_set(NETCONN_WIRED, NETCONN_CMD_CLOSE, NULL);
+    netmgr_conn_set(NETCONN_CELLULAR, NETCONN_CMD_CLOSE, NULL);
+
+    if (client->check_upgrade_timer) {
+        tal_sw_timer_delete(client->check_upgrade_timer);
+        client->check_upgrade_timer = NULL;
+    }
+
+    if (client->token_get.sem) {
+        tal_semaphore_release(client->token_get.sem);
+        client->token_get.sem = NULL;
+    }
+
+    if (client->binding) {
+        tal_free(client->binding);
+        client->binding = NULL;
+    }
+
+    if (client->schema) {
+        dp_schema_delete(client->activate.devid);
+        client->schema = NULL;
+    }
+
+    tal_event_unsubscribe(EVENT_LINK_TYPE_CHG, "iot", __tuya_iot_link_type_change_cb);
+    tal_event_unsubscribe(EVENT_LINK_ACTIVATE, "iot", tuya_iot_token_activate_evt);
+
+    client->state = STATE_IDLE;
+    client->nextstate = STATE_IDLE;
+    client->is_activated = false;
+
     return OPRT_OK;
 }
 
@@ -1042,12 +1105,19 @@ int tuya_iot_activated_data_remove(tuya_iot_client_t *client)
         return OPRT_COM_ERROR;
     }
 
+    client->is_activated = false;
+    tuya_lan_disable();
+#if defined(ENABLE_WIFI) && (ENABLE_WIFI == 1)
+    netcfg_stop(NETCFG_TUYA_WIFI_AP);
+#endif
+#if defined(ENABLE_BLUETOOTH) && (ENABLE_BLUETOOTH == 1)
+    netcfg_stop(NETCFG_TUYA_BLE);
+#endif
     /* Clean client local data */
     dp_schema_delete(client->activate.devid);
     tal_kv_del((const char *)(client->activate.schemaId));
     tal_kv_del((const char *)(client->config.storage_namespace));
     tuya_endpoint_remove();
-    client->is_activated = false;
     PR_INFO("Activated data remove successed");
 
     client->event.id = TUYA_EVENT_RESET_COMPLETE;
@@ -1229,7 +1299,8 @@ int tuya_iot_token_get_port_register(tuya_iot_client_t *client, tuya_token_get_c
  */
 int tuya_iot_version_update_sync(tuya_iot_client_t *client)
 {
-    if (client == NULL) {
+    if (client == NULL || client->config.software_ver == NULL || client->config.software_ver[0] == '\0' ||
+        client->config.storage_namespace == NULL || client->config.storage_namespace[0] == '\0') {
         return OPRT_INVALID_PARM;
     }
 
@@ -1248,22 +1319,57 @@ int tuya_iot_version_update_sync(tuya_iot_client_t *client)
 
     /* Format version JSON buffer */
     size_t version_len = 0;
+    size_t remain = prealloc_size;
     if (client->config.modules) {
         /* extension modules version */
-        version_len += sprintf(version_buffer + version_len, "%s", client->config.modules);
+        int written = snprintf(version_buffer + version_len, remain, "%s", client->config.modules);
+        if (written < 0 || (size_t)written >= remain) {
+            tal_free(version_buffer);
+            return OPRT_BUFFER_NOT_ENOUGH;
+        }
+        version_len += (size_t)written;
+        if (version_len == 0) {
+            tal_free(version_buffer);
+            return OPRT_BUFFER_NOT_ENOUGH;
+        }
         version_len -= 1; // remove ']'
-        version_len += sprintf(version_buffer + version_len, ",");
+        version_buffer[version_len] = '\0';
+        remain = prealloc_size - version_len;
+        written = snprintf(version_buffer + version_len, remain, ",");
+        if (written < 0 || (size_t)written >= remain) {
+            tal_free(version_buffer);
+            return OPRT_BUFFER_NOT_ENOUGH;
+        }
+        version_len += (size_t)written;
+        remain = prealloc_size - version_len;
     } else {
-        version_len += sprintf(version_buffer + version_len, "[");
+        int written = snprintf(version_buffer + version_len, remain, "[");
+        if (written < 0 || (size_t)written >= remain) {
+            tal_free(version_buffer);
+            return OPRT_BUFFER_NOT_ENOUGH;
+        }
+        version_len += (size_t)written;
+        remain = prealloc_size - version_len;
     }
 
     /* Main firmware information */
-    version_len += sprintf(version_buffer + version_len,
+    int written = snprintf(version_buffer + version_len, remain,
                            "{\\\"otaChannel\\\":%d,\\\"protocolVer\\\":\\\"%s\\\","
                            "\\\"baselineVer\\\":\\\"%s\\\",\\\"softVer\\\":\\\"%s\\\"}",
                            0, PV_VERSION, BS_VERSION, client->config.software_ver);
+    if (written < 0 || (size_t)written >= remain) {
+        tal_free(version_buffer);
+        return OPRT_BUFFER_NOT_ENOUGH;
+    }
+    version_len += (size_t)written;
+    remain = prealloc_size - version_len;
 
-    version_len += sprintf(version_buffer + version_len, "]");
+    written = snprintf(version_buffer + version_len, remain, "]");
+    if (written < 0 || (size_t)written >= remain) {
+        tal_free(version_buffer);
+        return OPRT_BUFFER_NOT_ENOUGH;
+    }
+    version_len += (size_t)written;
     PR_DEBUG("%s", version_buffer);
 
     /* local storage read buffer*/
@@ -1314,6 +1420,10 @@ int tuya_iot_version_update_sync(tuya_iot_client_t *client)
  */
 int tuya_iot_extension_modules_version_update(tuya_iot_client_t *client, const char *version)
 {
+    if (client == NULL || version == NULL || version[0] == '\0') {
+        return OPRT_INVALID_PARM;
+    }
+
     client->config.modules = version;
     return tuya_iot_version_update_sync(client);
 }

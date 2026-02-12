@@ -21,11 +21,14 @@
 #include "tal_thread.h"
 #include "tal_mutex.h"
 
+#include "audio_afe.h"
+
 /***********************************************************
 ************************macro define************************
 ***********************************************************/
 // I2S read time default is 10ms
 #define I2S_READ_TIME_MS (10)
+#define SAMPLE_DATABITS  (16)
 
 typedef struct {
     TDD_AUDIO_ES8388_CODEC_T cfg;
@@ -225,6 +228,8 @@ static void esp32_i2s_es8388_read_task(void *args)
             hdl->mic_cb(TDL_AUDIO_FRAME_FORMAT_PCM, TDL_AUDIO_STATUS_RECEIVING, hdl->data_buf, data_len);
         }
 
+        auio_afe_processor_feed(hdl->data_buf, (uint32_t)data_len);
+
         tal_system_sleep(I2S_READ_TIME_MS);
     }
 }
@@ -260,6 +265,12 @@ static OPERATE_RET __tdd_audio_esp_i2s_es8388_open(TDD_AUDIO_HANDLE_T handle, TD
     if (NULL == hdl->mutex_play) {
         PR_ERR("I2S es8388 mutex create failed");
         return OPRT_COM_ERROR;
+    }
+
+    rt = audio_afe_processor_init();
+    if(rt != OPRT_OK) {
+        PR_ERR("audio_afe_processor_init err:%d",  rt);
+        return rt;
     }
 
     const THREAD_CFG_T thread_cfg = {
@@ -336,8 +347,8 @@ OPERATE_RET tdd_audio_es8388_codec_register(char *name, TDD_AUDIO_ES8388_CODEC_T
 {
     OPERATE_RET rt = OPRT_OK;
     ESP_I2S_ES8388_HANDLE_T *_hdl = NULL;
-
     TDD_AUDIO_INTFS_T intfs = {0};
+    TDD_AUDIO_INFO_T info = {0};
 
     _hdl = (ESP_I2S_ES8388_HANDLE_T *)tal_malloc(sizeof(ESP_I2S_ES8388_HANDLE_T));
     TUYA_CHECK_NULL_RETURN(_hdl, OPRT_MALLOC_FAILED);
@@ -346,6 +357,11 @@ OPERATE_RET tdd_audio_es8388_codec_register(char *name, TDD_AUDIO_ES8388_CODEC_T
     // default play volume
     _hdl->play_volume = 80;
 
+    info.sample_rate    = cfg.mic_sample_rate;
+    info.sample_ch_num  = 1;
+    info.sample_bits    = SAMPLE_DATABITS;
+    info.sample_tm_ms   = I2S_READ_TIME_MS;
+
     memcpy(&_hdl->cfg, &cfg, sizeof(TDD_AUDIO_ES8388_CODEC_T));
 
     intfs.open = __tdd_audio_esp_i2s_es8388_open;
@@ -353,7 +369,7 @@ OPERATE_RET tdd_audio_es8388_codec_register(char *name, TDD_AUDIO_ES8388_CODEC_T
     intfs.config = __tdd_audio_esp_i2s_es8388_config;
     intfs.close = __tdd_audio_esp_i2s_es8388_close;
 
-    TUYA_CALL_ERR_GOTO(tdl_audio_driver_register(name, &intfs, (TDD_AUDIO_HANDLE_T)_hdl), __ERR);
+    TUYA_CALL_ERR_GOTO(tdl_audio_driver_register(name, (TDD_AUDIO_HANDLE_T)_hdl,  &intfs, &info), __ERR);
 
     return rt;
 

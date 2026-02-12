@@ -26,7 +26,9 @@
 /***********************************************************
 *************************micro define***********************
 ***********************************************************/
-#define MAX_WD_REFRESH_CNT 10
+#define WATCHDOG_TIMEOUT_MS    (60 * 1000)    
+#define FEED_INTERVAL_CNT      (3)  
+#define WATCHDOG_REFRESH_CNT   (10)
 
 /***********************************************************
 ***********************typedef define***********************
@@ -64,20 +66,21 @@ void user_main(void)
     PR_NOTICE("Platform commit-id:  %s", PLATFORM_COMMIT);
 
     /* watchdog init */
-    PR_DEBUG("init watchdog, interval: 60 sec");
     TUYA_WDOG_BASE_CFG_T cfg;
-    cfg.interval_ms = 60 * 1000;
-    uint32_t refreh_intv = tkl_watchdog_init(&cfg);
-    refreh_intv = refreh_intv >= 60000 ? refreh_intv : 60000;
+    cfg.interval_ms = WATCHDOG_TIMEOUT_MS;
+    uint32_t refresh_intv = tkl_watchdog_init(&cfg);
+
+    PR_NOTICE("init watchdog, set interval: %d sec, actual: %d sec", WATCHDOG_TIMEOUT_MS/1000, refresh_intv/1000);
 
     /* Feed watchdog */
     while (1) {
-        tal_system_sleep(refreh_intv / 3);
+        tal_system_sleep(refresh_intv/FEED_INTERVAL_CNT);
         TUYA_CALL_ERR_LOG(tkl_watchdog_refresh());
-        if (++g_wd_refresh_cnt > MAX_WD_REFRESH_CNT) {
+        if (++g_wd_refresh_cnt > WATCHDOG_REFRESH_CNT) {
+            PR_NOTICE("reach max refresh count, stop refresh watchdog to trigger system reset");
             break;
         } else {
-            PR_DEBUG("refresh watchdog, interval: %d sec", refreh_intv / (3 * 1000));
+            PR_NOTICE("refresh watchdog, interval: %d sec", refresh_intv/FEED_INTERVAL_CNT/1000);
         }
     }
 
@@ -121,7 +124,10 @@ static void tuya_app_thread(void *arg)
 
 void tuya_app_main(void)
 {
-    THREAD_CFG_T thrd_param = {4096, 4, "tuya_app_main"};
+    THREAD_CFG_T thrd_param = {0};
+    thrd_param.stackDepth = 1024 * 4;
+    thrd_param.priority = THREAD_PRIO_1;
+    thrd_param.thrdname = "tuya_app_main";
     tal_thread_create_and_start(&ty_app_thread, NULL, NULL, tuya_app_thread, NULL, &thrd_param);
 }
 #endif

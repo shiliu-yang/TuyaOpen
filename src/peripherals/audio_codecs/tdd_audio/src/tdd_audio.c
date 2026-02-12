@@ -34,6 +34,7 @@
 /***********************************************************
 ************************macro define************************
 ***********************************************************/
+#define AUDIO_PCM_FRAME_MS       20
 
 /***********************************************************
 ***********************typedef define***********************
@@ -104,7 +105,7 @@ static OPERATE_RET __tdd_audio_open(TDD_AUDIO_HANDLE_T handle, TDL_AUDIO_MIC_CB 
 
     TUYA_CALL_ERR_RETURN(tkl_ai_init(&config, 0));
     TUYA_CALL_ERR_RETURN(tkl_ai_start(0, 0));
-    TUYA_CALL_ERR_RETURN(tkl_ai_set_vol(TKL_AUDIO_TYPE_BOARD, 0, 80));
+    // TUYA_CALL_ERR_RETURN(tkl_ai_set_vol(TKL_AUDIO_TYPE_BOARD, 0, 80));
 
     uint8_t volume = hdl->play_volume;
     if(volume) {
@@ -128,10 +129,16 @@ static OPERATE_RET __tdd_audio_play(TDD_AUDIO_HANDLE_T handle, uint8_t *data, ui
     }
 
     TKL_AUDIO_FRAME_INFO_T frame;
+
+    frame.type = TKL_AUDIO_FRAME;
+    frame.codectype = TKL_CODEC_AUDIO_PCM;
+    frame.sample = hdl->cfg.sample_rate;
+    frame.datebits = hdl->cfg.data_bits;
+    frame.channel = hdl->cfg.channel;
     frame.pbuf = (char *)data;
     frame.used_size = len;
-    tkl_ao_put_frame(0, 0, NULL, &frame);
-
+   
+    TUYA_CALL_ERR_RETURN(tkl_ao_put_frame(0, 0, NULL, &frame));
 
     return rt;
 }
@@ -192,8 +199,8 @@ OPERATE_RET tdd_audio_register(char *name, TDD_AUDIO_T5AI_T cfg)
 {
     OPERATE_RET rt = OPRT_OK;
     TDD_AUDIO_DATA_HANDLE_T *_hdl = NULL;
-
     TDD_AUDIO_INTFS_T intfs = {0};
+    TDD_AUDIO_INFO_T info = {0};
 
     _hdl = (TDD_AUDIO_DATA_HANDLE_T *)tal_malloc(sizeof(TDD_AUDIO_DATA_HANDLE_T));
     TUYA_CHECK_NULL_RETURN(_hdl, OPRT_MALLOC_FAILED);
@@ -205,12 +212,17 @@ OPERATE_RET tdd_audio_register(char *name, TDD_AUDIO_T5AI_T cfg)
 
     memcpy(&_hdl->cfg, &cfg, sizeof(TDD_AUDIO_T5AI_T));
 
+    info.sample_rate   = cfg.sample_rate;
+    info.sample_ch_num = cfg.channel;
+    info.sample_bits   = cfg.data_bits;
+    info.sample_tm_ms  = AUDIO_PCM_FRAME_MS;
+
     intfs.open = __tdd_audio_open;
     intfs.play = __tdd_audio_play;
     intfs.config = __tdd_audio_config;
     intfs.close = __tdd_audio_close;
 
-    TUYA_CALL_ERR_GOTO(tdl_audio_driver_register(name, &intfs, (TDD_AUDIO_HANDLE_T)_hdl), __ERR);
+    TUYA_CALL_ERR_GOTO(tdl_audio_driver_register(name, (TDD_AUDIO_HANDLE_T)_hdl, &intfs, &info), __ERR);
 
     return rt;
 

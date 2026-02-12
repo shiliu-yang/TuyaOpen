@@ -48,8 +48,9 @@ static OPERATE_RET __board_register_display(void)
     display_cfg.sw_spi_cfg.spi_rst = BOARD_LCD_SW_SPI_RST_PIN;
 
     display_cfg.bl.type              = BOARD_LCD_BL_TYPE;
-    display_cfg.bl.gpio.pin          = BOARD_LCD_BL_PIN;
-    display_cfg.bl.gpio.active_level = BOARD_LCD_BL_ACTIVE_LV;
+    display_cfg.bl.pwm.id            = BOARD_LCD_BL_PWM_ID;
+    display_cfg.bl.pwm.cfg.frequency = 1000;
+    display_cfg.bl.pwm.cfg.duty      = 10000; // 0-10000
 
     display_cfg.width     = BOARD_LCD_WIDTH;
     display_cfg.height    = BOARD_LCD_HEIGHT;
@@ -60,12 +61,12 @@ static OPERATE_RET __board_register_display(void)
 
     TUYA_CALL_ERR_RETURN(tdd_disp_rgb_ili9488_register(DISPLAY_NAME, &display_cfg));
 
-    TDD_TOUCH_GT1151_INFO_T touch_cfg = {
+    TDD_TP_GT1151_INFO_T tp_cfg = {
         .i2c_cfg =
             {
-                .port = BOARD_TOUCH_I2C_PORT,
-                .scl_pin = BOARD_TOUCH_I2C_SCL_PIN,
-                .sda_pin = BOARD_TOUCH_I2C_SDA_PIN,
+                .port = BOARD_TP_I2C_PORT,
+                .scl_pin = BOARD_TP_I2C_SCL_PIN,
+                .sda_pin = BOARD_TP_I2C_SDA_PIN,
             },
         .tp_cfg =
             {
@@ -80,7 +81,7 @@ static OPERATE_RET __board_register_display(void)
             },
     };
 
-    TUYA_CALL_ERR_RETURN(tdd_touch_i2c_gt1151_register(DISPLAY_NAME, &touch_cfg));
+    TUYA_CALL_ERR_RETURN(tdd_tp_i2c_gt1151_register(DISPLAY_NAME, &tp_cfg));
 #endif
 
     return rt;
@@ -115,33 +116,29 @@ static OPERATE_RET __board_register_display(void)
     TUYA_CALL_ERR_RETURN(tdd_disp_spi_st7735s_register(DISPLAY_NAME, &display_cfg));
 #endif
 
-    return rt;
-}
-#elif defined (TUYA_T5AI_BOARD_EX_MODULE_29E_INK) && (TUYA_T5AI_BOARD_EX_MODULE_29E_INK ==1)
-static OPERATE_RET __board_register_display(void)   
-{
-    OPERATE_RET rt = OPRT_OK;
+#if defined(ENABLE_EYES_TWO_LCD) && (ENABLE_EYES_TWO_LCD == 1)
+    DISP_SPI_DEVICE_CFG_T display2_cfg;
 
-#if defined(DISPLAY_NAME)
-    DISP_SPI_DEVICE_CFG_T display_cfg;
+    memset(&display2_cfg, 0, sizeof(DISP_SPI_DEVICE_CFG_T));
 
-    memset(&display_cfg, 0, sizeof(DISP_SPI_DEVICE_CFG_T));
+    display2_cfg.bl.type              = BOARD_LCD_BL_TYPE;
+    display2_cfg.bl.gpio.pin          = BOARD_LCD_BL_PIN;
+    display2_cfg.bl.gpio.active_level = BOARD_LCD_BL_ACTIVE_LV;
 
-    display_cfg.bl.type   = BOARD_LCD_BL_TYPE;
+    display2_cfg.width     = BOARD_LCD_WIDTH;
+    display2_cfg.height    = BOARD_LCD_HEIGHT;
+    display2_cfg.pixel_fmt = BOARD_LCD_PIXELS_FMT;
+    display2_cfg.rotation  = BOARD_LCD_ROTATION;
 
-    display_cfg.width     = BOARD_LCD_WIDTH;
-    display_cfg.height    = BOARD_LCD_HEIGHT;
-    display_cfg.rotation  = BOARD_LCD_ROTATION;
+    display2_cfg.port      = BOARD_LCD_SPI2_PORT;
+    display2_cfg.spi_clk   = BOARD_LCD_SPI2_CLK;
+    display2_cfg.cs_pin    = BOARD_LCD_SPI2_CS_PIN;
+    display2_cfg.dc_pin    = BOARD_LCD_SPI2_DC_PIN;
+    display2_cfg.rst_pin   = BOARD_LCD_SPI2_RST_PIN;
 
-    display_cfg.port      = BOARD_LCD_SPI_PORT;
-    display_cfg.spi_clk   = BOARD_LCD_SPI_CLK;
-    display_cfg.cs_pin    = BOARD_LCD_SPI_CS_PIN;
-    display_cfg.dc_pin    = BOARD_LCD_SPI_DC_PIN;
-    display_cfg.rst_pin   = BOARD_LCD_SPI_RST_PIN;
+    display2_cfg.power.pin  = BOARD_LCD_POWER_PIN;
 
-    display_cfg.power.pin = BOARD_LCD_POWER_PIN;
-
-    TUYA_CALL_ERR_RETURN(tdd_disp_spi_mono_st7305_register(DISPLAY_NAME, &display_cfg, BOARD_LCD_CASET_XS));
+    TUYA_CALL_ERR_RETURN(tdd_disp_spi_st7735s_register(DISPLAY_NAME_2, &display2_cfg));
 #endif
 
     return rt;

@@ -17,11 +17,14 @@
 
 #include "tkl_i2s.h"
 
+#include "audio_afe.h"
+
 /***********************************************************
 ************************macro define************************
 ***********************************************************/
 // I2S read time default is 10ms
 #define I2S_READ_TIME_MS (10)
+#define SAMPLE_DATABITS  (16)
 
 /***********************************************************
 ***********************typedef define***********************
@@ -93,6 +96,8 @@ static void esp32_i2s_read_task(void *args)
                         samples * sizeof(int16_t));
         }
 
+        auio_afe_processor_feed(hdl->data_buf, samples * sizeof(int16_t));
+
         tal_system_sleep(I2S_READ_TIME_MS);
     }
 }
@@ -151,14 +156,22 @@ static OPERATE_RET __tdd_audio_no_codec_open(TDD_AUDIO_HANDLE_T handle, TDL_AUDI
         return OPRT_COM_ERROR;
     }
 
+    rt = audio_afe_processor_init();
+    if(rt != OPRT_OK) {
+        PR_ERR("audio_afe_processor_init err:%d",  rt);
+        return rt;
+    }
+
     const THREAD_CFG_T thread_cfg = {
         .thrdname = "esp32_i2s_read",
         .stackDepth = 3 * 1024,
         .priority = THREAD_PRIO_1,
     };
     PR_DEBUG("I2S read task args: %p", hdl);
-    TUYA_CALL_ERR_LOG(
-        tal_thread_create_and_start(&hdl->thrd_hdl, NULL, NULL, esp32_i2s_read_task, (void *)hdl, &thread_cfg));
+    TUYA_CALL_ERR_LOG(tal_thread_create_and_start(&hdl->thrd_hdl, NULL, NULL,\
+                                                 esp32_i2s_read_task, \
+                                                 (void *)hdl, &thread_cfg));
+
 
     return rt;
 }
@@ -268,8 +281,8 @@ OPERATE_RET tdd_audio_no_codec_register(char *name, TDD_AUDIO_NO_CODEC_T cfg)
 {
     OPERATE_RET rt = OPRT_OK;
     ESP_I2S_HANDLE_T *_hdl = NULL;
-
     TDD_AUDIO_INTFS_T intfs = {0};
+    TDD_AUDIO_INFO_T info = {0};
 
     _hdl = (ESP_I2S_HANDLE_T *)tal_malloc(sizeof(ESP_I2S_HANDLE_T));
     TUYA_CHECK_NULL_RETURN(_hdl, OPRT_MALLOC_FAILED);
@@ -278,6 +291,11 @@ OPERATE_RET tdd_audio_no_codec_register(char *name, TDD_AUDIO_NO_CODEC_T cfg)
     // default play volume
     _hdl->play_volume = 80;
 
+    info.sample_rate    = cfg.mic_sample_rate;
+    info.sample_ch_num  = 1;
+    info.sample_bits    = SAMPLE_DATABITS;
+    info.sample_tm_ms   = I2S_READ_TIME_MS;
+
     memcpy(&_hdl->cfg, &cfg, sizeof(TDD_AUDIO_NO_CODEC_T));
 
     intfs.open = __tdd_audio_no_codec_open;
@@ -285,7 +303,7 @@ OPERATE_RET tdd_audio_no_codec_register(char *name, TDD_AUDIO_NO_CODEC_T cfg)
     intfs.config = __tdd_audio_no_codec_config;
     intfs.close = __tdd_audio_no_codec_close;
 
-    TUYA_CALL_ERR_GOTO(tdl_audio_driver_register(name, &intfs, (TDD_AUDIO_HANDLE_T)_hdl), __ERR);
+    TUYA_CALL_ERR_GOTO(tdl_audio_driver_register(name, (TDD_AUDIO_HANDLE_T)_hdl,  &intfs, &info), __ERR);
 
     return rt;
 

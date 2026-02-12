@@ -13,7 +13,7 @@
 #define __TDL_DISPLAY_DRAW_H__
 
 #include "tuya_cloud_types.h"
-#include "tdl_display_manage.h"
+#include "tdl_display_type.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -85,34 +85,27 @@ OPERATE_RET tdl_disp_draw_rotate(TUYA_DISPLAY_ROTATION_E rot, \
                                    bool is_swap);
 
 /**
- * @brief Gets the bits per pixel for the specified display pixel format.
+ * @brief Rotates a rectangle coordinate to the specified angle.
  *
- * @param pixel_fmt Display pixel format enumeration value.
- * @return Bits per pixel for the given format, or 0 if unsupported.
+ * @param rot Rotation angle (90, 180, 270 degrees).
+ * @param width Display width (used for coordinate transformation).
+ * @param height Display height (used for coordinate transformation).
+ * @param rect Pointer to the rectangle structure to be rotated (modified in place).
+ * @return OPERATE_RET Operation result code.
  */
-uint8_t tdl_disp_get_fmt_bpp(TUYA_DISPLAY_PIXEL_FMT_E pixel_fmt);
+OPERATE_RET tdl_disp_rotate_rect(TUYA_DISPLAY_ROTATION_E rot,\
+                                 uint16_t width, uint16_t height,\
+                                 TDL_DISP_RECT_T *rect);
 
 /**
- * @brief Converts a color value from the source pixel format to the destination pixel format.
+ * @brief Copies pixel data from a source buffer to a rectangular area in the frame buffer.
  *
- * @param color Color value to convert.
- * @param src_fmt Source pixel format.
- * @param dst_fmt Destination pixel format.
- * @param threshold Threshold for monochrome conversion (0-65535).
- * @return Converted color value in the destination format.
+ * @param fb Pointer to the frame buffer structure.
+ * @param rect Pointer to the rectangle structure specifying the destination area.
+ * @param buf Pointer to the source buffer containing pixel data (tightly packed, no padding).
+ * @return OPERATE_RET Operation result code.
  */
-uint32_t tdl_disp_convert_color_fmt(uint32_t color, TUYA_DISPLAY_PIXEL_FMT_E src_fmt,\
-                                   TUYA_DISPLAY_PIXEL_FMT_E dst_fmt, uint32_t threshold);
-
-/**
- * @brief Converts a 16-bit RGB565 color value to the specified pixel format.
- *
- * @param rgb565 16-bit RGB565 color value.
- * @param fmt Destination pixel format.
- * @param threshold Threshold for monochrome conversion (0-65535).
- * @return Converted color value in the destination format.
- */
-uint32_t tdl_disp_convert_rgb565_to_color(uint16_t rgb565, TUYA_DISPLAY_PIXEL_FMT_E fmt, uint32_t threshold);
+OPERATE_RET tdl_disp_draw_copy(TDL_DISP_FRAME_BUFF_T *fb, TDL_DISP_RECT_T *rect, uint8_t *buf);
 
 #ifdef __cplusplus
 }

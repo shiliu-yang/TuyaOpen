@@ -10,7 +10,6 @@
 
 #include "tdl_button_manage.h"
 #include "tdl_joystick_manage.h"
-#include "ai_pocket_pet_app.h"
 #include "lv_vendor.h"
 #include "app_display.h"
 #include "game_pet.h"
@@ -25,31 +24,32 @@
 typedef struct {
     char *name;
     TDL_BUTTON_TOUCH_EVENT_E event;
-    POCKET_DISP_TP_E disp_tp;
+    uint32_t  key_tp;
 }BUTTON_CODE_MAP_T;
 
 BUTTON_CODE_MAP_T disp_btn_code_map[] = {
-    {"btn_enter", TDL_BUTTON_PRESS_DOWN, POCKET_DISP_TP_MENU_ENTER},
-    {"btn_esc",   TDL_BUTTON_PRESS_DOWN, POCKET_DISP_TP_MENU_ESC},
+    {"btn_enter", TDL_BUTTON_PRESS_DOWN, KEY_ENTER},
+    {"btn_esc",   TDL_BUTTON_PRESS_DOWN, KEY_ESC},
 };
 
 typedef struct {
     TDL_JOYSTICK_TOUCH_EVENT_E event;
-    POCKET_DISP_TP_E disp_tp;
+    uint32_t key_tp;
 }JOYSTICK_CODE_MAP_T;
 
 JOYSTICK_CODE_MAP_T disp_joystick_code_map[] = {
-    { TDL_JOYSTICK_UP, POCKET_DISP_TP_MENU_UP},
-    { TDL_JOYSTICK_DOWN, POCKET_DISP_TP_MENU_DOWN},
-    { TDL_JOYSTICK_LEFT, POCKET_DISP_TP_MENU_LEFT},
-    { TDL_JOYSTICK_RIGHT, POCKET_DISP_TP_MENU_RIGHT},
+    { TDL_JOYSTICK_UP, KEY_UP},
+    { TDL_JOYSTICK_DOWN, KEY_DOWN},
+    { TDL_JOYSTICK_LEFT, KEY_LEFT},
+    { TDL_JOYSTICK_RIGHT, KEY_RIGHT},
+    { TDL_JOYSTICK_BUTTON_PRESS_DOWN, KEY_JOYCON},
 };
 
 
 /***********************************************************
 ***********************variable define**********************
 ***********************************************************/
-
+static uint32_t sg_cur_key = 0;
 /***********************************************************
 ***********************function define**********************
 ***********************************************************/
@@ -74,10 +74,8 @@ static void __disp_button_function_cb(char *name, TDL_BUTTON_TOUCH_EVENT_E event
 
     for (i = 0; i < CNTSOF(disp_btn_code_map); i++) {
         if (strcmp(name, disp_btn_code_map[i].name) == 0 && event == disp_btn_code_map[i].event) {
-            PR_DEBUG("Button pressed: %s, event: %d, disp type: %d", name, event, disp_btn_code_map[i].disp_tp);
-
-            app_display_send_msg(disp_btn_code_map[i].disp_tp, NULL, 0);
-
+            PR_DEBUG("Button pressed: %s, event: %d, key type: %d", name, event, disp_btn_code_map[i].key_tp);
+            sg_cur_key = disp_btn_code_map[i].key_tp;
             break;
         }
     }
@@ -90,13 +88,25 @@ static void __disp_joystick_function_cb(char *name, TDL_JOYSTICK_TOUCH_EVENT_E e
 
      for (i = 0; i < CNTSOF(disp_joystick_code_map); i++) {
          if (event == disp_joystick_code_map[i].event) {
-            PR_DEBUG("joystick event: %d,  disp type: %d", event, disp_joystick_code_map[i].disp_tp);
-
-            app_display_send_msg(disp_joystick_code_map[i].disp_tp, NULL, 0);
-
+            PR_DEBUG("joystick event: %d,  key type: %d", event, disp_joystick_code_map[i].key_tp);
+            sg_cur_key = disp_joystick_code_map[i].key_tp;
             break;
          }
      }
+}
+
+static void __keypad_read(lv_indev_t *indev_drv, lv_indev_data_t *data)
+{
+    /*Set the last pressed coordinates*/
+    data->key = sg_cur_key;
+    
+    // Set the key state - if there's a key press, set to PRESSED, otherwise RELEASED
+    if (sg_cur_key != 0) {
+        data->state = LV_INDEV_STATE_PRESSED;
+        sg_cur_key = 0; // Clear the key after reading to avoid repeated events
+    } else {
+        data->state = LV_INDEV_STATE_RELEASED;
+    }
 }
 
 void pocket_game_pet_indev_init(void)
@@ -140,4 +150,17 @@ void pocket_game_pet_indev_init(void)
     for(uint32_t i=0; i<CNTSOF(disp_joystick_code_map); i++) {
         tdl_joystick_event_register(sg_joystick_hdl, disp_joystick_code_map[i].event, __disp_joystick_function_cb);
     }
+
+    /*Register a touchpad input device*/
+    lv_indev_t *indev_keypad = NULL;
+    indev_keypad = lv_indev_create();
+    lv_indev_set_type(indev_keypad, LV_INDEV_TYPE_KEYPAD);
+    lv_indev_set_read_cb(indev_keypad, __keypad_read);
+    lv_group_t *group = lv_group_get_default();
+    if (group == NULL) {
+        group = lv_group_create();
+        lv_group_set_default(group);
+    }
+    lv_indev_set_group(indev_keypad, group);
+    lv_group_set_default(group);
 }

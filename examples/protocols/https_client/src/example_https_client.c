@@ -68,7 +68,8 @@ OPERATE_RET __link_status_cb(void *data)
     uint16_t cacert_len = 0;
     uint8_t *cacert = NULL;
     static netmgr_status_e status = NETMGR_LINK_DOWN;
-    if (status == (netmgr_status_e)data && NETMGR_LINK_UP == (netmgr_status_e)data)
+    netmgr_status_e new_status = *((netmgr_status_e *)data);
+    if (status == new_status && NETMGR_LINK_UP == new_status)
         return OPRT_OK;
 
     /* HTTP Response */
@@ -202,7 +203,10 @@ static void tuya_app_thread(void *arg)
 
 void tuya_app_main(void)
 {
-    THREAD_CFG_T thrd_param = {4096, 4, "tuya_app_main"};
+    THREAD_CFG_T thrd_param = {0};
+    thrd_param.stackDepth = 1024 * 4;
+    thrd_param.priority = THREAD_PRIO_1;
+    thrd_param.thrdname = "tuya_app_main";
     tal_thread_create_and_start(&ty_app_thread, NULL, NULL, tuya_app_thread, NULL, &thrd_param);
 }
 #endif
