@@ -1,6 +1,9 @@
 name: TuyaOpen Check Build
 run-name: ${{ github.actor }} is testing out GitHub Actions 🚀
 on:
+  push:
+    branches:
+      - actions_test
   pull_request:
     branches:
       - master  # 当分支有提交时执行此工作流
