@@ -9,6 +9,7 @@ import click
 import requests
 import platform
 import logging
+import contextlib
 from typing import List
 
 
@@ -87,6 +88,53 @@ def get_logger():
         return OPEN_LOGGER
     set_logger()
     return OPEN_LOGGER
+
+
+def set_log_stream(stream):
+    """
+    将 logger 的输出重定向到指定流（如文件对象）。
+    仅影响 Python 层 logging 的输出目标，不改变进程的 stdout/stderr 文件描述符。
+    """
+    global OPEN_LOGGER_H
+    if OPEN_LOGGER_H is not None and stream is not None:
+        OPEN_LOGGER_H.stream = stream
+
+
+@contextlib.contextmanager
+def redirect_stdout_stderr_to(filepath, encoding="utf-8", append=False):
+    """
+    将进程的 stdout/stderr 重定向到指定文件（含子进程输出）。
+    在文件描述符（FD）层面重定向，因此通过 os.system/subprocess 启动的
+    cmake、ninja 等子进程的输出也会写入该文件。退出 with 时自动恢复原状。
+    append: 为 True 时以追加模式打开，否则覆盖（用于多次重定向到同一文件）。
+    """
+    get_logger()  # 确保 logger 已初始化，后续 set_log_stream 才能生效
+    mode = "a" if append else "w"
+    with open(filepath, mode, encoding=encoding) as f:
+        fd = f.fileno()
+        # 保存当前 stdout(1)、stderr(2) 的 FD，退出时用于恢复
+        saved_stdout = os.dup(1)
+        saved_stderr = os.dup(2)
+        try:
+            # FD 层面重定向：子进程会继承 1、2，故其输出也会进文件
+            os.dup2(fd, 1)
+            os.dup2(fd, 2)
+            # Python 层也指向同一文件，print / 当前进程写 stdout 进文件
+            sys.stdout = sys.stderr = f
+            # logger 的 StreamHandler 输出到同一文件
+            set_log_stream(f)
+            yield f
+        finally:
+            f.flush()
+            # 恢复 FD 1、2 为原来的终端/管道
+            os.dup2(saved_stdout, 1)
+            os.dup2(saved_stderr, 2)
+            os.close(saved_stdout)
+            os.close(saved_stderr)
+            # 恢复 Python 的 stdout/stderr 与 logger 输出目标
+            sys.stdout = sys.__stdout__
+            sys.stderr = sys.__stderr__
+            set_log_stream(sys.stderr)
 
 
 def set_global_params():
