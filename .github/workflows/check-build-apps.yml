@@ -9,17 +9,18 @@ on:
       - master  # 当分支有提交时执行此工作流
       - dev
 jobs:
-  Build-Switch-Demo:
+  Check-Build-Apps:
     runs-on: [self-hosted, Linux, X64]
     env:
       OPEN_COUNTRY_CODE: "NONE"
+      BUILD_LOG_BASE: ${{ github.workspace }}/tmp/logs/build_logs_${{ github.run_number }}
     steps:
-      - run: echo "🎉 The job was automatically triggered by a ${{ github.event_name }} event."
-      - run: echo "🐧 Running on a ${{ runner.os }}, branch is ${{ github.ref }} !"
       - name: Check out repository code
         uses: actions/checkout@v4
         with:
           show-progress: false
+      - run: echo "🎉 The job was automatically triggered by a ${{ github.event_name }} event."
+      - run: echo "🐧 Running on a ${{ runner.os }}, branch is ${{ github.ref }} !"
       - name: Check Base Tools
         run: |
           echo "::group::Checking base tools"
@@ -44,7 +45,7 @@ jobs:
           echo "::endgroup::"
       - name: Check [switch_demo] Build
         env:
-          BUILD_LOG_DIR: ${{ github.workspace }}/tmp/logs/build_logs_${{ github.run_number }}/switch_demo
+          BUILD_LOG_DIR: ${{ env.BUILD_LOG_BASE }}/switch_demo
         run: |
           echo "::group::Building switch_demo"
           cd ${{ github.workspace }}
@@ -54,7 +55,7 @@ jobs:
           echo "::endgroup::"
       - name: Check [your_chat_bot] Build
         env:
-          BUILD_LOG_DIR: ${{ github.workspace }}/tmp/logs/build_logs_${{ github.run_number }}/your_chat_bot
+          BUILD_LOG_DIR: ${{ env.BUILD_LOG_BASE }}/your_chat_bot
         run: |
           echo "::group::Building your_chat_bot"
           cd ${{ github.workspace }}
@@ -64,7 +65,7 @@ jobs:
           echo "::endgroup::"
       - name: Check [your_otto_robot] Build
         env:
-          BUILD_LOG_DIR: ${{ github.workspace }}/tmp/logs/build_logs_${{ github.run_number }}/your_otto_robot
+          BUILD_LOG_DIR: ${{ env.BUILD_LOG_BASE }}/your_otto_robot
         run: |
           echo "::group::Building your_otto_robot"
           cd ${{ github.workspace }}
@@ -74,7 +75,7 @@ jobs:
           echo "::endgroup::"
       - name: Check [camera_demo] Build
         env:
-          BUILD_LOG_DIR: ${{ github.workspace }}/tmp/logs/build_logs_${{ github.run_number }}/camera_demo
+          BUILD_LOG_DIR: ${{ env.BUILD_LOG_BASE }}/camera_demo
         run: |
           echo "::group::Building camera_demo"
           cd ${{ github.workspace }}
@@ -84,7 +85,7 @@ jobs:
           echo "::endgroup::"
       - name: Check [weather_get_demo] Build
         env:
-          BUILD_LOG_DIR: ${{ github.workspace }}/tmp/logs/build_logs_${{ github.run_number }}/weather_get_demo
+          BUILD_LOG_DIR: ${{ env.BUILD_LOG_BASE }}/weather_get_demo
         run: |
           echo "::group::Building weather_get_demo"
           cd ${{ github.workspace }}
@@ -98,6 +99,6 @@ jobs:
         if: always()
         with:
           name: build_logs_${{ github.run_number }}
-          path: ${{ github.workspace }}/tmp/logs/build_logs_${{ github.run_number }}
-          retention-days: 90  # Only keep for 90 days to avoid storage issues, max is 90
-          overwrite: false    # v4 does not support overwrite by default, keep as a reminder
+          path: ${{ env.BUILD_LOG_BASE }}
+          retention-days: 90
+          if-no-files-found: warn
