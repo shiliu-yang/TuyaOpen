@@ -42,36 +42,36 @@ jobs:
             echo "Cache copy script not found, skip: $SCRIPT_PATH"
           fi
           echo "::endgroup::"
-      # - name: Check [switch_demo] Build
-      #   env:
-      #     BUILD_LOG_DIR: ${{ github.workspace }}/tmp/logs/build_logs_${{ github.run_number }}/switch_demo
-      #   run: |
-      #     echo "::group::Building switch_demo"
-      #     cd ${{ github.workspace }}
-      #     . ./export.sh
-      #     cd ${{ github.workspace }}/apps/tuya_cloud/switch_demo
-      #     tos.py dev bac -d ${{ github.workspace }}/dist -o "$BUILD_LOG_DIR"
-      #     echo "::endgroup::"
-      # - name: Check [your_chat_bot] Build
-      #   env:
-      #     BUILD_LOG_DIR: ${{ github.workspace }}/tmp/logs/build_logs_${{ github.run_number }}/your_chat_bot
-      #   run: |
-      #     echo "::group::Building your_chat_bot"
-      #     cd ${{ github.workspace }}
-      #     . ./export.sh
-      #     cd ${{ github.workspace }}/apps/tuya.ai/your_chat_bot
-      #     tos.py dev bac -d ${{ github.workspace }}/dist -o "$BUILD_LOG_DIR"
-      #     echo "::endgroup::"
-      # - name: Check [your_otto_robot] Build
-      #   env:
-      #     BUILD_LOG_DIR: ${{ github.workspace }}/tmp/logs/build_logs_${{ github.run_number }}/your_otto_robot
-      #   run: |
-      #     echo "::group::Building your_otto_robot"
-      #     cd ${{ github.workspace }}
-      #     . ./export.sh
-      #     cd ${{ github.workspace }}/apps/tuya.ai/your_otto_robot
-      #     tos.py dev bac -d ${{ github.workspace }}/dist -o "$BUILD_LOG_DIR"
-      #     echo "::endgroup::"
+      - name: Check [switch_demo] Build
+        env:
+          BUILD_LOG_DIR: ${{ github.workspace }}/tmp/logs/build_logs_${{ github.run_number }}/switch_demo
+        run: |
+          echo "::group::Building switch_demo"
+          cd ${{ github.workspace }}
+          . ./export.sh
+          cd ${{ github.workspace }}/apps/tuya_cloud/switch_demo
+          tos.py dev bac -d ${{ github.workspace }}/dist -o "$BUILD_LOG_DIR"
+          echo "::endgroup::"
+      - name: Check [your_chat_bot] Build
+        env:
+          BUILD_LOG_DIR: ${{ github.workspace }}/tmp/logs/build_logs_${{ github.run_number }}/your_chat_bot
+        run: |
+          echo "::group::Building your_chat_bot"
+          cd ${{ github.workspace }}
+          . ./export.sh
+          cd ${{ github.workspace }}/apps/tuya.ai/your_chat_bot
+          tos.py dev bac -d ${{ github.workspace }}/dist -o "$BUILD_LOG_DIR"
+          echo "::endgroup::"
+      - name: Check [your_otto_robot] Build
+        env:
+          BUILD_LOG_DIR: ${{ github.workspace }}/tmp/logs/build_logs_${{ github.run_number }}/your_otto_robot
+        run: |
+          echo "::group::Building your_otto_robot"
+          cd ${{ github.workspace }}
+          . ./export.sh
+          cd ${{ github.workspace }}/apps/tuya.ai/your_otto_robot
+          tos.py dev bac -d ${{ github.workspace }}/dist -o "$BUILD_LOG_DIR"
+          echo "::endgroup::"
       - name: Check [camera_demo] Build
         env:
           BUILD_LOG_DIR: ${{ github.workspace }}/tmp/logs/build_logs_${{ github.run_number }}/camera_demo
@@ -82,22 +82,22 @@ jobs:
           cd ${{ github.workspace }}/apps/tuya_cloud/camera_demo
           tos.py dev bac -d ${{ github.workspace }}/dist -o "$BUILD_LOG_DIR"
           echo "::endgroup::"
-      # - name: Check [weather_get_demo] Build
-      #   env:
-      #     BUILD_LOG_DIR: ${{ github.workspace }}/tmp/logs/build_logs_${{ github.run_number }}/weather_get_demo
-      #   run: |
-      #     echo "::group::Building weather_get_demo"
-      #     cd ${{ github.workspace }}
-      #     . ./export.sh
-      #     cd ${{ github.workspace }}/apps/tuya_cloud/weather_get_demo
-      #     tos.py dev bac -d ${{ github.workspace }}/dist -o "$BUILD_LOG_DIR"
-      #     echo "::endgroup::"
-      # - run: echo "💡 This job's status is ${{ job.status }}."
+      - name: Check [weather_get_demo] Build
+        env:
+          BUILD_LOG_DIR: ${{ github.workspace }}/tmp/logs/build_logs_${{ github.run_number }}/weather_get_demo
+        run: |
+          echo "::group::Building weather_get_demo"
+          cd ${{ github.workspace }}
+          . ./export.sh
+          cd ${{ github.workspace }}/apps/tuya_cloud/weather_get_demo
+          tos.py dev bac -d ${{ github.workspace }}/dist -o "$BUILD_LOG_DIR"
+          echo "::endgroup::"
+      - run: echo "💡 This job's status is ${{ job.status }}."
       - name: Upload Log
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: build_logs_${{ github.run_number }}
           path: ${{ github.workspace }}/tmp/logs/build_logs_${{ github.run_number }}
-          retention-days: 60  # Only keep for 60 days to avoid storage issues
+          retention-days: 90  # Only keep for 90 days to avoid storage issues, max is 90
           overwrite: false    # v4 does not support overwrite by default, keep as a reminder
