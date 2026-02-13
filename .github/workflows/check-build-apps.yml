@@ -42,16 +42,16 @@ jobs:
             echo "Cache copy script not found, skip: $SCRIPT_PATH"
           fi
           echo "::endgroup::"
-      - name: Check [switch_demo] Build
-        env:
-          BUILD_LOG_DIR: ${{ github.workspace }}/tmp/logs/build_logs_${{ github.run_number }}/switch_demo
-        run: |
-          echo "::group::Building switch_demo"
-          cd ${{ github.workspace }}
-          . ./export.sh
-          cd ${{ github.workspace }}/apps/tuya_cloud/switch_demo
-          tos.py dev bac -d ${{ github.workspace }}/dist -o "$BUILD_LOG_DIR"
-          echo "::endgroup::"
+      # - name: Check [switch_demo] Build
+      #   env:
+      #     BUILD_LOG_DIR: ${{ github.workspace }}/tmp/logs/build_logs_${{ github.run_number }}/switch_demo
+      #   run: |
+      #     echo "::group::Building switch_demo"
+      #     cd ${{ github.workspace }}
+      #     . ./export.sh
+      #     cd ${{ github.workspace }}/apps/tuya_cloud/switch_demo
+      #     tos.py dev bac -d ${{ github.workspace }}/dist -o "$BUILD_LOG_DIR"
+      #     echo "::endgroup::"
       # - name: Check [your_chat_bot] Build
       #   env:
       #     BUILD_LOG_DIR: ${{ github.workspace }}/tmp/logs/build_logs_${{ github.run_number }}/your_chat_bot
@@ -93,19 +93,11 @@ jobs:
       #     tos.py dev bac -d ${{ github.workspace }}/dist -o "$BUILD_LOG_DIR"
       #     echo "::endgroup::"
       # - run: echo "💡 This job's status is ${{ job.status }}."
-      - name: Compress log files
-        env:
-          BUILD_LOG_DIR: ${{ github.workspace }}/tmp/logs/build_logs_${{ github.run_number }}
-        run: |
-          echo "::group::Compressing log files"
-          cd "$BUILD_LOG_DIR"
-          tar -czf build_logs_${{ github.run_number }}.tar.gz *
-          echo "::endgroup::"
       - name: Upload Log
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: build_logs_${{ github.run_number }}
-          path: ${{ github.workspace }}/tmp/logs/build_logs_${{ github.run_number }}/build_logs_${{ github.run_number }}.tar.gz
-          # retention-days: 60  # Only keep for 60 days to avoid storage issues
-          # overwrite: false    # v4 does not support overwrite by default, keep as a reminder
+          path: ${{ github.workspace }}/tmp/logs/build_logs_${{ github.run_number }}
+          retention-days: 60  # Only keep for 60 days to avoid storage issues
+          overwrite: false    # v4 does not support overwrite by default, keep as a reminder
