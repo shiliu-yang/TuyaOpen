@@ -87,20 +87,29 @@ def build_all_config_exec(dist, log_dir):
         ok = build_project(log_file=log_file, log_file_append=False)
 
         if ok:
+            logger.note(f"Build {config_file_name} success")
             build_result_list.append(f"Build {config_file_name} success")
             if dist:
                 _save_product(dist_abs, config)
         else:
+            logger.error(f"Build {config_file_name} failed")
             build_result_list.append(f"Build {config_file_name} failed")
             exit_flag = 1
-        full_clean_project()
+        full_clean_project(log_file=log_file, log_file_append=True)
 
     # print build result
+    BORDER = "================================"
+    logger.note(BORDER)
+    logger.note("Build Result")
+    logger.note(BORDER)
     for result in build_result_list:
         if result.endswith("success"):
-            logger.note(result)
+            name = result.replace("Build ", "").replace(" success", "")
+            logger.note(f"  ✓ {name}")
         else:
-            logger.error(result)
+            name = result.replace("Build ", "").replace(" failed", "")
+            logger.error(f"  ✗ {name}")
+    logger.note(BORDER)
 
     sys.exit(exit_flag)
 
