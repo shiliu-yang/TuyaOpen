@@ -93,7 +93,6 @@ jobs:
           cd ${{ github.workspace }}/apps/tuya_cloud/weather_get_demo
           tos.py dev bac -d ${{ github.workspace }}/dist -o "$BUILD_LOG_DIR"
           echo "::endgroup::"
-      - run: echo "💡 This job's status is ${{ job.status }}."
       - name: Upload Log
         uses: actions/upload-artifact@v4
         if: always()
