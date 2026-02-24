@@ -93,11 +93,15 @@ jobs:
           cd ${{ github.workspace }}/apps/tuya_cloud/weather_get_demo
           tos.py dev bac -d ${{ github.workspace }}/dist -o "$BUILD_LOG_DIR"
           echo "::endgroup::"
+      - name: Set timestamp
+        id: timestamp
+        if: always()
+        run: echo "timestamp=$(date +'%Y%m%d_%H%M%S')" >> $GITHUB_OUTPUT
       - name: Upload Log
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: build_logs_${{ github.run_number }}
+          name: build_logs_${{ github.run_number }}_${{ steps.timestamp.outputs.timestamp }}
           path: ${{ env.BUILD_LOG_BASE }}
           retention-days: 90
           if-no-files-found: warn
