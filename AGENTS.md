@@ -4,46 +4,67 @@
 
 ### Overview
 
-TuyaOpen is a cross-platform IoT (C/C++) SDK for building AI-agent-powered smart hardware. It targets multiple hardware platforms (Tuya T-series MCUs, ESP32, Raspberry Pi, Linux/Ubuntu). The LINUX platform target can be compiled and run natively on the development host.
+TuyaOpen is a cross-platform IoT SDK (C/C++) for smart hardware. It supports Tuya T-series MCUs, ESP32, Raspberry Pi, and Linux/Ubuntu. On Cursor Cloud, the LINUX target can be compiled and run natively on the host.
+
+### Communication and behavior
+
+- Always respond in Simplified Chinese unless explicitly requested otherwise.
+- Prefer concise progress updates while running commands.
+- Do not use interactive workflows unless the task explicitly requires them.
 
 ### Environment setup
 
-Run the export script from the repo root to set up the environment. It creates a Python venv (`.venv/`), installs pip dependencies (`requirements.txt`), and sets `OPEN_SDK_ROOT`/`OPEN_SDK_PYTHON`/`OPEN_SDK_PIP` environment variables. Choose the script matching the host OS:
-
-- **Linux / macOS**: run `. ./export.sh` in bash
-- **Windows**: run `export.bat` or `export.ps1`
-
-Cursor Cloud runs Linux, so use:
+Initialize the environment from repository root:
 
 ```bash
 cd /workspace && . ./export.sh
 ```
 
-If the venv already exists, the script skips creation and activates it directly. After execution, `tos.py` commands are available.
+What this does:
+- Creates or reuses `.venv/`
+- Installs Python dependencies from `requirements.txt`
+- Exports `OPEN_SDK_ROOT`, `OPEN_SDK_PYTHON`, and `OPEN_SDK_PIP`
+- Makes `tos.py` available in the current shell
 
 ### Build workflow
 
-Standard commands (see README.md):
-1. `tos.py check` — verifies tools (git, cmake, make, ninja) and downloads git submodules
-2. `cd examples/<category>/<project>` then `tos.py build` — builds for configured platform
-3. For LINUX target: the output is a native ELF binary in `dist/`
+Standard flow:
+1. `tos.py check` to verify required tools and submodules
+2. `cd examples/<category>/<project>`
+3. `tos.py build`
+4. Use binaries from `<project>/dist/` (LINUX target produces native ELF)
 
-To build for LINUX/Ubuntu (runnable on this host), use `tos.py config choice` in the project directory to select the LINUX/Ubuntu platform. This is an interactive command that presents a menu for platform selection.
+### Non-interactive configuration guidance
 
-### Lint / format
+- `tos.py config choice` and `tos.py config menu` are interactive TTY flows. Avoid them in non-interactive cloud runs.
+- Prefer editing `app_default.config` directly for deterministic builds.
+- To avoid prompt blocks from platform commit checks, create:
 
-- `python tools/check_format.py --debug --files <file>` or `--dir <dir>` — checks C/C++ format via clang-format, Chinese character detection, and file header validation
-- `python tools/check_format.py --base <branch>` — PR mode, checks files changed relative to base branch
-- Requires `clang-format` (installed as system package)
+```bash
+mkdir -p .cache && touch .cache/.dont_prompt_update_platform
+```
+
+### Lint and formatting
+
+- Single file or directory checks:
+  - `python tools/check_format.py --debug --files <file>`
+  - `python tools/check_format.py --debug --dir <dir>`
+- PR-style checks:
+  - `python tools/check_format.py --base <branch>`
 
 ### System dependencies
 
-The following system packages are needed (see `Dockerfile`):
+Expected packages (see `Dockerfile`):
 `build-essential`, `libsystemd-dev`, `locales`, `libc6-i386`, `libusb-1.0-0`, `libusb-1.0-0-dev`, `python3`, `python3-pip`, `python3-venv`, `clang-format`
 
-### Gotchas
+### Validation expectations
 
-- `tos.py` config commands (`config choice`, `config menu`) are interactive (use TTY menus). Avoid them in non-interactive shells. Instead, directly write `app_default.config` with the desired Kconfig values.
-- The platform SDK (e.g. `TuyaOpen-ubuntu`) is fetched on first build via `tos.py build` or `tos.py update` from GitHub. It is cached at `platform/LINUX/`.
-- The `check_platform_commit` function in the build flow may prompt for input if the platform commit doesn't match. Create `.cache/.dont_prompt_update_platform` to suppress this.
-- The build creates artifacts in `<project>/.build/` and `<project>/dist/`.
+- For source changes, run the smallest relevant build or check for the touched area.
+- For formatting-only updates, run `tools/check_format.py` against changed files.
+- For docs-only updates, verify file content, command correctness, and path validity.
+
+### Artifacts and output locations
+
+- Build intermediates: `<project>/.build/`
+- Final outputs: `<project>/dist/`
+- Platform SDK cache: `platform/LINUX/`
