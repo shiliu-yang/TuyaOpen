@@ -16,7 +16,7 @@ TuyaOpen is a cross-platform IoT (C/C++) SDK for building AI-agent-powered smart
 Cursor Cloud 环境为 Linux，因此使用：
 
 ```bash
-cd /workspace && source export.sh
+cd /workspace && . ./export.sh
 ```
 
 如果 venv 已存在，脚本会跳过创建步骤直接激活。执行完成后即可使用 `tos.py` 系列命令。
