@@ -28,13 +28,7 @@ Standard commands (see README.md):
 2. `cd examples/<category>/<project>` then `tos.py build` — builds for configured platform
 3. For LINUX target: the output is a native ELF binary in `dist/`
 
-To build for LINUX/Ubuntu (runnable on this host), the project's `app_default.config` must contain:
-```
-CONFIG_BOARD_CHOICE_LINUX=y
-CONFIG_BOARD_CHOICE_UBUNTU=y
-```
-
-The default config for `examples/get-started/sample_project` targets T5AI. Change it to LINUX before building, then restore if needed.
+To build for LINUX/Ubuntu (runnable on this host), use `tos.py config choice` in the project directory to select the LINUX/Ubuntu platform. This is an interactive command that presents a menu for platform selection.
 
 ### Lint / format
 
