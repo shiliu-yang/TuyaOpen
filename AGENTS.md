@@ -8,15 +8,18 @@ TuyaOpen is a cross-platform IoT (C/C++) SDK for building AI-agent-powered smart
 
 ### Environment setup
 
-The environment is bootstrapped by `source export.sh` in the repo root, which creates a Python venv at `.venv/`, installs pip dependencies from `requirements.txt`, and sets `OPEN_SDK_ROOT`, `OPEN_SDK_PYTHON`, `OPEN_SDK_PIP` env vars. When running `tos.py` commands in a shell, always activate the venv first:
+环境配置通过在仓库根目录下执行 export 脚本完成，脚本会创建 Python venv（`.venv/`）、安装 pip 依赖（`requirements.txt`）、设置 `OPEN_SDK_ROOT`/`OPEN_SDK_PYTHON`/`OPEN_SDK_PIP` 环境变量。根据宿主机操作系统选择对应脚本：
 
+- **Linux / macOS**：在 bash 下执行 `source export.sh`
+- **Windows**：执行 `export.bat` 或 `export.ps1`
+
+Cursor Cloud 环境为 Linux，因此使用：
+
+```bash
+cd /workspace && source export.sh
 ```
-source /workspace/.venv/bin/activate
-export PATH=$PATH:/workspace
-export OPEN_SDK_ROOT=/workspace
-export OPEN_SDK_PYTHON=/workspace/.venv/bin/python
-export OPEN_SDK_PIP=/workspace/.venv/bin/pip
-```
+
+如果 venv 已存在，脚本会跳过创建步骤直接激活。执行完成后即可使用 `tos.py` 系列命令。
 
 ### Build workflow
 
