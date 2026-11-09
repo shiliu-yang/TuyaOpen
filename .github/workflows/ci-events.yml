@@ -1,0 +1,205 @@
+name: CI event ingress
+
+on:
+  workflow_dispatch:
+  issues:
+    types: [opened, edited, reopened]
+  issue_comment:
+    types: [created]
+  pull_request_target:
+    types: [opened, synchronize, reopened, edited, closed, converted_to_draft, ready_for_review]
+    branches: [master]
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: tuyaopen-ci-events-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  relay:
+    if: github.repository == 'shiliu-yang/TuyaOpen' && github.ref == 'refs/heads/master'
+    runs-on: [tuyaopen-ci, linux, x64]
+    timeout-minutes: 5
+    steps:
+      - name: Relay the Actions event over the private network
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          set -uo pipefail
+          umask 077
+
+          endpoint='http://api:8080/internal/events/actions'
+          audience='tuyaopen-ci-events'
+          oidc_response_file=''
+          envelope_file=''
+          api_response_file=''
+
+          cleanup() {
+            rm -f -- "$oidc_response_file" "$envelope_file" "$api_response_file"
+            unset oidc_token
+          }
+          trap cleanup EXIT HUP INT TERM
+
+          oidc_response_file=$(mktemp)
+          envelope_file=$(mktemp)
+          api_response_file=$(mktemp)
+
+          if [[ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" || -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]]; then
+            echo "run_id=${RUN_ID} http_status=n/a relay_status=oidc_request_unavailable" >&2
+            exit 1
+          fi
+          if [[ ! "$ACTIONS_ID_TOKEN_REQUEST_TOKEN" =~ ^[A-Za-z0-9._~-]+$ ]]; then
+            echo "run_id=${RUN_ID} http_status=n/a relay_status=oidc_request_invalid" >&2
+            exit 1
+          fi
+
+          oidc_http_code=$(
+            printf 'header = "Authorization: bearer %s"\n' "$ACTIONS_ID_TOKEN_REQUEST_TOKEN" |
+              curl --config - --silent --connect-timeout 5 --max-time 20 --get \
+                --data-urlencode "audience=$audience" \
+                --output "$oidc_response_file" \
+                --write-out '%{http_code}' \
+                "$ACTIONS_ID_TOKEN_REQUEST_URL"
+          )
+          oidc_curl_exit=$?
+          if (( oidc_curl_exit != 0 )) || [[ "$oidc_http_code" != '200' ]]; then
+            echo "run_id=${RUN_ID} http_status=${oidc_http_code:-000} relay_status=oidc_request_failed" >&2
+            exit 1
+          fi
+          if ! oidc_token=$(jq -er '
+            if (.value | type) == "string" and (.value | length) > 0
+            then .value
+            else empty
+            end
+          ' "$oidc_response_file" 2>/dev/null); then
+            echo "run_id=${RUN_ID} http_status=${oidc_http_code} relay_status=oidc_response_invalid" >&2
+            exit 1
+          fi
+          if [[ ! "$oidc_token" =~ ^[A-Za-z0-9._~-]+$ ]]; then
+            echo "run_id=${RUN_ID} http_status=${oidc_http_code} relay_status=oidc_token_invalid" >&2
+            exit 1
+          fi
+
+          if [[ -z "${GITHUB_EVENT_PATH:-}" || ! -r "$GITHUB_EVENT_PATH" ]]; then
+            echo "run_id=${RUN_ID} http_status=n/a relay_status=event_file_unavailable" >&2
+            exit 1
+          fi
+          if ! jq -c -e --null-input \
+            --arg event_name "$EVENT_NAME" \
+            --arg run_id "$RUN_ID" \
+            --arg run_attempt "$RUN_ATTEMPT" \
+            --slurpfile payload "$GITHUB_EVENT_PATH" '
+              if ($payload | length) == 1 and ($payload[0] | type) == "object"
+              then {
+                event_name: $event_name,
+                run_id: $run_id,
+                run_attempt: $run_attempt,
+                payload: $payload[0]
+              }
+              else error("event payload must be one JSON object")
+              end
+            ' > "$envelope_file" 2>/dev/null; then
+            echo "run_id=${RUN_ID} http_status=n/a relay_status=event_envelope_failed" >&2
+            exit 1
+          fi
+
+          envelope_size=$(wc -c < "$envelope_file")
+          envelope_size="${envelope_size//[[:space:]]/}"
+          if [[ ! "$envelope_size" =~ ^[0-9]+$ ]] || (( envelope_size > 1048576 )); then
+            echo "run_id=${RUN_ID} http_status=n/a relay_status=body_too_large" >&2
+            exit 1
+          fi
+
+          response_http=''
+          response_status=''
+          response_curl_exit=0
+
+          request_envelope() {
+            local retry
+            response_http=''
+            response_status=''
+            response_curl_exit=0
+
+            for retry in 1 2 3 4; do
+              : > "$api_response_file"
+              response_http=$(
+                printf 'header = "Authorization: Bearer %s"\n' "$oidc_token" |
+                  curl --config - --silent --connect-timeout 5 --max-time 20 \
+                    --request POST \
+                    --header 'Content-Type: application/json' \
+                    --data-binary @"$envelope_file" \
+                    --output "$api_response_file" \
+                    --write-out '%{http_code}' \
+                    "$endpoint"
+              )
+              response_curl_exit=$?
+
+              if (( response_curl_exit == 0 )); then
+                response_status=$(jq -er '
+                  if type == "object" and (.status | type) == "string"
+                  then .status
+                  else empty
+                  end
+                ' "$api_response_file" 2>/dev/null) || response_status=''
+              else
+                response_status=''
+              fi
+
+              transient=0
+              case "$response_curl_exit:$response_http" in
+                6:*|7:*|28:*|52:*|56:*|*:429|*:500|*:502|*:503|*:504)
+                  transient=1
+                  ;;
+              esac
+              if (( transient == 1 )); then
+                case "$retry" in
+                  1) sleep 1 ;;
+                  2) sleep 2 ;;
+                  3) sleep 4 ;;
+                esac
+                continue
+              fi
+              break
+            done
+          }
+
+          report_failure() {
+            local failure_status
+            case "$response_http" in
+              401) failure_status='authentication_failed' ;;
+              403) failure_status='authorization_failed' ;;
+              503) failure_status='service_unavailable' ;;
+              *) failure_status="${response_status:-request_failed}" ;;
+            esac
+            echo "run_id=${RUN_ID} http_status=${response_http:-000} relay_status=${failure_status}" >&2
+            exit 1
+          }
+
+          request_envelope
+          if [[ "$EVENT_NAME" == 'workflow_dispatch' ]]; then
+            if ! { [[ "$response_http" == '202' && "$response_status" == 'queued' ]] ||
+                   [[ "$response_http" == '200' && "$response_status" == 'duplicate' ]]; }; then
+              report_failure
+            fi
+            echo "run_id=${RUN_ID} http_status=${response_http} relay_status=${response_status}"
+
+            request_envelope
+            if [[ "$response_http" != '200' || "$response_status" != 'duplicate' ]]; then
+              report_failure
+            fi
+            echo "run_id=${RUN_ID} http_status=${response_http} relay_status=${response_status}"
+          else
+            if ! { [[ "$response_http" == '202' && "$response_status" == 'queued' ]] ||
+                   [[ "$response_http" == '200' && "$response_status" == 'duplicate' ]]; }; then
+              report_failure
+            fi
+            echo "run_id=${RUN_ID} http_status=${response_http} relay_status=${response_status}"
+          fi
