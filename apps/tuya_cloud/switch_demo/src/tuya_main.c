@@ -8,6 +8,7 @@
  * @copyright Copyright (c) 2021-2025 Tuya Inc. All Rights Reserved.
  *
  * 2025-07-11   yangjie     Add cellular network support.
+ * 2026-11-11   ci-postmerge   App-level intake check after workflow merge; no functional change.
  */
 
 #include "cJSON.h"
