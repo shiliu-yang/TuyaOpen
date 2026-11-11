@@ -5,65 +5,18 @@ on:
     inputs:
       pr_number:
         description: Pull request number
-        required: false
+        required: true
         type: string
-      board:
-        description: Daily PR board/config
+      app_switch_demo:
+        description: Build switch_demo with its T5AI default
         required: false
-        type: choice
-        default: SELECT_BOARD
-        options:
-          - SELECT_BOARD
-          - switch_demo::boards/BK7231X/config/BK7231X.config
-          - switch_demo::boards/ESP32/config/ESP32-C2.config
-          - switch_demo::boards/ESP32/config/ESP32-C3.config
-          - switch_demo::boards/ESP32/config/ESP32-C6.config
-          - switch_demo::boards/ESP32/config/ESP32-P4-C6.config
-          - switch_demo::boards/ESP32/config/ESP32-S3.config
-          - switch_demo::boards/ESP32/config/ESP32.config
-          - switch_demo::boards/GD32/config/GD32.config
-          - switch_demo::boards/L511C_Y6E/config/L511C_Y6E.config
-          - switch_demo::boards/L511C_Y7PM/config/L511C_Y7PM.config
-          - switch_demo::boards/L511G_Y7PM/config/L511G_Y7PM.config
-          - switch_demo::boards/LINUX/config/Linux.config
-          - switch_demo::boards/LN882H/config/EWT103-W15.config
-          - switch_demo::boards/LN882H/config/LN882H.config
-          - switch_demo::boards/SIWX917/config/BRD2605A.config
-          - switch_demo::boards/SIWX917/config/SIWX917.config
-          - switch_demo::boards/T2/config/T2.config
-          - switch_demo::boards/T3/config/T3.config
-          - switch_demo::boards/T5AI/config/T5AI.config
-          - switch_demo::boards/T9/config/T9.config
-          - your_chat_bot::apps/tuya.ai/your_chat_bot/config/ATK_T5AI_MINI_BOARD.config
-          - your_chat_bot::apps/tuya.ai/your_chat_bot/config/BRD2605A.config
-          - your_chat_bot::apps/tuya.ai/your_chat_bot/config/DNESP32S3_BOX.config
-          - your_chat_bot::apps/tuya.ai/your_chat_bot/config/DNESP32S3_BOX2_WIFI.config
-          - your_chat_bot::apps/tuya.ai/your_chat_bot/config/DNESP32S3.config
-          - your_chat_bot::apps/tuya.ai/your_chat_bot/config/DshanPi_A1.config
-          - your_chat_bot::apps/tuya.ai/your_chat_bot/config/ESP32S3_BREAD_COMPACT_WIFI.config
-          - your_chat_bot::apps/tuya.ai/your_chat_bot/config/LCKFB_T5AI_TOUCH.config
-          - your_chat_bot::apps/tuya.ai/your_chat_bot/config/NICEMCU_T5_0_96ISP.config
-          - your_chat_bot::apps/tuya.ai/your_chat_bot/config/NICEMCU_T5_2_8ISP.config
-          - your_chat_bot::apps/tuya.ai/your_chat_bot/config/NICEMCU_T5_DEV.config
-          - your_chat_bot::apps/tuya.ai/your_chat_bot/config/RaspberryPi.config
-          - your_chat_bot::apps/tuya.ai/your_chat_bot/config/SEEED_ESP32S3_XIAO_SENSE.config
-          - your_chat_bot::apps/tuya.ai/your_chat_bot/config/SIWX917_AI_DEV_KIT.config
-          - your_chat_bot::apps/tuya.ai/your_chat_bot/config/T5AI_MINI_LCD_1.54.config
-          - your_chat_bot::apps/tuya.ai/your_chat_bot/config/T5AI_MOJI_1.28.config
-          - your_chat_bot::apps/tuya.ai/your_chat_bot/config/TaishanPi_3.config
-          - your_chat_bot::apps/tuya.ai/your_chat_bot/config/TUYA_L511G_Y7PM_BOARD.config
-          - your_chat_bot::apps/tuya.ai/your_chat_bot/config/TUYA_T5AI_BOARD_LCD_3.5_CAM_PRINTER.config
-          - your_chat_bot::apps/tuya.ai/your_chat_bot/config/TUYA_T5AI_BOARD_LCD_3.5_CAMERA.config
-          - your_chat_bot::apps/tuya.ai/your_chat_bot/config/TUYA_T5AI_BOARD_LCD_3.5_v101.config
-          - your_chat_bot::apps/tuya.ai/your_chat_bot/config/TUYA_T5AI_BOARD_LCD_3.5_WITH_L511.config
-          - your_chat_bot::apps/tuya.ai/your_chat_bot/config/TUYA_T5AI_BOARD_LCD_3.5.config
-          - your_chat_bot::apps/tuya.ai/your_chat_bot/config/TUYA_T5AI_CORE.config
-          - your_chat_bot::apps/tuya.ai/your_chat_bot/config/TUYA_T5AI_EVB.config
-          - your_chat_bot::apps/tuya.ai/your_chat_bot/config/TUYA_T9_EVB.config
-          - your_chat_bot::apps/tuya.ai/your_chat_bot/config/WAVESHARE_ESP32S3_TOUCH_AMOLED_1_8.config
-          - your_chat_bot::apps/tuya.ai/your_chat_bot/config/WAVESHARE_T5AI_TOUCH_AMOLED_1_75.config
-          - your_chat_bot::apps/tuya.ai/your_chat_bot/config/XINGZHI_ESP32S3_Cube_0_96OLED_WIFI.config
-          - your_chat_bot::apps/tuya.ai/your_chat_bot/config/ZECTRIX_T5AI_NOTE_4.config
+        type: boolean
+        default: false
+      app_your_chat_bot:
+        description: Build your_chat_bot with its T5AI default
+        required: false
+        type: boolean
+        default: false
   issues:
     types: [opened, edited, reopened]
   issue_comment:
