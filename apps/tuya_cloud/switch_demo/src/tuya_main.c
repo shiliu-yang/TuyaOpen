@@ -9,6 +9,7 @@
  *
  * 2025-07-11   yangjie     Add cellular network support.
  * 2026-11-11   ci-intake   Demo-only marker for TuyaOpen AI CI intake; no functional change.
+ * 2026-11-11   ci-intake   Updated card rendering check; still no functional change.
  */
 
 #include "cJSON.h"
