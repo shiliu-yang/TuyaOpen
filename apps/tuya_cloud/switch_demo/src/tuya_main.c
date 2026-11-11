@@ -269,7 +269,7 @@ void user_main(void)
     tal_time_service_init();
     tal_log_init(TAL_LOG_LEVEL_DEBUG, 1024, (TAL_LOG_OUTPUT_CB)tkl_log_output);
 
-    PR_NOTICE("Application information:");
+    PR_NOTICE("Application information: TuyaOpen CI Phase 1 source acceptance");
     PR_NOTICE("Project name:        %s", PROJECT_NAME);
     PR_NOTICE("App version:         %s", PROJECT_VERSION);
     PR_NOTICE("Compile time:        %s", __DATE__);
