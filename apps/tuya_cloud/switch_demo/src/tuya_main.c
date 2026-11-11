@@ -9,6 +9,7 @@
  *
  * 2025-07-11   yangjie     Add cellular network support.
  * 2026-11-11   ci-demo     Demo-only marker for TuyaOpen AI CI; no functional change.
+ * 2026-11-11   ci-demo     Second demo marker; still no functional change.
  */
 
 #include "cJSON.h"
