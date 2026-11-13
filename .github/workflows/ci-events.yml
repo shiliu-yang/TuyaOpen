@@ -1,9 +1,9 @@
-name: TuyaOpen CI Build
+name: TuyaOpen CI · PR Build
 run-name: "${{ inputs.pr_number && format('PR #{0}', inputs.pr_number) || github.event.workflow_run.display_title }} · TuyaOpen build"
 
 on:
   workflow_run:
-    workflows: [TuyaOpen CI Review]
+    workflows: ['TuyaOpen CI Review', 'TuyaOpen CI · PR Review']
     types: [completed]
     branches: [master]
   workflow_dispatch:

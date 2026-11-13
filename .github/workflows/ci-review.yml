@@ -1,4 +1,4 @@
-name: TuyaOpen CI Review
+name: TuyaOpen CI · PR Review
 run-name: "${{ github.event_name == 'issue_comment' && contains(github.event.comment.body, '/build ') && 'Build request · PR' || github.event_name }} #${{ github.event.number || github.event.issue.number || github.run_id }}"
 
 on:

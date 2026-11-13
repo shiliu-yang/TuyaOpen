@@ -1,4 +1,4 @@
-name: TuyaOpen CI Nightly
+name: TuyaOpen CI · Nightly
 run-name: "${{ inputs.report_run_id && format('Nightly evidence #{0}', inputs.report_run_id) || 'Nightly submission' }}"
 
 on:
