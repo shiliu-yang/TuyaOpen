@@ -8,13 +8,13 @@ on:
         description: Pull request number
         required: true
         type: string
-      app_switch_demo:
-        description: Build switch_demo with its T5AI default
+      switch_demo_all:
+        description: switch_demo · all configurations
         required: false
         type: boolean
         default: false
-      app_your_chat_bot:
-        description: Build your_chat_bot with its T5AI default
+      your_chat_bot_all:
+        description: your_chat_bot · all configurations
         required: false
         type: boolean
         default: false
@@ -31,7 +31,7 @@ jobs:
   build:
     if: github.repository == 'shiliu-yang/TuyaOpen' && github.ref == 'refs/heads/master'
     runs-on: [tuyaopen-ci-build, linux, x64]
-    timeout-minutes: 75
+    timeout-minutes: 1440
     steps:
       - name: Build milestones
         id: build
