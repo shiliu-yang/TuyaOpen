@@ -1,4 +1,4 @@
-name: TuyaOpen CI · Release
+name: TuyaOpen CI - Release
 
 on:
   push:

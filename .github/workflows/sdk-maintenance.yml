@@ -1,4 +1,4 @@
-name: TuyaOpen CI · SDK Maintenance
+name: TuyaOpen CI - SDK Maintenance
 run-name: SDK ${{ inputs.mode || 'update' }}
 on:
   schedule:

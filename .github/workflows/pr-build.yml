@@ -1,9 +1,9 @@
-name: TuyaOpen CI · PR Build
-run-name: "${{ inputs.pr_number && format('PR #{0}', inputs.pr_number) || github.event.workflow_run.display_title }} · TuyaOpen build"
+name: TuyaOpen CI - PR Build
+run-name: "${{ inputs.pr_number && format('PR #{0}', inputs.pr_number) || github.event.workflow_run.display_title }} - TuyaOpen build"
 
 on:
   workflow_run:
-    workflows: ['TuyaOpen CI Review', 'TuyaOpen CI · PR Review']
+    workflows: ['TuyaOpen CI - PR Review']
     types: [completed]
     branches: [master]
   workflow_dispatch:
@@ -13,12 +13,12 @@ on:
         required: true
         type: string
       switch_demo_all:
-        description: switch_demo · all configurations
+        description: switch_demo - all configurations
         required: false
         type: boolean
         default: false
       your_chat_bot_all:
-        description: your_chat_bot · all configurations
+        description: your_chat_bot - all configurations
         required: false
         type: boolean
         default: false
@@ -38,7 +38,7 @@ jobs:
       (github.event_name == 'workflow_dispatch' ||
        (github.event.workflow_run.conclusion == 'success' &&
         github.event.workflow_run.event == 'issue_comment' &&
-        startsWith(github.event.workflow_run.display_title, 'Build request · PR #')))
+        startsWith(github.event.workflow_run.display_title, 'Build request - PR #')))
     runs-on: [tuyaopen-ci-build, linux, x64]
     timeout-minutes: 1440
     steps:

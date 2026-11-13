@@ -1,4 +1,4 @@
-name: TuyaOpen CI · Gitee Sync
+name: TuyaOpen CI - Gitee Sync
 on: 
   - push
   - delete
