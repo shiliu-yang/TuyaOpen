@@ -1,5 +1,5 @@
 name: TuyaOpen CI Review
-run-name: "${{ github.event_name }} #${{ github.event.number || github.event.issue.number || github.run_id }} · TuyaOpen review"
+run-name: "${{ github.event_name == 'issue_comment' && contains(github.event.comment.body, '/build ') && 'Build request · PR' || github.event_name }} #${{ github.event.number || github.event.issue.number || github.run_id }}"
 
 on:
   pull_request_target:
@@ -20,36 +20,10 @@ jobs:
   review:
     if: github.repository == 'shiliu-yang/TuyaOpen' && (github.event_name != 'issue_comment' || github.event.comment.user.type != 'Bot')
     runs-on: [tuyaopen-ci-events, linux, x64]
-    timeout-minutes: 1440
+    timeout-minutes: 30
     steps:
-      - name: Review or requested build milestones
+      - name: Review, validate commands and hand over
         id: build
         shell: bash
         run: python /app/infra/build/actions_event.py
 
-      - name: Upload build logs
-        id: logs
-        if: always() && steps.build.outputs.logs_path != ''
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: build-logs-${{ steps.build.outputs.scope }}
-          path: ${{ steps.build.outputs.logs_path }}
-          if-no-files-found: error
-          compression-level: 3
-      - name: Upload firmware
-        id: firmware
-        if: always() && steps.build.outputs.firmware_path != ''
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: firmware-${{ steps.build.outputs.scope }}
-          path: ${{ steps.build.outputs.firmware_path }}
-          if-no-files-found: error
-          compression-level: 0
-      - name: Results and cleanup
-        if: always()
-        shell: bash
-        env:
-          BUILD_OUTPUT_DIR: ${{ steps.build.outputs.root }}
-          LOG_ARTIFACT_URL: ${{ steps.logs.outputs.artifact-url }}
-          FIRMWARE_ARTIFACT_URL: ${{ steps.firmware.outputs.artifact-url }}
-        run: python /app/infra/build/actions_job.py --summary
