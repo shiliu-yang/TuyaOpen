@@ -30,7 +30,7 @@ concurrency:
 jobs:
   build:
     if: github.repository == 'shiliu-yang/TuyaOpen' && github.ref == 'refs/heads/master'
-    runs-on: [tuyaopen-ci, linux, x64]
+    runs-on: [tuyaopen-ci-build, linux, x64]
     timeout-minutes: 75
     steps:
       - name: Build milestones
@@ -65,4 +65,3 @@ jobs:
           LOG_ARTIFACT_URL: ${{ steps.logs.outputs.artifact-url }}
           FIRMWARE_ARTIFACT_URL: ${{ steps.firmware.outputs.artifact-url }}
         run: python /app/infra/build/actions_job.py --summary
-
